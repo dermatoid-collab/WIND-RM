@@ -49,7 +49,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.windrm.app.R
 import com.windrm.app.model.Route
-import com.windrm.app.remote.strava.StravaActivitySummary
+import com.windrm.app.remote.strava.StravaRouteSummary
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -190,11 +190,11 @@ private fun StravaTab(
         }
 
         LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(viewModel.stravaActivities, key = { it.id }) { activity ->
-                StravaActivityCard(
-                    activity = activity,
-                    importing = viewModel.importingActivityId == activity.id,
-                    onImport = { viewModel.importStravaActivity(activity, onImported) },
+            items(viewModel.stravaRoutes, key = { it.id }) { route ->
+                StravaRouteCard(
+                    route = route,
+                    importing = viewModel.importingRouteId == route.id,
+                    onImport = { viewModel.importStravaRoute(route, onImported) },
                 )
             }
         }
@@ -202,16 +202,16 @@ private fun StravaTab(
 }
 
 @Composable
-private fun StravaActivityCard(activity: StravaActivitySummary, importing: Boolean, onImport: () -> Unit) {
+private fun StravaRouteCard(route: StravaRouteSummary, importing: Boolean, onImport: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text(activity.name, style = MaterialTheme.typography.titleMedium)
+            Text(route.name, style = MaterialTheme.typography.titleMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("%.1f km".format(activity.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
-                Text("${activity.total_elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                Text("%.1f km".format(route.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                Text("${route.elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
             }
             TextButton(onClick = onImport, enabled = !importing) {
-                if (importing) CircularProgressIndicator(modifier = Modifier.size(16.dp)) else Text(stringResource(R.string.strava_import_activity))
+                if (importing) CircularProgressIndicator(modifier = Modifier.size(16.dp)) else Text(stringResource(R.string.strava_import_route))
             }
         }
     }

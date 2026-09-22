@@ -15,8 +15,8 @@ interface RouteDao {
     @Query("SELECT * FROM routes WHERE id = :id")
     suspend fun getById(id: Long): RouteEntity?
 
-    @Query("SELECT * FROM routes WHERE stravaActivityId = :stravaActivityId LIMIT 1")
-    suspend fun getByStravaActivityId(stravaActivityId: Long): RouteEntity?
+    @Query("SELECT * FROM routes WHERE stravaRouteId = :stravaRouteId LIMIT 1")
+    suspend fun getByStravaRouteId(stravaRouteId: Long): RouteEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(route: RouteEntity): Long

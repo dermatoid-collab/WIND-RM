@@ -23,6 +23,18 @@ class StravaAuthManager(
     private val redirectUri: String
         get() = "${BuildConfig.STRAVA_REDIRECT_SCHEME}://${BuildConfig.STRAVA_REDIRECT_HOST}"
 
+    @Volatile
+    private var cachedAthleteId: Long? = null
+
+    /** The authenticated athlete's numeric id, needed to list their routes. Cached after the first call. */
+    suspend fun athleteId(): Long? {
+        cachedAthleteId?.let { return it }
+        val token = bearerToken() ?: return null
+        val id = api.getAuthenticatedAthlete(token).id
+        cachedAthleteId = id
+        return id
+    }
+
     fun launchAuthorization() {
         val uri = Uri.parse(StravaApi.AUTHORIZE_URL).buildUpon()
             .appendQueryParameter("client_id", BuildConfig.STRAVA_CLIENT_ID)
@@ -49,7 +61,10 @@ class StravaAuthManager(
 
     suspend fun isAuthorized(): Boolean = tokenStore.load() != null
 
-    suspend fun signOut() = tokenStore.clear()
+    suspend fun signOut() {
+        cachedAthleteId = null
+        tokenStore.clear()
+    }
 
     /** Returns a currently-valid `Bearer ...` header value, refreshing the token first if it's expiring. */
     suspend fun bearerToken(): String? {

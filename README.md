@@ -9,7 +9,9 @@ dell'aria e luce diurna previsti punto per punto lungo tutto il tragitto.
 
 - **Importazione percorsi**
   - da file **GPX** locale (`Storage Access Framework`, nessun permesso richiesto)
-  - da **Strava** (OAuth2, richiede le tue credenziali API — vedi sotto)
+  - da **Strava** — le **routes** disegnate col Route Builder di Strava (`GET
+    /athletes/{id}/routes` + `export_gpx`), non le attività registrate: OAuth2 con scope
+    `read_all`, richiede le tue credenziali API — vedi sotto
 - **Dettaglio percorso**: mappa OpenStreetMap con il tracciato, scelta di orario di partenza
   (ora / pianificato) e velocità media (precompilata dal passo reale se il GPX/Strava contiene
   i timestamp)

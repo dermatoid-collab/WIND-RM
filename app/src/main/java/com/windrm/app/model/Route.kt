@@ -28,8 +28,8 @@ data class Route(
     val elevationGainM: Double,
     /** True when [RoutePoint.timeOffsetS] reflects a real recorded pace rather than a constant speed. */
     val hasTimestamps: Boolean = false,
-    /** Strava activity id this route was imported from, if any. */
-    val stravaActivityId: Long? = null,
+    /** Strava route id (from the Route Builder) this was imported from, if any. */
+    val stravaRouteId: Long? = null,
 ) {
     val startPoint: RoutePoint? get() = points.firstOrNull()
 

@@ -7,7 +7,7 @@
     <string name="tab_strava">Strava</string>
     <string name="import_gpx">Importa GPX</string>
     <string name="connect_strava">Connetti Strava</string>
-    <string name="strava_connect_prompt">Collega il tuo account Strava per importare le attività recenti come percorsi.</string>
+    <string name="strava_connect_prompt">Collega il tuo account Strava per importare le routes create con il Route Builder.</string>
     <string name="strava_not_configured_title">Strava non configurato</string>
     <string name="strava_not_configured_message">Per collegare Strava, imposta STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET in local.properties. Vedi il README del progetto.</string>
     <string name="no_routes_yet">Nessun percorso ancora. Importa un file GPX o collega Strava per iniziare.</string>
@@ -42,5 +42,5 @@
     <string name="share">Condividi</string>
 
     <!-- Strava -->
-    <string name="strava_import_activity">Importa come percorso</string>
+    <string name="strava_import_route">Importa route</string>
 </resources>

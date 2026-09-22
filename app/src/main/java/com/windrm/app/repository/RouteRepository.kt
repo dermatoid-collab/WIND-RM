@@ -15,9 +15,9 @@ class RouteRepository(private val dao: RouteDao) {
 
     suspend fun saveRoute(route: Route): Long = dao.insert(RouteEntity.fromRoute(route))
 
-    /** Avoids duplicate imports when the same Strava activity is imported twice. */
-    suspend fun findByStravaActivityId(activityId: Long): Route? =
-        dao.getByStravaActivityId(activityId)?.toRoute()
+    /** Avoids duplicate imports when the same Strava route is imported twice. */
+    suspend fun findByStravaRouteId(stravaRouteId: Long): Route? =
+        dao.getByStravaRouteId(stravaRouteId)?.toRoute()
 
     suspend fun deleteRoute(route: Route) {
         dao.deleteById(route.id)

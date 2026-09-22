@@ -10,8 +10,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.gpx.GpxParser
 import com.windrm.app.model.Route
-import com.windrm.app.remote.strava.StravaActivitySummary
 import com.windrm.app.remote.strava.StravaAuthManager
+import com.windrm.app.remote.strava.StravaRouteSummary
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.StravaRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,7 +28,8 @@ class RoutesListViewModel(
     val routes: StateFlow<List<Route>> = routeRepository.observeRoutes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    var stravaActivities by mutableStateOf<List<StravaActivitySummary>>(emptyList())
+    /** Routes drawn with Strava's Route Builder (not recorded activities). */
+    var stravaRoutes by mutableStateOf<List<StravaRouteSummary>>(emptyList())
         private set
     var stravaLoading by mutableStateOf(false)
         private set
@@ -36,7 +37,7 @@ class RoutesListViewModel(
         private set
     var stravaError by mutableStateOf<String?>(null)
         private set
-    var importingActivityId by mutableStateOf<Long?>(null)
+    var importingRouteId by mutableStateOf<Long?>(null)
         private set
     var gpxError by mutableStateOf<String?>(null)
         private set
@@ -46,7 +47,7 @@ class RoutesListViewModel(
     init {
         viewModelScope.launch {
             stravaAuthorized = stravaAuthManager.isAuthorized()
-            if (stravaAuthorized) refreshStravaActivities()
+            if (stravaAuthorized) refreshStravaRoutes()
         }
     }
 
@@ -56,35 +57,35 @@ class RoutesListViewModel(
     fun onStravaAuthorized() {
         viewModelScope.launch {
             stravaAuthorized = stravaAuthManager.isAuthorized()
-            if (stravaAuthorized) refreshStravaActivities()
+            if (stravaAuthorized) refreshStravaRoutes()
         }
     }
 
-    fun refreshStravaActivities() {
+    fun refreshStravaRoutes() {
         viewModelScope.launch {
             stravaLoading = true
             stravaError = null
-            runCatching { stravaRepository.listRecentActivities() }
-                .onSuccess { stravaActivities = it }
-                .onFailure { stravaError = it.message ?: "Errore nel caricamento delle attività Strava" }
+            runCatching { stravaRepository.listRoutes() }
+                .onSuccess { stravaRoutes = it }
+                .onFailure { stravaError = it.message ?: "Errore nel caricamento delle routes Strava" }
             stravaLoading = false
         }
     }
 
-    fun importStravaActivity(activity: StravaActivitySummary, onImported: (Route) -> Unit) {
+    fun importStravaRoute(route: StravaRouteSummary, onImported: (Route) -> Unit) {
         viewModelScope.launch {
-            importingActivityId = activity.id
+            importingRouteId = route.id
             stravaError = null
             runCatching {
-                routeRepository.findByStravaActivityId(activity.id) ?: run {
-                    val route = stravaRepository.importActivityAsRoute(activity)
-                    val id = routeRepository.saveRoute(route)
-                    route.copy(id = id)
+                routeRepository.findByStravaRouteId(route.id) ?: run {
+                    val imported = stravaRepository.importRouteAsRoute(route)
+                    val id = routeRepository.saveRoute(imported)
+                    imported.copy(id = id)
                 }
             }
                 .onSuccess { onImported(it) }
-                .onFailure { stravaError = it.message ?: "Errore nell'importazione dell'attività" }
-            importingActivityId = null
+                .onFailure { stravaError = it.message ?: "Errore nell'importazione della route" }
+            importingRouteId = null
         }
     }
 

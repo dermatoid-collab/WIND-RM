@@ -12,24 +12,17 @@ data class StravaTokenResponse(
 )
 
 @Serializable
-data class StravaActivitySummary(
+data class StravaAthlete(
+    val id: Long,
+)
+
+/** A route created with Strava's Route Builder (not a recorded activity). */
+@Serializable
+data class StravaRouteSummary(
     val id: Long,
     val name: String,
     val distance: Double = 0.0,
-    val total_elevation_gain: Double = 0.0,
-    val type: String? = null,
-    val sport_type: String? = null,
-    val start_date: String? = null,
-)
-
-@Serializable
-data class StravaStreamSet(
-    val latlng: StravaStream<List<List<Double>>>? = null,
-    val altitude: StravaStream<List<Double>>? = null,
-    val time: StravaStream<List<Int>>? = null,
-)
-
-@Serializable
-data class StravaStream<T>(
-    val data: T,
+    val elevation_gain: Double = 0.0,
+    val private: Boolean = false,
+    val starred: Boolean = false,
 )

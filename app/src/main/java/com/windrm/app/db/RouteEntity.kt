@@ -23,7 +23,7 @@ data class RouteEntity(
     val distanceKm: Double,
     val elevationGainM: Double,
     val hasTimestamps: Boolean,
-    val stravaActivityId: Long?,
+    val stravaRouteId: Long?,
 ) {
     fun toRoute(): Route = Route(
         id = id,
@@ -34,7 +34,7 @@ data class RouteEntity(
         distanceKm = distanceKm,
         elevationGainM = elevationGainM,
         hasTimestamps = hasTimestamps,
-        stravaActivityId = stravaActivityId,
+        stravaRouteId = stravaRouteId,
     )
 
     companion object {
@@ -47,7 +47,7 @@ data class RouteEntity(
             distanceKm = route.distanceKm,
             elevationGainM = route.elevationGainM,
             hasTimestamps = route.hasTimestamps,
-            stravaActivityId = route.stravaActivityId,
+            stravaRouteId = route.stravaRouteId,
         )
     }
 }
