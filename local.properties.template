@@ -1,0 +1,10 @@
+# Copy this file to local.properties (gitignored) and fill in your values.
+
+# Path to the Android SDK on your machine (Android Studio fills this in automatically).
+sdk.dir=/path/to/Android/sdk
+
+# Optional: Strava API credentials for the "Connect Strava" feature.
+# Create an app at https://www.strava.com/settings/api to obtain these.
+# Authorization Callback Domain must be set to: windrm://strava-callback
+STRAVA_CLIENT_ID=
+STRAVA_CLIENT_SECRET=

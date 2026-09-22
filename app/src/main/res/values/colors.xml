@@ -1,0 +1,10 @@
+<resources>
+    <color name="wind_orange">#F4511E</color>
+    <color name="wind_orange_dark">#D84315</color>
+    <color name="wind_orange_light">#FF8A65</color>
+    <color name="wind_blue">#4285F4</color>
+    <color name="background_light">#FAFAFA</color>
+    <color name="background_dark">#121212</color>
+    <color name="surface_light">#FFFFFF</color>
+    <color name="surface_dark">#1E1E1E</color>
+</resources>

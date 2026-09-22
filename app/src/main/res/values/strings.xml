@@ -1,0 +1,46 @@
+<resources>
+    <string name="app_name">WIND-RM</string>
+
+    <!-- Routes list -->
+    <string name="routes_title">WIND-RM</string>
+    <string name="tab_recent">Recenti</string>
+    <string name="tab_strava">Strava</string>
+    <string name="import_gpx">Importa GPX</string>
+    <string name="connect_strava">Connetti Strava</string>
+    <string name="strava_connect_prompt">Collega il tuo account Strava per importare le attività recenti come percorsi.</string>
+    <string name="strava_not_configured_title">Strava non configurato</string>
+    <string name="strava_not_configured_message">Per collegare Strava, imposta STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET in local.properties. Vedi il README del progetto.</string>
+    <string name="no_routes_yet">Nessun percorso ancora. Importa un file GPX o collega Strava per iniziare.</string>
+    <string name="delete_route">Elimina percorso</string>
+
+    <!-- Route detail -->
+    <string name="starting">Partenza</string>
+    <string name="starting_now">Ora</string>
+    <string name="average_speed">Velocità media</string>
+    <string name="forecast_route">PREVISIONE PERCORSO</string>
+    <string name="km_h">km/h</string>
+
+    <!-- Forecast -->
+    <string name="temperature">Temperatura</string>
+    <string name="precipitation">Precipitazioni</string>
+    <string name="wind">Vento</string>
+    <string name="precipitation_and_cloud_cover">Precipitazioni e Copertura Nuvolosa</string>
+    <string name="wind_direction">Direzione del Vento</string>
+    <string name="elevation">Altimetria</string>
+    <string name="daylight_and_uv">Luce Diurna e Indice UV</string>
+    <string name="air_quality">Qualità dell\'Aria</string>
+    <string name="humidity_and_dew_point">Umidità e Punto di Rugiada</string>
+    <string name="sunrise">Alba</string>
+    <string name="sunset">Tramonto</string>
+    <string name="civil_sunrise">Alba civile</string>
+    <string name="civil_sunset">Tramonto civile</string>
+    <string name="peak_aqi">AQI di picco</string>
+    <string name="main_pollutant">Inquinante principale</string>
+    <string name="loading_forecast">Calcolo previsioni lungo il percorso…</string>
+    <string name="forecast_error">Impossibile scaricare le previsioni. Controlla la connessione e riprova.</string>
+    <string name="retry">Riprova</string>
+    <string name="share">Condividi</string>
+
+    <!-- Strava -->
+    <string name="strava_import_activity">Importa come percorso</string>
+</resources>
