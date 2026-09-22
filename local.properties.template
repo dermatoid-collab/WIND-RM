@@ -5,6 +5,8 @@ sdk.dir=/path/to/Android/sdk
 
 # Optional: Strava API credentials for the "Connect Strava" feature.
 # Create an app at https://www.strava.com/settings/api to obtain these.
-# Authorization Callback Domain must be set to: windrm://strava-callback
+# Authorization Callback Domain must be set to just: strava-callback
+# (no scheme/no "://" — Strava validates only the host part of the redirect_uri,
+# which is windrm://strava-callback in full)
 STRAVA_CLIENT_ID=
 STRAVA_CLIENT_SECRET=
