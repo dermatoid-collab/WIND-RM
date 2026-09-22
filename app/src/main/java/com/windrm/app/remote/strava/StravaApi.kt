@@ -1,28 +1,34 @@
 package com.windrm.app.remote.strava
 
 import okhttp3.ResponseBody
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.Streaming
 
 interface StravaApi {
 
-    @GET("oauth/token")
+    // Strava's OAuth token endpoint only accepts POST (a GET here returns HTTP 404).
+    @FormUrlEncoded
+    @POST("oauth/token")
     suspend fun exchangeCodeForToken(
-        @Query("client_id") clientId: String,
-        @Query("client_secret") clientSecret: String,
-        @Query("code") code: String,
-        @Query("grant_type") grantType: String = "authorization_code",
+        @Field("client_id") clientId: String,
+        @Field("client_secret") clientSecret: String,
+        @Field("code") code: String,
+        @Field("grant_type") grantType: String = "authorization_code",
     ): StravaTokenResponse
 
-    @GET("oauth/token")
+    @FormUrlEncoded
+    @POST("oauth/token")
     suspend fun refreshToken(
-        @Query("client_id") clientId: String,
-        @Query("client_secret") clientSecret: String,
-        @Query("refresh_token") refreshToken: String,
-        @Query("grant_type") grantType: String = "refresh_token",
+        @Field("client_id") clientId: String,
+        @Field("client_secret") clientSecret: String,
+        @Field("refresh_token") refreshToken: String,
+        @Field("grant_type") grantType: String = "refresh_token",
     ): StravaTokenResponse
 
     @GET("api/v3/athlete")
