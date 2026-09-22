@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.gpx.GpxParser
 import com.windrm.app.model.Route
+import com.windrm.app.remote.strava.StravaAuthEvent
 import com.windrm.app.remote.strava.StravaAuthManager
 import com.windrm.app.remote.strava.StravaRouteSummary
 import com.windrm.app.repository.RouteRepository
@@ -49,15 +50,37 @@ class RoutesListViewModel(
             stravaAuthorized = stravaAuthManager.isAuthorized()
             if (stravaAuthorized) refreshStravaRoutes()
         }
+        // Authoritative signal for the OAuth round-trip: MainActivity hands the redirect to
+        // StravaAuthManager, which exchanges the code for a token asynchronously and publishes
+        // the outcome here. This must not depend on Activity resume timing (see onStravaAuthorized
+        // below) — that check races the token exchange's network call and would often lose.
+        viewModelScope.launch {
+            stravaAuthManager.authEvents.collect { event ->
+                when (event) {
+                    is StravaAuthEvent.Authorized -> {
+                        stravaError = null
+                        stravaAuthorized = true
+                        refreshStravaRoutes()
+                    }
+                    is StravaAuthEvent.Failed -> stravaError = event.message
+                }
+            }
+        }
     }
 
     fun connectStrava() = stravaAuthManager.launchAuthorization()
 
-    /** Call after MainActivity handles a `windrm://strava-callback` redirect intent. */
+    /**
+     * Best-effort re-check on resume (e.g. access revoked from strava.com in a browser tab).
+     * The actual "just authorized" transition is driven by [StravaAuthManager.authEvents] above.
+     */
     fun onStravaAuthorized() {
         viewModelScope.launch {
-            stravaAuthorized = stravaAuthManager.isAuthorized()
-            if (stravaAuthorized) refreshStravaRoutes()
+            val nowAuthorized = stravaAuthManager.isAuthorized()
+            if (nowAuthorized && !stravaAuthorized) {
+                stravaAuthorized = true
+                refreshStravaRoutes()
+            }
         }
     }
 

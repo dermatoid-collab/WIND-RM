@@ -175,6 +175,13 @@ private fun StravaTab(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(stringResource(R.string.strava_connect_prompt), modifier = Modifier.padding(24.dp))
                     Button(onClick = onConnect) { Text(stringResource(R.string.connect_strava)) }
+                    viewModel.stravaError?.let { error ->
+                        Text(
+                            error,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 16.dp, start = 24.dp, end = 24.dp),
+                        )
+                    }
                 }
             }
             return

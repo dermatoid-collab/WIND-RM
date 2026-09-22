@@ -5,7 +5,17 @@ import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import com.windrm.app.BuildConfig
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.time.Instant
+
+/** Result of processing a `windrm://strava-callback` redirect, published on [StravaAuthManager.authEvents]. */
+sealed interface StravaAuthEvent {
+    data object Authorized : StravaAuthEvent
+    data class Failed(val message: String) : StravaAuthEvent
+}
 
 /**
  * Drives the Strava OAuth2 "Authorization Code" flow: opens Strava's mobile authorize page in a
@@ -19,6 +29,12 @@ class StravaAuthManager(
     private val tokenStore: StravaTokenStore,
 ) {
     val isConfigured: Boolean get() = BuildConfig.STRAVA_CLIENT_ID.isNotBlank() && BuildConfig.STRAVA_CLIENT_SECRET.isNotBlank()
+
+    // replay = 1 so a collector that starts a moment after handleRedirect() finishes (e.g. the
+    // Activity's onResume/Compose recomposition racing the async token exchange, or the process
+    // being recreated while the Custom Tab was open) still observes the outcome.
+    private val _authEvents = MutableSharedFlow<StravaAuthEvent>(replay = 1, extraBufferCapacity = 1)
+    val authEvents: SharedFlow<StravaAuthEvent> = _authEvents.asSharedFlow()
 
     private val redirectUri: String
         get() = "${BuildConfig.STRAVA_REDIRECT_SCHEME}://${BuildConfig.STRAVA_REDIRECT_HOST}"
@@ -50,12 +66,27 @@ class StravaAuthManager(
         }
     }
 
-    /** Call from MainActivity when a `windrm://strava-callback` intent is received. Returns true if it was handled. */
+    /**
+     * Call from MainActivity when a `windrm://strava-callback` intent is received. Returns true
+     * if the uri was ours to handle (regardless of whether the token exchange then succeeded);
+     * the actual outcome is published on [authEvents] once the (asynchronous) exchange completes.
+     */
     suspend fun handleRedirect(uri: Uri): Boolean {
         if (uri.scheme != BuildConfig.STRAVA_REDIRECT_SCHEME || uri.host != BuildConfig.STRAVA_REDIRECT_HOST) return false
-        val code = uri.getQueryParameter("code") ?: return false
-        val response = api.exchangeCodeForToken(BuildConfig.STRAVA_CLIENT_ID, BuildConfig.STRAVA_CLIENT_SECRET, code)
-        tokenStore.save(StravaTokens(response.access_token, response.refresh_token, response.expires_at))
+        val code = uri.getQueryParameter("code")
+        if (code == null) {
+            _authEvents.emit(StravaAuthEvent.Failed(uri.getQueryParameter("error") ?: "Autorizzazione Strava annullata."))
+            return true
+        }
+        try {
+            val response = api.exchangeCodeForToken(BuildConfig.STRAVA_CLIENT_ID, BuildConfig.STRAVA_CLIENT_SECRET, code)
+            tokenStore.save(StravaTokens(response.access_token, response.refresh_token, response.expires_at))
+            _authEvents.emit(StravaAuthEvent.Authorized)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _authEvents.emit(StravaAuthEvent.Failed(e.message ?: "Scambio del token Strava non riuscito."))
+        }
         return true
     }
 
