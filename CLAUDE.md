@@ -25,3 +25,19 @@ Regole operative:
    questo progetto o questa conversazione.
 
 Impostata su richiesta esplicita dell'utente il 2026-09-22.
+
+## Workflow di build: l'utente NON usa Android Studio
+
+L'unico modo in cui l'utente ottiene un APK è la build su **GitHub Actions**
+(`.github/workflows/build-apk.yml`), scaricando l'artifact `windrm-debug-apk`.
+Non ha Android Studio installato/configurato.
+
+- Non proporre mai "apri Android Studio", "esegui su un emulatore", ecc. come
+  passaggio da seguire.
+- Per far compilare o ricompilare l'app: push su un branch osservato dal
+  workflow, oppure `mcp__github__actions_run_trigger` (`run_workflow`) per
+  lanciarla senza bisogno di un nuovo push (utile per far ripartire la build
+  dopo aver aggiunto/cambiato dei secret, che da soli non triggerano un run).
+- Le istruzioni "Opzione B — Android Studio" nel README restano per chi altro
+  dovesse clonare il repo, ma non sono il percorso di riferimento per questo
+  utente.
