@@ -15,6 +15,13 @@ interface OpenMeteoApi {
         @Query("daily") daily: String = "sunrise,sunset",
         @Query("timezone") timezone: String = "UTC",
         @Query("wind_speed_unit") windSpeedUnit: String = "kmh",
+        // Explicit (matches the default, but self-documenting): auto-picks the best available
+        // high-resolution regional model per point -- e.g. DWD ICON-D2 (2km) / ICON-EU (7km) over
+        // most of Italy -- falling back to a global model outside that model's domain or forecast range.
+        @Query("models") models: String = "best_match",
+        // Avoids the API snapping a route point near a river/lake/coast to a water grid cell,
+        // which can carry noticeably different temperature/wind than the actual road surface.
+        @Query("cell_selection") cellSelection: String = "land",
     ): List<OpenMeteoResponse>
 
     @GET("v1/air-quality")
@@ -25,6 +32,7 @@ interface OpenMeteoApi {
         @Query("end_date") endDate: String,
         @Query("hourly") hourly: String = AIR_QUALITY_HOURLY_PARAMS,
         @Query("timezone") timezone: String = "UTC",
+        @Query("cell_selection") cellSelection: String = "land",
     ): List<OpenMeteoResponse>
 
     companion object {
