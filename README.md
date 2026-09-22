@@ -59,7 +59,27 @@ app/src/main/java/com/windrm/app/
     └── theme/          Tema Material 3
 ```
 
-## Come compilare
+## Come ottenere un APK
+
+### Opzione A — GitHub Actions (nessuna installazione necessaria)
+
+Il workflow [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) compila un
+APK debug ad ogni push (o manualmente da **Actions → Build APK → Run workflow**), usando i
+runner Ubuntu di GitHub che hanno già l'Android SDK preinstallato:
+
+1. Vai sulla tab **Actions** del repository.
+2. Apri l'esecuzione più recente di **Build APK** (o lancene una nuova con "Run workflow").
+3. A build completata, scarica l'artifact **windrm-debug-apk** in fondo alla pagina: contiene
+   `app-debug.apk`, installabile direttamente su un telefono Android (serve abilitare
+   "Origini sconosciute"/"Installa app sconosciute" per l'app che lo apre).
+
+Per far funzionare anche **"Connetti Strava"** nell'APK compilato da GitHub, aggiungi due
+*repository secrets* (Settings → Secrets and variables → Actions) chiamati
+`STRAVA_CLIENT_ID` e `STRAVA_CLIENT_SECRET`: il workflow li scrive da solo in
+`local.properties` prima della build. Senza questi secret l'APK si compila comunque,
+semplicemente la tab Strava resterà "non configurata".
+
+### Opzione B — Android Studio
 
 1. Apri la cartella del progetto con **Android Studio** (Koala o successivo) — JDK 17 e
    Android SDK con `compileSdk 34` vengono gestiti automaticamente da Android Studio.
@@ -78,10 +98,10 @@ app/src/main/java/com/windrm/app/
 > **Nota per chi continua lo sviluppo da questa sessione Claude Code:** l'ambiente
 > containerizzato in cui è stato scritto questo progetto non ha accesso a `dl.google.com`
 > (il repository Maven di Google), quindi non è stato possibile eseguire una build Gradle
-> reale né un `gradle sync` per validare la compilazione: il codice è stato scritto e
-> rivisto manualmente con la massima attenzione, ma vale la pena fare una prima build in
-> Android Studio e sistemare eventuali piccoli errori di compilazione prima di fidarsi
-> ciecamente del codice generato.
+> reale né un `gradle sync` in questa sessione per validare la compilazione: il codice è
+> stato scritto e rivisto manualmente con la massima attenzione, ma la prima esecuzione del
+> workflow GitHub Actions (che gira su runner con accesso pieno a Internet) è il primo test
+> di compilazione reale — controlla il log di quella run se qualcosa non va.
 
 ## Possibili sviluppi futuri
 

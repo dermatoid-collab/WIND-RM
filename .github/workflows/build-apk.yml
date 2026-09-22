@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Optional: makes "Connetti Strava" work in the built APK if you've added
+      # STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET as repository secrets. If they're
+      # not set, this just writes empty values (same as not having a
+      # local.properties at all) and the build proceeds normally without Strava.
+      - name: Configure local.properties
+        run: |
+          echo "STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID }}" >> local.properties
+          echo "STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET }}" >> local.properties
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windrm-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
