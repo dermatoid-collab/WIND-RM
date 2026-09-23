@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.view.MotionEvent
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -81,6 +82,17 @@ private fun createMapView(context: Context): MapView = MapView(context).apply {
     setMultiTouchControls(true)
     minZoomLevel = 4.0
     maxZoomLevel = 17.0 // OpenTopoMap doesn't render tiles past z17
+    // The enclosing screen is a scrollable Compose Column, which otherwise steals a one-finger
+    // drag as a page scroll before osmdroid's own touch handling ever sees it. Telling the
+    // parent not to intercept while a finger is down on the map lets a single-finger drag pan
+    // the map itself, matching what setMultiTouchControls(true) already does for pinch-zoom.
+    setOnTouchListener { view, event ->
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> view.parent?.requestDisallowInterceptTouchEvent(true)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> view.parent?.requestDisallowInterceptTouchEvent(false)
+        }
+        false
+    }
     if (context is androidx.lifecycle.LifecycleOwner) {
         context.lifecycle.addObserver(
             object : androidx.lifecycle.DefaultLifecycleObserver {
