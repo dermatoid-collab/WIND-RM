@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.windrm.app.model.RoutePoint
@@ -35,7 +36,10 @@ fun RouteMapView(
     windArrows: List<WindArrowPoint>? = null,
 ) {
     AndroidView(
-        modifier = modifier.fillMaxWidth().height(280.dp),
+        // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned
+        // bounds while the surrounding Column is scrolling, bleeding over the next section's
+        // title -- clipToBounds() forces the native view's drawing to stay inside this box.
+        modifier = modifier.fillMaxWidth().height(280.dp).clipToBounds(),
         factory = { context ->
             createMapView(context)
         },
