@@ -2,6 +2,7 @@ package com.windrm.app.ui.routes
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,11 +71,13 @@ private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MM
 @Composable
 fun RoutesListScreen(
     viewModel: RoutesListViewModel,
+    initialTab: Int,
+    onBack: () -> Unit,
     onRouteSelected: (Route) -> Unit,
 ) {
     val context = LocalContext.current
     val routes by viewModel.routes.collectAsStateWithLifecycle()
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(initialTab) }
     var showStravaInfo by remember { mutableStateOf(false) }
 
     // Re-checks Strava authorization when returning from the OAuth browser flow (or app switcher).
@@ -93,6 +96,11 @@ fun RoutesListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.routes_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = Color.White,

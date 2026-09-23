@@ -1,6 +1,7 @@
 package com.windrm.app.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -12,6 +13,8 @@ import androidx.navigation.navArgument
 import com.windrm.app.di.AppContainer
 import com.windrm.app.ui.forecast.ForecastScreen
 import com.windrm.app.ui.forecast.ForecastViewModel
+import com.windrm.app.ui.home.HomeScreen
+import com.windrm.app.ui.home.HomeViewModel
 import com.windrm.app.ui.routedetail.RouteDetailScreen
 import com.windrm.app.ui.routedetail.RouteDetailViewModel
 import com.windrm.app.ui.routes.RoutesListScreen
@@ -21,8 +24,26 @@ import com.windrm.app.ui.routes.RoutesListViewModel
 fun WindRmNavHost(container: AppContainer) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = Destination.RoutesList.route) {
-        composable(Destination.RoutesList.route) {
+    NavHost(navController = navController, startDestination = Destination.Home.route) {
+        composable(Destination.Home.route) {
+            val appContext = LocalContext.current.applicationContext
+            val viewModel = viewModel<HomeViewModel>(
+                factory = viewModelFactory {
+                    initializer { HomeViewModel(appContext, container.weatherRepository) }
+                },
+            )
+            HomeScreen(
+                viewModel = viewModel,
+                onOpenRecent = { navController.navigate(Destination.RoutesList.path(0)) },
+                onOpenStrava = { navController.navigate(Destination.RoutesList.path(1)) },
+            )
+        }
+
+        composable(
+            route = Destination.RoutesList.route,
+            arguments = listOf(navArgument(Destination.RoutesList.ARG_INITIAL_TAB) { type = NavType.IntType }),
+        ) { backStackEntry ->
+            val initialTab = backStackEntry.arguments?.getInt(Destination.RoutesList.ARG_INITIAL_TAB) ?: 0
             val viewModel = viewModel<RoutesListViewModel>(
                 factory = viewModelFactory {
                     initializer { RoutesListViewModel(container.routeRepository, container.stravaRepository, container.stravaAuthManager) }
@@ -30,6 +51,8 @@ fun WindRmNavHost(container: AppContainer) {
             )
             RoutesListScreen(
                 viewModel = viewModel,
+                initialTab = initialTab,
+                onBack = { navController.popBackStack() },
                 onRouteSelected = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
             )
         }

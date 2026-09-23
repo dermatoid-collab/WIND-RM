@@ -66,6 +66,15 @@ data class RouteForecastResult(
         }
 }
 
+/** A snapshot for the home screen: current conditions at a location, plus a short hourly glance. */
+data class CurrentWeatherSnapshot(
+    val locationLabel: String,
+    val current: WeatherPoint,
+    val highC: Double,
+    val lowC: Double,
+    val hourly: List<WeatherPoint>,
+)
+
 fun aqiLabel(aqi: Double): String = when {
     aqi <= 20 -> "Good"
     aqi <= 40 -> "Fair"

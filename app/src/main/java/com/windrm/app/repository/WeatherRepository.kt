@@ -5,6 +5,7 @@ import com.windrm.app.domain.HourlySeries
 import com.windrm.app.domain.RouteSampler
 import com.windrm.app.domain.parseOpenMeteoInstant
 import com.windrm.app.model.AirQualityPoint
+import com.windrm.app.model.CurrentWeatherSnapshot
 import com.windrm.app.model.DaylightInfo
 import com.windrm.app.model.Route
 import com.windrm.app.model.RouteForecastPoint
@@ -62,6 +63,36 @@ class WeatherRepository(
             avgSpeedKmh = avgSpeedKmh,
             points = forecastPoints,
             daylight = buildDaylightInfo(weatherResponses.firstOrNull(), startTime),
+        )
+    }
+
+    /** Current conditions + a short hourly glance at [lat]/[lon], for the home screen. */
+    suspend fun currentWeather(lat: Double, lon: Double, locationLabel: String, hoursAhead: Int = 6): CurrentWeatherSnapshot {
+        val now = Instant.now()
+        val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(now)
+        val endDate = dateFormatter.withZone(ZoneOffset.UTC).format(now.plusSeconds(86_400))
+
+        // Open-Meteo returns a single JSON object (not an array) for a single location; sending
+        // the same point twice keeps the response shape consistent with the rest of this class.
+        val latitudeParam = "$lat,$lat"
+        val longitudeParam = "$lon,$lon"
+
+        val response = weatherApi.forecast(
+            latitude = latitudeParam,
+            longitude = longitudeParam,
+            startDate = startDate,
+            endDate = endDate,
+            daily = "sunrise,sunset,temperature_2m_max,temperature_2m_min",
+        ).firstOrNull()
+
+        val daily = response?.daily
+        val current = buildWeatherPoint(now, response)
+        return CurrentWeatherSnapshot(
+            locationLabel = locationLabel,
+            current = current,
+            highC = daily?.temperature_2m_max?.firstOrNull() ?: current.temperatureC,
+            lowC = daily?.temperature_2m_min?.firstOrNull() ?: current.temperatureC,
+            hourly = (0..hoursAhead).map { buildWeatherPoint(now.plusSeconds(it * 3600L), response) },
         )
     }
 

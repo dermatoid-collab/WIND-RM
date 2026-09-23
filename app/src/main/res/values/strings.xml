@@ -56,4 +56,8 @@
     <string name="elevation_gain_label">Elevation Gain</string>
     <string name="distance_label">Distance</string>
     <string name="speed_label">Speed</string>
+
+    <!-- Home -->
+    <string name="location_permission_prompt">Allow location access to see the current weather here.</string>
+    <string name="enable_location">Enable Location</string>
 </resources>

@@ -45,4 +45,6 @@ data class DailyBlock(
     val time: List<String> = emptyList(),
     val sunrise: List<String?>? = null,
     val sunset: List<String?>? = null,
+    val temperature_2m_max: List<Double?>? = null,
+    val temperature_2m_min: List<Double?>? = null,
 )
