@@ -5,6 +5,7 @@
     <string name="routes_title">WIND-RM</string>
     <string name="tab_recent">Recent</string>
     <string name="tab_strava">Strava</string>
+    <string name="menu_files">Files</string>
     <string name="import_gpx">Import GPX</string>
     <string name="connect_strava">Connect Strava</string>
     <string name="strava_connect_prompt">Connect your Strava account to import your activities, routes and segments.</string>

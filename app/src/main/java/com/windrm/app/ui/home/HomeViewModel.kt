@@ -7,13 +7,17 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.gpx.GpxUriImporter
 import com.windrm.app.model.CurrentWeatherSnapshot
+import com.windrm.app.model.Route
+import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.WeatherRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -23,6 +27,7 @@ import java.util.Locale
 class HomeViewModel(
     private val appContext: Context,
     private val weatherRepository: WeatherRepository,
+    private val routeRepository: RouteRepository,
 ) : ViewModel() {
 
     var snapshot by mutableStateOf<CurrentWeatherSnapshot?>(null)
@@ -32,6 +37,8 @@ class HomeViewModel(
     var error by mutableStateOf<String?>(null)
         private set
     var hasLocationPermission by mutableStateOf(hasPermission())
+        private set
+    var gpxError by mutableStateOf<String?>(null)
         private set
 
     init {
@@ -89,4 +96,13 @@ class HomeViewModel(
                 ?.firstOrNull()
                 ?.let { it.locality ?: it.subAdminArea ?: it.adminArea }
         }.getOrNull() ?: "Current location"
+
+    fun importGpx(context: Context, uri: Uri, onImported: (Route) -> Unit) {
+        viewModelScope.launch {
+            gpxError = null
+            runCatching { GpxUriImporter.import(context, uri, routeRepository) }
+                .onSuccess { onImported(it) }
+                .onFailure { gpxError = it.message ?: "Couldn't import the GPX file" }
+        }
+    }
 }

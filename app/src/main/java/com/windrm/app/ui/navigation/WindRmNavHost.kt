@@ -29,13 +29,14 @@ fun WindRmNavHost(container: AppContainer) {
             val appContext = LocalContext.current.applicationContext
             val viewModel = viewModel<HomeViewModel>(
                 factory = viewModelFactory {
-                    initializer { HomeViewModel(appContext, container.weatherRepository) }
+                    initializer { HomeViewModel(appContext, container.weatherRepository, container.routeRepository) }
                 },
             )
             HomeScreen(
                 viewModel = viewModel,
                 onOpenRecent = { navController.navigate(Destination.RoutesList.path(0)) },
                 onOpenStrava = { navController.navigate(Destination.RoutesList.path(1)) },
+                onRouteImported = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
             )
         }
 

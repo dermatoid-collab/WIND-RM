@@ -2,13 +2,12 @@ package com.windrm.app.ui.routes
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.windrm.app.gpx.GpxParser
+import com.windrm.app.gpx.GpxUriImporter
 import com.windrm.app.model.Route
 import com.windrm.app.remote.strava.StravaActivitySummary
 import com.windrm.app.remote.strava.StravaAuthEvent
@@ -159,14 +158,7 @@ class RoutesListViewModel(
     fun importGpx(context: Context, uri: Uri, onImported: (Route) -> Unit) {
         viewModelScope.launch {
             gpxError = null
-            runCatching {
-                val name = queryDisplayName(context, uri) ?: "Imported route"
-                val route = context.contentResolver.openInputStream(uri)?.use { stream ->
-                    GpxParser.parse(stream, name.substringBeforeLast('.'))
-                } ?: error("Couldn't open the selected file")
-                val id = routeRepository.saveRoute(route)
-                route.copy(id = id)
-            }
+            runCatching { GpxUriImporter.import(context, uri, routeRepository) }
                 .onSuccess { onImported(it) }
                 .onFailure { gpxError = it.message ?: "Couldn't import the GPX file" }
         }
@@ -174,15 +166,5 @@ class RoutesListViewModel(
 
     fun deleteRoute(route: Route) {
         viewModelScope.launch { routeRepository.deleteRoute(route) }
-    }
-
-    private fun queryDisplayName(context: Context, uri: Uri): String? {
-        val cursor = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-        return cursor?.use {
-            if (it.moveToFirst()) {
-                val index = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (index >= 0) it.getString(index) else null
-            } else null
-        }
     }
 }

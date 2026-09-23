@@ -15,7 +15,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Umbrella
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
@@ -34,10 +36,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.model.CurrentWeatherSnapshot
+import com.windrm.app.model.Route
 import com.windrm.app.model.WeatherPoint
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -49,9 +53,14 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onOpenRecent: () -> Unit,
     onOpenStrava: () -> Unit,
+    onRouteImported: (Route) -> Unit,
 ) {
+    val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.onPermissionResult(granted)
+    }
+    val gpxLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importGpx(context, uri, onImported = onRouteImported)
     }
 
     Scaffold(
@@ -75,8 +84,12 @@ fun HomeScreen(
             )
 
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MenuRow(stringResource(R.string.tab_recent), onOpenRecent)
-                MenuRow(stringResource(R.string.tab_strava), onOpenStrava)
+                MenuRow(Icons.Filled.History, stringResource(R.string.tab_recent), onOpenRecent)
+                MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
+                MenuRow(Icons.Filled.UploadFile, stringResource(R.string.menu_files)) {
+                    gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*"))
+                }
+                viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
@@ -131,10 +144,10 @@ private fun CurrentWeatherCard(snapshot: CurrentWeatherSnapshot) {
 }
 
 @Composable
-private fun MenuRow(label: String, onClick: () -> Unit) {
+private fun MenuRow(icon: ImageVector, label: String, onClick: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.DirectionsBike, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp))
         }
     }
