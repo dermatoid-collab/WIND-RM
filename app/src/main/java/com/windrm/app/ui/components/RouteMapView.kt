@@ -74,6 +74,10 @@ private fun createMapView(context: Context): MapView = MapView(context).apply {
     // OpenTopoMap: contour-line topographic style, closer to the Garmin-style maps the user
     // is used to from other cycling apps, and free/no API key (unlike Garmin's own tiles).
     setTileSource(TileSourceFactory.OpenTopo)
+    // Without this, osmdroid renders tiles at their raw 256px size regardless of screen density,
+    // so contour lines and labels look small and soft on high-density phones; this scales tiles
+    // up to match the device's actual pixel density, making the map read as noticeably sharper.
+    isTilesScaledToDpi = true
     setMultiTouchControls(true)
     minZoomLevel = 4.0
     maxZoomLevel = 17.0 // OpenTopoMap doesn't render tiles past z17
@@ -103,12 +107,27 @@ private fun boundingBoxOf(points: List<GeoPoint>): BoundingBox {
 
 /** Draws a rotated arrow at each sample point, pointing in the direction the wind blows towards. */
 private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Overlay() {
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    // A white halo drawn behind the black arrow keeps it legible over both light and dark
+    // terrain (forest greens, contour browns) on the OpenTopoMap tiles.
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.FILL
     }
-    private val arrowLengthPx = 34f
-    private val arrowHeadPx = 12f
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.BLACK
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val arrowLengthPx = 46f
+    private val arrowHeadPx = 18f
+    private val lineStrokePx = 7f
+    private val haloStrokePx = 12f
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
@@ -131,16 +150,19 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         val tipX = cx + dx * arrowLengthPx / 2
         val tipY = cy + dy * arrowLengthPx / 2
 
-        canvas.drawLine(tailX, tailY, tipX, tipY, paint.apply { strokeWidth = 5f })
-
         val leftAngle = bearingRad + Math.toRadians(150.0).toFloat()
         val rightAngle = bearingRad - Math.toRadians(150.0).toFloat()
-        val path = Path().apply {
+        val headPath = Path().apply {
             moveTo(tipX, tipY)
             lineTo(tipX + sin(leftAngle) * arrowHeadPx, tipY - cos(leftAngle) * arrowHeadPx)
             lineTo(tipX + sin(rightAngle) * arrowHeadPx, tipY - cos(rightAngle) * arrowHeadPx)
             close()
         }
-        canvas.drawPath(path, paint.apply { style = Paint.Style.FILL })
+
+        // Halo pass first (shaft + head outline), then the solid black shape on top.
+        canvas.drawLine(tailX, tailY, tipX, tipY, haloPaint.apply { strokeWidth = haloStrokePx })
+        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.6f })
+        canvas.drawLine(tailX, tailY, tipX, tipY, linePaint.apply { strokeWidth = lineStrokePx })
+        canvas.drawPath(headPath, fillPaint)
     }
 }
