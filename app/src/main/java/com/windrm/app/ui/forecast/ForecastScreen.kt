@@ -196,7 +196,9 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
         SectionBox {
             Text(stringResource(R.string.wind_direction), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
             RouteMapView(
-                points = points.map { it.point },
+                // The full-resolution track, not the sparse weather-sampling points below --
+                // otherwise the drawn line cuts corners on every curve between samples.
+                points = result.route.points,
                 windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg) },
             )
         }
