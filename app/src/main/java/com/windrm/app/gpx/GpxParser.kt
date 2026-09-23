@@ -71,7 +71,7 @@ object GpxParser {
         }
 
         if (rawPoints.size < 2) {
-            throw GpxParseException("Il file GPX non contiene un percorso valido (servono almeno 2 punti).")
+            throw GpxParseException("The GPX file doesn't contain a valid route (at least 2 points are required).")
         }
 
         val hasTimestamps = rawPoints.all { it.time != null }

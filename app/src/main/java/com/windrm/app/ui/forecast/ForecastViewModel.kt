@@ -40,14 +40,14 @@ class ForecastViewModel(
         viewModelScope.launch {
             uiState = ForecastUiState.Loading
             runCatching {
-                val route = routeRepository.getRoute(routeId) ?: error("Percorso non trovato")
+                val route = routeRepository.getRoute(routeId) ?: error("Route not found")
                 weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh)
             }
                 .onSuccess {
                     scrubIndex = 0
                     uiState = ForecastUiState.Success(it)
                 }
-                .onFailure { uiState = ForecastUiState.Error(it.message ?: "Errore nel calcolo delle previsioni") }
+                .onFailure { uiState = ForecastUiState.Error(it.message ?: "Couldn't calculate the forecast") }
         }
     }
 }

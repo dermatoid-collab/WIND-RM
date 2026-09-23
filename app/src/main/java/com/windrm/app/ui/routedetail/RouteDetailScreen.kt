@@ -174,7 +174,11 @@ private fun StartTimeDialog(
         text = {
             Column {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Oggi" to 0, "Domani" to 1, "+2 giorni" to 2).forEach { (label, offset) ->
+                    listOf(
+                        stringResource(R.string.today) to 0,
+                        stringResource(R.string.tomorrow) to 1,
+                        stringResource(R.string.plus_two_days) to 2,
+                    ).forEach { (label, offset) ->
                         FilterChip(selected = daysOffset == offset, onClick = { daysOffset = offset }, label = { Text(label) })
                     }
                 }
@@ -187,7 +191,7 @@ private fun StartTimeDialog(
         dismissButton = {
             Row {
                 TextButton(onClick = onNow) { Text(stringResource(R.string.starting_now)) }
-                TextButton(onClick = onDismiss) { Text("Annulla") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
             }
         },
     )

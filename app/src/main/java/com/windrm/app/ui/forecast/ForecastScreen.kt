@@ -207,14 +207,14 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 xLabels = timeLabels,
                 yUnit = " m",
                 series = listOf(
-                    ChartSeries("Elevazione (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }),
+                    ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }),
                 ),
             )
             Text(
                 "%s: %.0f m↑    %s: %.1f km    %s: %.1f km/h".format(
-                    "Dislivello", result.route.elevationGainM,
-                    "Distanza", result.route.distanceKm,
-                    "Velocità", result.avgSpeedKmh,
+                    stringResource(R.string.elevation_gain_label), result.route.elevationGainM,
+                    stringResource(R.string.distance_label), result.route.distanceKm,
+                    stringResource(R.string.speed_label), result.avgSpeedKmh,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 4.dp),
@@ -373,12 +373,12 @@ private fun shareForecast(context: android.content.Context, result: RouteForecas
     val first = result.points.firstOrNull()?.weather
     val text = buildString {
         appendLine("WIND-RM · ${result.route.name}")
-        appendLine("Partenza: ${formatter.format(result.startTime)}")
+        appendLine("Starting: ${formatter.format(result.startTime)}")
         appendLine("%.1f km · %.0f m↑".format(result.route.distanceKm, result.route.elevationGainM))
         if (first != null) {
-            appendLine("Al via: ${first.temperatureC.roundToInt()}°C, vento ${first.windSpeedKmh.roundToInt()} km/h")
+            appendLine("At the start: ${first.temperatureC.roundToInt()}°C, wind ${first.windSpeedKmh.roundToInt()} km/h")
         }
-        result.peakAqi?.let { appendLine("AQI di picco: ${it.europeanAqi.roundToInt()} (${aqiLabel(it.europeanAqi)})") }
+        result.peakAqi?.let { appendLine("Peak AQI: ${it.europeanAqi.roundToInt()} (${aqiLabel(it.europeanAqi)})") }
     }
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"

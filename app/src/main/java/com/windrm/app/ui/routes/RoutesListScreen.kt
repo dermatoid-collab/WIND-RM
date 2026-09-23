@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,6 +28,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -48,12 +52,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.windrm.app.R
+import com.windrm.app.domain.PolylineDecoder
 import com.windrm.app.model.Route
+import com.windrm.app.remote.strava.StravaActivitySummary
+import com.windrm.app.remote.strava.StravaMapSummary
 import com.windrm.app.remote.strava.StravaRouteSummary
+import com.windrm.app.remote.strava.StravaSegmentSummary
+import com.windrm.app.ui.components.RoutePolylinePreview
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+
+private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +106,14 @@ fun RoutesListScreen(
                 }
             }
         },
+        bottomBar = {
+            if (selectedTab == 1 && viewModel.stravaAuthorized) {
+                StravaSectionBar(
+                    selected = viewModel.stravaSection,
+                    onSelect = viewModel::selectStravaSection,
+                )
+            }
+        },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = selectedTab) {
@@ -126,6 +145,30 @@ fun RoutesListScreen(
 }
 
 @Composable
+private fun StravaSectionBar(selected: StravaSection, onSelect: (StravaSection) -> Unit) {
+    NavigationBar {
+        NavigationBarItem(
+            selected = selected == StravaSection.ACTIVITIES,
+            onClick = { onSelect(StravaSection.ACTIVITIES) },
+            icon = { Icon(Icons.Filled.DirectionsBike, contentDescription = null) },
+            label = { Text(stringResource(R.string.strava_section_activities)) },
+        )
+        NavigationBarItem(
+            selected = selected == StravaSection.ROUTES,
+            onClick = { onSelect(StravaSection.ROUTES) },
+            icon = { Icon(Icons.Filled.Map, contentDescription = null) },
+            label = { Text(stringResource(R.string.strava_section_routes)) },
+        )
+        NavigationBarItem(
+            selected = selected == StravaSection.SEGMENTS,
+            onClick = { onSelect(StravaSection.SEGMENTS) },
+            icon = { Icon(Icons.Filled.EmojiEvents, contentDescription = null) },
+            label = { Text(stringResource(R.string.strava_section_segments)) },
+        )
+    }
+}
+
+@Composable
 private fun RecentRoutesTab(routes: List<Route>, onSelected: (Route) -> Unit, onDelete: (Route) -> Unit) {
     if (routes.isEmpty()) {
         EmptyState(stringResource(R.string.no_routes_yet))
@@ -142,18 +185,19 @@ private fun RecentRoutesTab(routes: List<Route>, onSelected: (Route) -> Unit, on
 private fun RouteCard(route: Route, onClick: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Icons.Filled.DirectionsBike,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp),
-            )
+            RoutePolylinePreview(points = route.points.map { it.lat to it.lon })
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Text(formatDate(route.createdAtEpochMs), style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(dateFormatter.format(Instant.ofEpochMilli(route.createdAtEpochMs)), style = MaterialTheme.typography.bodySmall)
+                val durationS = route.points.lastOrNull()?.timeOffsetS?.takeIf { it > 0 }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    durationS?.let { Text(formatDuration(it), style = MaterialTheme.typography.bodyMedium) }
                     Text("%.1f km".format(route.distanceKm), style = MaterialTheme.typography.bodyMedium)
                     Text("${route.elevationGainM.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                    durationS?.let {
+                        val speed = route.distanceKm / (it / 3600.0)
+                        Text("%.1f km/h".format(speed), style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
             IconButton(onClick = onDelete) {
@@ -196,13 +240,80 @@ private fun StravaTab(
             Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
         }
 
-        LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(viewModel.stravaRoutes, key = { it.id }) { route ->
-                StravaRouteCard(
-                    route = route,
-                    importing = viewModel.importingRouteId == route.id,
-                    onImport = { viewModel.importStravaRoute(route, onImported) },
-                )
+        when (viewModel.stravaSection) {
+            StravaSection.ACTIVITIES -> StravaActivitiesList(viewModel, onImported)
+            StravaSection.ROUTES -> StravaRoutesList(viewModel, onImported)
+            StravaSection.SEGMENTS -> StravaSegmentsList(viewModel, onImported)
+        }
+    }
+}
+
+@Composable
+private fun StravaActivitiesList(viewModel: RoutesListViewModel, onImported: (Route) -> Unit) {
+    if (viewModel.stravaActivities.isEmpty()) {
+        EmptyState(stringResource(R.string.strava_no_activities))
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(viewModel.stravaActivities, key = { it.id }) { activity ->
+            StravaActivityCard(
+                activity = activity,
+                importing = viewModel.importingId == activity.id,
+                onImport = { viewModel.importStravaActivity(activity, onImported) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StravaRoutesList(viewModel: RoutesListViewModel, onImported: (Route) -> Unit) {
+    if (viewModel.stravaRoutes.isEmpty()) {
+        EmptyState(stringResource(R.string.strava_no_routes))
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(viewModel.stravaRoutes, key = { it.id }) { route ->
+            StravaRouteCard(
+                route = route,
+                importing = viewModel.importingId == route.id,
+                onImport = { viewModel.importStravaRoute(route, onImported) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StravaSegmentsList(viewModel: RoutesListViewModel, onImported: (Route) -> Unit) {
+    if (viewModel.stravaSegments.isEmpty()) {
+        EmptyState(stringResource(R.string.strava_no_segments))
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(viewModel.stravaSegments, key = { it.id }) { segment ->
+            StravaSegmentCard(
+                segment = segment,
+                importing = viewModel.importingId == segment.id,
+                onImport = { viewModel.importStravaSegment(segment, onImported) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun StravaActivityCard(activity: StravaActivitySummary, importing: Boolean, onImport: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RoutePolylinePreview(points = mapPoints(activity.map))
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(activity.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                activity.start_date?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (activity.moving_time > 0) Text(formatDuration(activity.moving_time), style = MaterialTheme.typography.bodyMedium)
+                    Text("%.1f km".format(activity.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                    Text("${activity.total_elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                    if (activity.average_speed > 0) Text("%.1f km/h".format(activity.average_speed * 3.6), style = MaterialTheme.typography.bodyMedium)
+                }
+                ImportButton(importing, onImport)
             }
         }
     }
@@ -211,16 +322,43 @@ private fun StravaTab(
 @Composable
 private fun StravaRouteCard(route: StravaRouteSummary, importing: Boolean, onImport: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
-            Text(route.name, style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("%.1f km".format(route.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
-                Text("${route.elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
-            }
-            TextButton(onClick = onImport, enabled = !importing) {
-                if (importing) CircularProgressIndicator(modifier = Modifier.size(16.dp)) else Text(stringResource(R.string.strava_import_route))
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RoutePolylinePreview(points = mapPoints(route.map))
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                route.created_at?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("%.1f km".format(route.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                    Text("${route.elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                }
+                ImportButton(importing, onImport)
             }
         }
+    }
+}
+
+@Composable
+private fun StravaSegmentCard(segment: StravaSegmentSummary, importing: Boolean, onImport: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            RoutePolylinePreview(points = mapPoints(segment.map))
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(segment.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("%.1f km".format(segment.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                    Text("${(segment.elevation_high - segment.elevation_low).roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                    Text("%.1f%%".format(segment.average_grade), style = MaterialTheme.typography.bodyMedium)
+                }
+                ImportButton(importing, onImport)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportButton(importing: Boolean, onImport: () -> Unit) {
+    TextButton(onClick = onImport, enabled = !importing) {
+        if (importing) CircularProgressIndicator(modifier = Modifier.size(16.dp)) else Text(stringResource(R.string.strava_import))
     }
 }
 
@@ -231,7 +369,13 @@ private fun EmptyState(message: String) {
     }
 }
 
-private fun formatDate(epochMs: Long): String {
-    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
-    return formatter.format(Instant.ofEpochMilli(epochMs))
+private fun mapPoints(map: StravaMapSummary?): List<Pair<Double, Double>> =
+    map?.anyPolyline?.let { PolylineDecoder.decode(it) }.orEmpty()
+
+private fun formatIsoDate(iso: String): String = dateFormatter.format(Instant.parse(iso))
+
+private fun formatDuration(totalSeconds: Long): String {
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }

@@ -52,10 +52,43 @@ interface StravaApi {
         @Path("id") routeId: Long,
     ): ResponseBody
 
+    /** Recorded rides -- distinct from planned [StravaRouteSummary]s. */
+    @GET("api/v3/athlete/activities")
+    suspend fun listActivities(
+        @Header("Authorization") bearerToken: String,
+        @Query("per_page") perPage: Int = 30,
+        @Query("page") page: Int = 1,
+    ): List<StravaActivitySummary>
+
+    @GET("api/v3/activities/{id}/streams")
+    suspend fun getActivityStreams(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") activityId: Long,
+        @Query("keys") keys: String = "latlng,altitude,time",
+        @Query("key_by_type") keyByType: Boolean = true,
+    ): StravaStreamSet
+
+    /** Strava only exposes segments the athlete has starred, not an arbitrary search. */
+    @GET("api/v3/segments/starred")
+    suspend fun listStarredSegments(
+        @Header("Authorization") bearerToken: String,
+        @Query("per_page") perPage: Int = 30,
+        @Query("page") page: Int = 1,
+    ): List<StravaSegmentSummary>
+
+    @GET("api/v3/segments/{id}/streams")
+    suspend fun getSegmentStreams(
+        @Header("Authorization") bearerToken: String,
+        @Path("id") segmentId: Long,
+        @Query("keys") keys: String = "latlng,altitude",
+        @Query("key_by_type") keyByType: Boolean = true,
+    ): StravaStreamSet
+
     companion object {
         const val API_BASE_URL = "https://www.strava.com/"
         const val AUTHORIZE_URL = "https://www.strava.com/oauth/mobile/authorize"
-        /** `read_all` is required to list/export private routes (not just public/starred ones). */
-        const val SCOPE = "read_all"
+        // read_all: routes/segments (general "read" family). activity:read_all: activities and
+        // their streams (a separate scope family Strava gates independently).
+        const val SCOPE = "read_all,activity:read_all"
     }
 }

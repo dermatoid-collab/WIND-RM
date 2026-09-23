@@ -17,6 +17,7 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.cos
@@ -45,6 +46,9 @@ fun RouteMapView(
         },
         update = { mapView ->
             mapView.overlays.clear()
+            // OpenTopoMap's usage policy requires visible attribution; re-added every update()
+            // since overlays.clear() above would otherwise drop it too.
+            mapView.overlays.add(CopyrightOverlay(mapView.context))
             if (points.isNotEmpty()) {
                 val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
                 val polyline = Polyline(mapView).apply {
@@ -67,10 +71,12 @@ fun RouteMapView(
 }
 
 private fun createMapView(context: Context): MapView = MapView(context).apply {
-    setTileSource(TileSourceFactory.MAPNIK)
+    // OpenTopoMap: contour-line topographic style, closer to the Garmin-style maps the user
+    // is used to from other cycling apps, and free/no API key (unlike Garmin's own tiles).
+    setTileSource(TileSourceFactory.OpenTopo)
     setMultiTouchControls(true)
     minZoomLevel = 4.0
-    maxZoomLevel = 19.0
+    maxZoomLevel = 17.0 // OpenTopoMap doesn't render tiles past z17
     if (context is androidx.lifecycle.LifecycleOwner) {
         context.lifecycle.addObserver(
             object : androidx.lifecycle.DefaultLifecycleObserver {

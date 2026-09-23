@@ -3,44 +3,57 @@
 
     <!-- Routes list -->
     <string name="routes_title">WIND-RM</string>
-    <string name="tab_recent">Recenti</string>
+    <string name="tab_recent">Recent</string>
     <string name="tab_strava">Strava</string>
-    <string name="import_gpx">Importa GPX</string>
-    <string name="connect_strava">Connetti Strava</string>
-    <string name="strava_connect_prompt">Collega il tuo account Strava per importare le routes create con il Route Builder.</string>
-    <string name="strava_not_configured_title">Strava non configurato</string>
-    <string name="strava_not_configured_message">Per collegare Strava, imposta STRAVA_CLIENT_ID e STRAVA_CLIENT_SECRET in local.properties. Vedi il README del progetto.</string>
-    <string name="no_routes_yet">Nessun percorso ancora. Importa un file GPX o collega Strava per iniziare.</string>
-    <string name="delete_route">Elimina percorso</string>
+    <string name="import_gpx">Import GPX</string>
+    <string name="connect_strava">Connect Strava</string>
+    <string name="strava_connect_prompt">Connect your Strava account to import your activities, routes and segments.</string>
+    <string name="strava_not_configured_title">Strava not configured</string>
+    <string name="strava_not_configured_message">To connect Strava, set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in local.properties. See the project README.</string>
+    <string name="no_routes_yet">No routes yet. Import a GPX file or connect Strava to get started.</string>
+    <string name="delete_route">Delete route</string>
+
+    <!-- Strava sub-selector: Activities / Routes / Segments -->
+    <string name="strava_section_activities">Activities</string>
+    <string name="strava_section_routes">Routes</string>
+    <string name="strava_section_segments">Segments</string>
+    <string name="strava_no_activities">No activities found.</string>
+    <string name="strava_no_routes">No routes found.</string>
+    <string name="strava_no_segments">No segments found.</string>
+    <string name="strava_import">Import</string>
 
     <!-- Route detail -->
-    <string name="starting">Partenza</string>
-    <string name="starting_now">Ora</string>
-    <string name="average_speed">Velocità media</string>
-    <string name="forecast_route">PREVISIONE PERCORSO</string>
+    <string name="starting">Starting</string>
+    <string name="starting_now">Now</string>
+    <string name="average_speed">Average Speed</string>
+    <string name="forecast_route">FORECAST ROUTE</string>
     <string name="km_h">km/h</string>
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="plus_two_days">+2 days</string>
+    <string name="cancel">Cancel</string>
 
     <!-- Forecast -->
-    <string name="temperature">Temperatura</string>
-    <string name="precipitation">Precipitazioni</string>
-    <string name="wind">Vento</string>
-    <string name="precipitation_and_cloud_cover">Precipitazioni e Copertura Nuvolosa</string>
-    <string name="wind_direction">Direzione del Vento</string>
-    <string name="elevation">Altimetria</string>
-    <string name="daylight_and_uv">Luce Diurna e Indice UV</string>
-    <string name="air_quality">Qualità dell\'Aria</string>
-    <string name="humidity_and_dew_point">Umidità e Punto di Rugiada</string>
-    <string name="sunrise">Alba</string>
-    <string name="sunset">Tramonto</string>
-    <string name="civil_sunrise">Alba civile</string>
-    <string name="civil_sunset">Tramonto civile</string>
-    <string name="peak_aqi">AQI di picco</string>
-    <string name="main_pollutant">Inquinante principale</string>
-    <string name="loading_forecast">Calcolo previsioni lungo il percorso…</string>
-    <string name="forecast_error">Impossibile scaricare le previsioni. Controlla la connessione e riprova.</string>
-    <string name="retry">Riprova</string>
-    <string name="share">Condividi</string>
-
-    <!-- Strava -->
-    <string name="strava_import_route">Importa route</string>
+    <string name="temperature">Temperature</string>
+    <string name="precipitation">Precipitation</string>
+    <string name="wind">Wind</string>
+    <string name="precipitation_and_cloud_cover">Precipitation and Cloud Cover</string>
+    <string name="wind_direction">Wind Direction</string>
+    <string name="elevation">Elevation</string>
+    <string name="daylight_and_uv">Daylight and UV Index</string>
+    <string name="air_quality">Air Quality</string>
+    <string name="humidity_and_dew_point">Humidity and Dew Point</string>
+    <string name="sunrise">Sunrise</string>
+    <string name="sunset">Sunset</string>
+    <string name="civil_sunrise">Civil Sunrise</string>
+    <string name="civil_sunset">Civil Sunset</string>
+    <string name="peak_aqi">Peak AQI</string>
+    <string name="main_pollutant">Main Pollutant</string>
+    <string name="loading_forecast">Calculating forecast along the route…</string>
+    <string name="forecast_error">Couldn\'t download the forecast. Check your connection and try again.</string>
+    <string name="retry">Retry</string>
+    <string name="share">Share</string>
+    <string name="elevation_gain_label">Elevation Gain</string>
+    <string name="distance_label">Distance</string>
+    <string name="speed_label">Speed</string>
 </resources>

@@ -61,16 +61,16 @@ data class RouteForecastResult(
             return listOf(
                 "PM2.5" to peak.pm2_5,
                 "PM10" to peak.pm10,
-                "Ozono" to peak.ozone,
+                "Ozone" to peak.ozone,
             ).maxByOrNull { it.second }?.first
         }
 }
 
 fun aqiLabel(aqi: Double): String = when {
-    aqi <= 20 -> "Buona"
-    aqi <= 40 -> "Discreta"
-    aqi <= 60 -> "Moderata"
-    aqi <= 80 -> "Scarsa"
-    aqi <= 100 -> "Molto scarsa"
-    else -> "Severa"
+    aqi <= 20 -> "Good"
+    aqi <= 40 -> "Fair"
+    aqi <= 60 -> "Moderate"
+    aqi <= 80 -> "Poor"
+    aqi <= 100 -> "Very Poor"
+    else -> "Severe"
 }
