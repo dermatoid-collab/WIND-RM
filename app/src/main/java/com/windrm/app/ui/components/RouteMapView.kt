@@ -54,13 +54,15 @@ fun RouteMapView(
                 val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
                 val polyline = Polyline(mapView).apply {
                     setPoints(geoPoints)
-                    outlinePaint.color = Color.parseColor("#F4511E")
+                    outlinePaint.color = Color.parseColor("#B71C1C")
                     outlinePaint.strokeWidth = 9f
                 }
                 mapView.overlays.add(polyline)
 
                 if (!windArrows.isNullOrEmpty()) {
-                    mapView.overlays.add(WindArrowsOverlay(windArrows))
+                    // One arrow per weather-sample point was too dense to read; halve it.
+                    val thinnedArrows = windArrows.filterIndexed { index, _ -> index % 2 == 0 }
+                    mapView.overlays.add(WindArrowsOverlay(thinnedArrows))
                 }
 
                 val bbox = boundingBoxOf(geoPoints)
@@ -75,10 +77,6 @@ private fun createMapView(context: Context): MapView = MapView(context).apply {
     // OpenTopoMap: contour-line topographic style, closer to the Garmin-style maps the user
     // is used to from other cycling apps, and free/no API key (unlike Garmin's own tiles).
     setTileSource(TileSourceFactory.OpenTopo)
-    // Without this, osmdroid renders tiles at their raw 256px size regardless of screen density,
-    // so contour lines and labels look small and soft on high-density phones; this scales tiles
-    // up to match the device's actual pixel density, making the map read as noticeably sharper.
-    isTilesScaledToDpi = true
     setMultiTouchControls(true)
     minZoomLevel = 4.0
     maxZoomLevel = 17.0 // OpenTopoMap doesn't render tiles past z17
