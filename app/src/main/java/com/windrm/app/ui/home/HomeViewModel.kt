@@ -58,6 +58,12 @@ class HomeViewModel(
         }
     }
 
+    /** Re-checks permission and refreshes the snapshot each time the home screen resumes. */
+    fun refreshOnResume() {
+        hasLocationPermission = hasPermission()
+        if (hasLocationPermission) loadCurrentLocationWeather()
+    }
+
     private fun hasPermission(): Boolean =
         ContextCompat.checkSelfPermission(appContext, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 

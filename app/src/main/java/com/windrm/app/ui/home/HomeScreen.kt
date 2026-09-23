@@ -32,6 +32,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -61,6 +62,13 @@ fun HomeScreen(
     }
     val gpxLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.importGpx(context, uri, onImported = onRouteImported)
+    }
+
+    // Refreshes the weather snapshot every time the home screen comes back to the foreground,
+    // instead of only once when the ViewModel is first created.
+    LifecycleResumeEffect(Unit) {
+        viewModel.refreshOnResume()
+        onPauseOrDispose { }
     }
 
     Scaffold(

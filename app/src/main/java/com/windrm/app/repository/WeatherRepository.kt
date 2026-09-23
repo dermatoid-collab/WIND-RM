@@ -18,6 +18,7 @@ import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 class WeatherRepository(
     private val weatherApi: OpenMeteoApi,
@@ -87,12 +88,15 @@ class WeatherRepository(
 
         val daily = response?.daily
         val current = buildWeatherPoint(now, response)
+        // The strip shows round clock hours (15:00, 16:00, ...) rather than "now plus N hours",
+        // which would carry the exact minute/second the request happened to fire at.
+        val hourlyStart = now.truncatedTo(ChronoUnit.HOURS)
         return CurrentWeatherSnapshot(
             locationLabel = locationLabel,
             current = current,
             highC = daily?.temperature_2m_max?.firstOrNull() ?: current.temperatureC,
             lowC = daily?.temperature_2m_min?.firstOrNull() ?: current.temperatureC,
-            hourly = (0..hoursAhead).map { buildWeatherPoint(now.plusSeconds(it * 3600L), response) },
+            hourly = (0..hoursAhead).map { buildWeatherPoint(hourlyStart.plusSeconds(it * 3600L), response) },
         )
     }
 
