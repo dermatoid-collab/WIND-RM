@@ -9,8 +9,11 @@ import com.windrm.app.model.Route
 import com.windrm.app.repository.RouteRepository
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
-import java.time.ZonedDateTime
+
+/** Open-Meteo's practical hourly-forecast horizon; dates beyond this aren't offered in the picker. */
+const val FORECAST_HORIZON_DAYS = 15L
 
 class RouteDetailViewModel(
     private val routeRepository: RouteRepository,
@@ -21,7 +24,7 @@ class RouteDetailViewModel(
         private set
     var avgSpeedKmh by mutableStateOf(25.0)
     var startsNow by mutableStateOf(true)
-    var plannedDaysOffset by mutableStateOf(0)
+    var plannedDate by mutableStateOf(LocalDate.now())
     var plannedHour by mutableStateOf(8)
     var plannedMinute by mutableStateOf(0)
 
@@ -33,9 +36,9 @@ class RouteDetailViewModel(
         }
     }
 
-    fun setPlannedTime(daysOffset: Int, hour: Int, minute: Int) {
+    fun setPlannedTime(date: LocalDate, hour: Int, minute: Int) {
         startsNow = false
-        plannedDaysOffset = daysOffset
+        plannedDate = date
         plannedHour = hour
         plannedMinute = minute
     }
@@ -47,12 +50,6 @@ class RouteDetailViewModel(
     fun computeStartInstant(): Instant = if (startsNow) {
         Instant.now()
     } else {
-        ZonedDateTime.now(ZoneId.systemDefault())
-            .plusDays(plannedDaysOffset.toLong())
-            .withHour(plannedHour)
-            .withMinute(plannedMinute)
-            .withSecond(0)
-            .withNano(0)
-            .toInstant()
+        plannedDate.atTime(plannedHour, plannedMinute).atZone(ZoneId.systemDefault()).toInstant()
     }
 }

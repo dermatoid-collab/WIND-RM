@@ -29,9 +29,6 @@
     <string name="average_speed">Average Speed</string>
     <string name="forecast_route">FORECAST ROUTE</string>
     <string name="km_h">km/h</string>
-    <string name="today">Today</string>
-    <string name="tomorrow">Tomorrow</string>
-    <string name="plus_two_days">+2 days</string>
     <string name="cancel">Cancel</string>
 
     <!-- Forecast -->

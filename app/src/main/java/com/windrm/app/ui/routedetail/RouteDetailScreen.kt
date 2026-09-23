@@ -1,6 +1,5 @@
 package com.windrm.app.ui.routedetail
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,22 +11,27 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +47,10 @@ import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.ui.components.RouteMapView
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +83,7 @@ fun RouteDetailScreen(
         }
 
         var showTimeDialog by remember { mutableStateOf(false) }
+        val plannedLabelFormatter = remember { DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault()) }
 
         Column(
             Modifier
@@ -97,7 +106,7 @@ fun RouteDetailScreen(
                         if (viewModel.startsNow) {
                             stringResource(R.string.starting_now)
                         } else {
-                            "+%dg %02d:%02d".format(viewModel.plannedDaysOffset, viewModel.plannedHour, viewModel.plannedMinute)
+                            viewModel.plannedDate.atTime(viewModel.plannedHour, viewModel.plannedMinute).format(plannedLabelFormatter)
                         },
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.weight(1f),
@@ -138,7 +147,7 @@ fun RouteDetailScreen(
 
         if (showTimeDialog) {
             StartTimeDialog(
-                initialDaysOffset = viewModel.plannedDaysOffset,
+                initialDate = viewModel.plannedDate,
                 initialHour = if (viewModel.startsNow) Instant.now().atZone(java.time.ZoneId.systemDefault()).hour else viewModel.plannedHour,
                 initialMinute = if (viewModel.startsNow) Instant.now().atZone(java.time.ZoneId.systemDefault()).minute else viewModel.plannedMinute,
                 onDismiss = { showTimeDialog = false },
@@ -146,8 +155,8 @@ fun RouteDetailScreen(
                     viewModel.useNow()
                     showTimeDialog = false
                 },
-                onConfirm = { daysOffset, hour, minute ->
-                    viewModel.setPlannedTime(daysOffset, hour, minute)
+                onConfirm = { date, hour, minute ->
+                    viewModel.setPlannedTime(date, hour, minute)
                     showTimeDialog = false
                 },
             )
@@ -158,35 +167,32 @@ fun RouteDetailScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StartTimeDialog(
-    initialDaysOffset: Int,
+    initialDate: LocalDate,
     initialHour: Int,
     initialMinute: Int,
     onDismiss: () -> Unit,
     onNow: () -> Unit,
-    onConfirm: (daysOffset: Int, hour: Int, minute: Int) -> Unit,
+    onConfirm: (date: LocalDate, hour: Int, minute: Int) -> Unit,
 ) {
-    var daysOffset by remember { mutableStateOf(initialDaysOffset) }
+    var date by remember { mutableStateOf(initialDate) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val timeState = rememberTimePickerState(initialHour = initialHour, initialMinute = initialMinute, is24Hour = true)
+    val dateFieldFormatter = remember { DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.starting)) },
         text = {
             Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(
-                        stringResource(R.string.today) to 0,
-                        stringResource(R.string.tomorrow) to 1,
-                        stringResource(R.string.plus_two_days) to 2,
-                    ).forEach { (label, offset) ->
-                        FilterChip(selected = daysOffset == offset, onClick = { daysOffset = offset }, label = { Text(label) })
-                    }
+                OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                    Text(date.format(dateFieldFormatter))
                 }
                 Box(Modifier.padding(top = 12.dp)) { TimePicker(state = timeState) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(daysOffset, timeState.hour, timeState.minute) }) { Text("OK") }
+            TextButton(onClick = { onConfirm(date, timeState.hour, timeState.minute) }) { Text("OK") }
         },
         dismissButton = {
             Row {
@@ -195,4 +201,36 @@ private fun StartTimeDialog(
             }
         },
     )
+
+    if (showDatePicker) {
+        val today = remember { LocalDate.now() }
+        val maxDate = remember(today) { today.plusDays(FORECAST_HORIZON_DAYS) }
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            // Beyond this horizon Open-Meteo's high-resolution regional models fall back to lower
+            // detail, and reliability drops accordingly -- see WeatherRepository's forecastRoute.
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    val candidate = Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                    return !candidate.isBefore(today) && !candidate.isAfter(maxDate)
+                }
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let {
+                        date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
