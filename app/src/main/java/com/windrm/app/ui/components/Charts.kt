@@ -2,6 +2,7 @@ package com.windrm.app.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.awaitEachGesture
 import androidx.compose.ui.input.pointer.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
@@ -51,7 +54,8 @@ private val Y_AXIS_WIDTH = 40.dp
  * Mirrors the layout used throughout the forecast screen (temperature, wind, elevation, etc.).
  *
  * Dragging a finger anywhere over the plot moves a shared scrub cursor ([scrubIndex]/[onScrub])
- * and shows each series' value at that instant next to the title.
+ * and shows each series' value at that instant in a floating card over the chart, with a
+ * crosshair (vertical + per-series horizontal guide lines) marking exactly where they land.
  */
 @Composable
 fun MultiSeriesChart(
@@ -65,14 +69,10 @@ fun MultiSeriesChart(
     chartHeight: Dp = 160.dp,
     scrubIndex: Int? = null,
     onScrub: ((Int) -> Unit)? = null,
+    scrubLabel: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
-            if (scrubIndex != null) {
-                ScrubReadout(series, scrubIndex, yUnit)
-            }
-        }
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
 
         TimeAxisLabels(xLabels)
 
@@ -155,6 +155,17 @@ fun MultiSeriesChart(
                     if (scrubIndex != null && sampleCount > 1) {
                         val stepX = size.width / (sampleCount - 1)
                         val x = scrubIndex.coerceIn(0, sampleCount - 1) * stepX
+                        series.forEach { s ->
+                            val v = s.values.getOrNull(scrubIndex.coerceIn(0, s.values.size - 1)) ?: return@forEach
+                            val fraction = ((v - min) / (max - min)).coerceIn(0f, 1f)
+                            val y = size.height * (1f - fraction)
+                            drawLine(
+                                color = s.color.copy(alpha = 0.6f),
+                                start = Offset(0f, y),
+                                end = Offset(size.width, y),
+                                strokeWidth = 1.dp.toPx(),
+                            )
+                        }
                         drawLine(
                             color = Color.DarkGray.copy(alpha = 0.6f),
                             start = Offset(x, 0f),
@@ -169,6 +180,9 @@ fun MultiSeriesChart(
                             drawCircle(color = s.color, radius = 3.5.dp.toPx(), center = Offset(x, y))
                         }
                     }
+                }
+                if (scrubIndex != null) {
+                    ScrubTooltip(series, scrubIndex, yUnit, scrubLabel, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
                 }
             }
             YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = true, height = chartHeight)
@@ -236,12 +250,21 @@ private fun YAxisLabels(min: Float, max: Float, unit: String, modifier: Modifier
 
 private fun formatAxisValue(v: Float): String = if (v == v.toInt().toFloat()) v.toInt().toString() else "%.1f".format(v)
 
+/** Floating card anchored at the chart's top-start corner, showing the scrubbed instant's values. */
 @Composable
-private fun ScrubReadout(series: List<ChartSeries>, index: Int, yUnit: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+private fun ScrubTooltip(series: List<ChartSeries>, index: Int, yUnit: String, label: String?, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .shadow(2.dp, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, Color.LightGray.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        label?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
         series.forEach { s ->
             val v = s.values.getOrNull(index.coerceIn(0, s.values.size - 1)) ?: return@forEach
-            Text(formatAxisValue(v) + yUnit, color = s.color, style = MaterialTheme.typography.labelLarge)
+            if (s.label.isEmpty()) return@forEach
+            Text("${s.label}: ${formatAxisValue(v)}$yUnit", color = s.color, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

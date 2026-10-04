@@ -151,6 +151,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
     val current = points[scrubIndex.coerceIn(0, points.lastIndex)]
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
+    val scrubLabel = "%.0f km, %s".format(current.point.distanceFromStartM / 1000.0, timeFmt.format(current.arrivalTime))
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         GaugesRow(points, current)
@@ -163,6 +164,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 xLabels = timeLabels,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }),
                     ChartSeries("Feels Like (°C)", FeelsLikeColor, points.map { it.weather.feelsLikeC.toFloat() }),
@@ -177,6 +179,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yRangeOverride = 0f..100f,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false),
                     ChartSeries("Intensity", IntensityColor, points.map { it.weather.precipitationMm.toFloat() }, filled = false),
@@ -192,6 +195,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yUnit = " km/h",
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false),
                     ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }),
@@ -216,6 +220,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yUnit = " m",
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }),
                 ),
@@ -238,6 +243,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yRangeOverride = 0f..12f,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Daylight", DaylightColor, points.map { if (it.weather.isDay) 12f else 0f }),
                     ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }),
@@ -271,6 +277,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                     yRangeOverride = 0f..100f,
                     scrubIndex = scrubIndex,
                     onScrub = onScrub,
+                    scrubLabel = scrubLabel,
                     bands = listOf(
                         ChartBand(0f..20f, AqiGood),
                         ChartBand(20f..40f, AqiFair),
@@ -291,6 +298,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 xLabels = timeLabels,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }),
                     ChartSeries("Dew Point (°C)", DewPointColor, points.map { it.weather.dewPointC.toFloat() }),
