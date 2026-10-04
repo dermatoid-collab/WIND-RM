@@ -84,6 +84,10 @@ fun RouteMapView(
                 }
                 mapView.overlays.add(polyline)
 
+                // Start drawn first so the finish flag ends up on top when they coincide (a
+                // loop route), per the "finish must always show in front of start" requirement.
+                mapView.overlays.add(StartFinishOverlay(geoPoints.first(), geoPoints.last()))
+
                 if (!windArrows.isNullOrEmpty()) {
                     // One arrow per weather-sample point was too dense to read; halve it.
                     val thinnedArrows = windArrows.filterIndexed { index, _ -> index % 2 == 0 }
@@ -175,6 +179,44 @@ private fun boundingBoxOf(points: List<GeoPoint>): BoundingBox {
     return BoundingBox(north, east, south, west)
 }
 
+/** Green dot at the route's start, checkered flag at its end (end always drawn on top when they coincide, e.g. a loop). */
+private class StartFinishOverlay(private val start: GeoPoint, private val finish: GeoPoint) : Overlay() {
+    private val startFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#43A047"); style = Paint.Style.FILL }
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 3f }
+    private val blackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; style = Paint.Style.FILL }
+    private val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val out = android.graphics.Point()
+
+        mapView.projection.toPixels(start, out)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 10f, startFillPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 10f, ringPaint)
+
+        mapView.projection.toPixels(finish, out)
+        drawCheckeredFlag(canvas, out.x.toFloat(), out.y.toFloat())
+    }
+
+    private fun drawCheckeredFlag(canvas: Canvas, cx: Float, cy: Float) {
+        val size = 16f
+        val half = size / 2
+        canvas.drawCircle(cx, cy, half + 3f, whitePaint)
+        val cells = 4
+        val cellSize = size / cells
+        for (row in 0 until cells) {
+            for (col in 0 until cells) {
+                if ((row + col) % 2 == 0) {
+                    val left = cx - half + col * cellSize
+                    val top = cy - half + row * cellSize
+                    canvas.drawRect(left, top, left + cellSize, top + cellSize, blackPaint)
+                }
+            }
+        }
+        canvas.drawRect(cx - half, cy - half, cx + half, cy + half, ringPaint)
+    }
+}
+
 /** A marker at the route point currently under a finger on any chart below the map. */
 private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
@@ -246,33 +288,35 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         val headLengthPx = 16f
         val headHalfWidthPx = 11f
 
-        // bearing 0 = pointing up (north); rotate clockwise for increasing degrees. The tip
-        // sits at a fixed distance from the route point; only the tail moves further out.
+        // bearing 0 = pointing up (north); rotate clockwise for increasing degrees.
         val fx = sin(bearingRad)
         val fy = -cos(bearingRad)
-        val tipX = cx + fx * tipOffsetPx
-        val tipY = cy + fy * tipOffsetPx
-        val tailX = cx + fx * lengthPx
-        val tailY = cy + fy * lengthPx
+        // The anchor is the PLAIN end, always this close to the route point regardless of wind
+        // speed; the pointed head is the end that moves further out as wind gets stronger -- the
+        // previous version had these swapped, so the head sat near the route and the shaft
+        // trailed off behind it, reading as backwards.
+        val anchorX = cx + fx * tipOffsetPx
+        val anchorY = cy + fy * tipOffsetPx
+        val headX = cx + fx * lengthPx
+        val headY = cy + fy * lengthPx
 
-        // Classic arrowhead: apex at the tip, base a fixed distance behind it along the shaft,
-        // perpendicular corners symmetric around that base -- an unambiguous "normal" arrow
-        // shape, unlike the angle-from-tip construction tried before, which read as inverted.
+        // Classic arrowhead: apex at the head end, base a fixed distance back towards the
+        // anchor, perpendicular corners symmetric around that base.
         val px = -fy
         val py = fx
-        val baseX = tipX - fx * headLengthPx
-        val baseY = tipY - fy * headLengthPx
+        val baseX = headX - fx * headLengthPx
+        val baseY = headY - fy * headLengthPx
         val headPath = Path().apply {
-            moveTo(tipX, tipY)
+            moveTo(headX, headY)
             lineTo(baseX + px * headHalfWidthPx, baseY + py * headHalfWidthPx)
             lineTo(baseX - px * headHalfWidthPx, baseY - py * headHalfWidthPx)
             close()
         }
 
         // Halo pass first (shaft + head outline), then the solid black shape on top.
-        canvas.drawLine(tailX, tailY, tipX, tipY, haloPaint.apply { strokeWidth = haloStrokePx })
+        canvas.drawLine(anchorX, anchorY, headX, headY, haloPaint.apply { strokeWidth = haloStrokePx })
         canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.6f })
-        canvas.drawLine(tailX, tailY, tipX, tipY, linePaint.apply { strokeWidth = lineStrokePx })
+        canvas.drawLine(anchorX, anchorY, headX, headY, linePaint.apply { strokeWidth = lineStrokePx })
         canvas.drawPath(headPath, fillPaint)
     }
 }

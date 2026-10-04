@@ -167,10 +167,14 @@ fun MultiSeriesChart(
                         drawPath(linePath, color = s.color, style = Stroke(width = 1.6.dp.toPx()))
                     }
                     if (scrubIndex != null && sampleCount > 1) {
-                        val stepX = size.width / (sampleCount - 1)
-                        val x = scrubIndex.coerceIn(0, sampleCount - 1) * stepX
+                        // scrubIndex lives in the shared time axis's sample space (sampleCount
+                        // entries); a series can have a different, denser resolution (e.g.
+                        // elevation's full GPX track vs. the ~45 weather samples), so its own
+                        // value is looked up via the touched fraction, not the raw shared index.
+                        val scrubFraction = scrubIndex.coerceIn(0, sampleCount - 1).toFloat() / (sampleCount - 1)
+                        val x = size.width * scrubFraction
                         series.forEach { s ->
-                            val v = s.values.getOrNull(scrubIndex.coerceIn(0, s.values.size - 1)) ?: return@forEach
+                            val v = s.valueAtFraction(scrubFraction) ?: return@forEach
                             val fraction = ((v - min) / (max - min)).coerceIn(0f, 1f)
                             val y = size.height * (1f - fraction)
                             drawLine(
@@ -187,7 +191,7 @@ fun MultiSeriesChart(
                             strokeWidth = 1.5.dp.toPx(),
                         )
                         series.forEach { s ->
-                            val v = s.values.getOrNull(scrubIndex.coerceIn(0, s.values.size - 1)) ?: return@forEach
+                            val v = s.valueAtFraction(scrubFraction) ?: return@forEach
                             val fraction = ((v - min) / (max - min)).coerceIn(0f, 1f)
                             val y = size.height * (1f - fraction)
                             drawCircle(color = Color.White, radius = 5.dp.toPx(), center = Offset(x, y))
@@ -201,7 +205,7 @@ fun MultiSeriesChart(
                     val maxOffset = (maxWidth - tooltipWidth).coerceAtLeast(0.dp)
                     val xOffset = (maxWidth * fraction - tooltipWidth / 2).coerceIn(0.dp, maxOffset)
                     ScrubTooltip(
-                        series, scrubIndex, yUnit, scrubLabel,
+                        series, fraction, yUnit, scrubLabel,
                         modifier = Modifier.offset(x = xOffset, y = 4.dp).widthIn(max = tooltipWidth),
                     )
                 }
@@ -285,7 +289,7 @@ private fun formatAxisValue(v: Float): String = if (v == v.toInt().toFloat()) v.
 
 /** Floating card anchored at the chart's top-start corner, showing the scrubbed instant's values. */
 @Composable
-private fun ScrubTooltip(series: List<ChartSeries>, index: Int, yUnit: String, label: String?, modifier: Modifier = Modifier) {
+private fun ScrubTooltip(series: List<ChartSeries>, fraction: Float, yUnit: String, label: String?, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .shadow(2.dp, RoundedCornerShape(8.dp))
@@ -295,11 +299,20 @@ private fun ScrubTooltip(series: List<ChartSeries>, index: Int, yUnit: String, l
     ) {
         label?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
         series.forEach { s ->
-            val v = s.values.getOrNull(index.coerceIn(0, s.values.size - 1)) ?: return@forEach
+            val v = s.valueAtFraction(fraction) ?: return@forEach
             if (s.label.isEmpty()) return@forEach
             Text("${s.label}: ${formatAxisValue(v)}$yUnit", color = s.color, style = MaterialTheme.typography.bodyMedium)
         }
     }
+}
+
+/** Maps a 0..1 position along the shared time axis into this series' own index space -- needed
+ * because a series can have a different resolution than the shared sample count (e.g. elevation's
+ * full GPX track vs. the sparser weather samples the other series use). */
+private fun ChartSeries.valueAtFraction(fraction: Float): Float? {
+    if (values.isEmpty()) return null
+    val idx = (fraction * (values.size - 1)).roundToInt().coerceIn(0, values.lastIndex)
+    return values[idx]
 }
 
 @Composable

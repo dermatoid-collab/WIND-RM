@@ -238,7 +238,10 @@ private fun ForecastContent(
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }, smooth = false),
+                    // The full-resolution GPX/Strava track, not the sparse weather-sampling
+                    // points used by the other charts -- those are only ~45 points over a whole
+                    // route, which flattens real climbs/descents into a crude staircase.
+                    ChartSeries("Elevation (m)", TempColor, result.route.points.map { (it.eleM ?: 0.0).toFloat() }, smooth = false),
                 ),
             )
             Text(
