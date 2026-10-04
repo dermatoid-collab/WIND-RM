@@ -108,6 +108,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                     result = state.result,
                     scrubIndex = viewModel.scrubIndex,
                     onScrub = { viewModel.scrubIndex = it },
+                    onScrubEnd = { viewModel.scrubIndex = null },
                     mapStyle = viewModel.mapStyle,
                 )
             }
@@ -144,13 +145,20 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScrub: (Int) -> Unit, mapStyle: MapStyle) {
+private fun ForecastContent(
+    result: RouteForecastResult,
+    scrubIndex: Int?,
+    onScrub: (Int) -> Unit,
+    onScrubEnd: () -> Unit,
+    mapStyle: MapStyle,
+) {
     val points = result.points
     if (points.isEmpty()) {
         ErrorContent(stringResource(R.string.forecast_error), onRetry = {})
         return
     }
-    val current = points[scrubIndex.coerceIn(0, points.lastIndex)]
+    val current = points[(scrubIndex ?: 0).coerceIn(0, points.lastIndex)]
+    val highlightPoint = scrubIndex?.let { points[it.coerceIn(0, points.lastIndex)].point }
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     val scrubLabel = "%.0f km, %s".format(current.point.distanceFromStartM / 1000.0, timeFmt.format(current.arrivalTime))
@@ -166,6 +174,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 xLabels = timeLabels,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }),
@@ -181,6 +190,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yRangeOverride = 0f..100f,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false),
@@ -197,6 +207,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yUnit = " km/h",
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false),
@@ -213,6 +224,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 points = result.route.points,
                 windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
                 mapStyle = mapStyle,
+                highlightPoint = highlightPoint,
             )
         }
 
@@ -223,6 +235,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yUnit = " m",
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }),
@@ -246,6 +259,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 yRangeOverride = 0f..12f,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Daylight", DaylightColor, points.map { if (it.weather.isDay) 12f else 0f }),
@@ -280,6 +294,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                     yRangeOverride = 0f..100f,
                     scrubIndex = scrubIndex,
                     onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
                     scrubLabel = scrubLabel,
                     bands = listOf(
                         ChartBand(0f..20f, AqiGood),
@@ -301,6 +316,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 xLabels = timeLabels,
                 scrubIndex = scrubIndex,
                 onScrub = onScrub,
+                onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
                     ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }),
@@ -315,8 +331,9 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 Text(timeFmt.format(points.last().arrivalTime), style = MaterialTheme.typography.bodySmall)
             }
             Slider(
-                value = scrubIndex.toFloat(),
+                value = (scrubIndex ?: 0).toFloat(),
                 onValueChange = { onScrub(it.roundToInt()) },
+                onValueChangeFinished = onScrubEnd,
                 valueRange = 0f..(points.lastIndex).toFloat().coerceAtLeast(0f),
                 steps = (points.size - 2).coerceAtLeast(0),
             )

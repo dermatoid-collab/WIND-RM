@@ -17,6 +17,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "app_settin
 enum class MapStyle(val label: String, val requiresApiKey: Boolean) {
     OSM_STANDARD("OSM Standard", requiresApiKey = false),
     OPEN_TOPO("OpenTopoMap", requiresApiKey = false),
+    MAPBOX_OUTDOORS("Mapbox Outdoors (same as Strava)", requiresApiKey = true),
     CARTO_POSITRON("CARTO Positron", requiresApiKey = true),
     THUNDERFOREST_OUTDOORS("Thunderforest Outdoors", requiresApiKey = true),
 }

@@ -13,7 +13,10 @@ STRAVA_CLIENT_SECRET=
 
 # Optional: map style API keys, used by the "Map style" setting (Settings screen).
 # Without these, only OSM Standard and OpenTopoMap are offered (both free, no key needed).
+# Mapbox Outdoors: same provider Strava's own app uses. Free token at
+# https://account.mapbox.com/access-tokens/ (50k free map loads/month).
 # CARTO Positron: free key at https://carto.com/basemaps/apikey/ (5M requests/month, non-commercial)
 # Thunderforest Outdoors: free key at https://www.thunderforest.com/pricing/ (150k tiles/month, Hobby tier)
+MAPBOX_ACCESS_TOKEN=
 CARTO_API_KEY=
 THUNDERFOREST_API_KEY=

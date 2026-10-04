@@ -36,6 +36,7 @@ jobs:
           echo "STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET }}" >> local.properties
           echo "CARTO_API_KEY=${{ secrets.CARTO_API_KEY }}" >> local.properties
           echo "THUNDERFOREST_API_KEY=${{ secrets.THUNDERFOREST_API_KEY }}" >> local.properties
+          echo "MAPBOX_ACCESS_TOKEN=${{ secrets.MAPBOX_ACCESS_TOKEN }}" >> local.properties
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace

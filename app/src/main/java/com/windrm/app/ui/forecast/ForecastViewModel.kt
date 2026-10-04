@@ -1,7 +1,6 @@
 package com.windrm.app.ui.forecast
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -32,8 +31,8 @@ class ForecastViewModel(
     var uiState by mutableStateOf<ForecastUiState>(ForecastUiState.Loading)
         private set
 
-    /** Index into the forecast points currently selected by the bottom time scrubber. */
-    var scrubIndex by mutableIntStateOf(0)
+    /** Index into the forecast points currently under a finger (chart or slider); null = not touching. */
+    var scrubIndex by mutableStateOf<Int?>(null)
 
     var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
         private set
@@ -51,7 +50,7 @@ class ForecastViewModel(
                 weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh)
             }
                 .onSuccess {
-                    scrubIndex = 0
+                    scrubIndex = null
                     uiState = ForecastUiState.Success(it)
                 }
                 .onFailure { uiState = ForecastUiState.Error(it.message ?: "Couldn't calculate the forecast") }

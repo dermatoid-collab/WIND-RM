@@ -81,12 +81,13 @@ Per far funzionare anche **"Connetti Strava"** nell'APK compilato da GitHub, agg
 `local.properties` prima della build. Senza questi secret l'APK si compila comunque,
 semplicemente la tab Strava resterà "non configurata".
 
-Allo stesso modo, per offrire anche gli stili mappa **CARTO Positron** e **Thunderforest
-Outdoors** nella schermata Settings (oltre a OSM Standard e OpenTopoMap, sempre disponibili
-senza chiave), aggiungi i secret `CARTO_API_KEY` (gratuita su
-<https://carto.com/basemaps/apikey/>) e `THUNDERFOREST_API_KEY` (gratuita su
-<https://www.thunderforest.com/pricing/>, piano Hobby). Senza queste chiavi, Settings mostra
-solo le due opzioni gratuite senza chiave.
+Allo stesso modo, per offrire anche gli stili mappa **Mapbox Outdoors** (lo stesso usato
+dall'app di Strava), **CARTO Positron** e **Thunderforest Outdoors** nella schermata Settings
+(oltre a OSM Standard e OpenTopoMap, sempre disponibili senza chiave), aggiungi i secret
+`MAPBOX_ACCESS_TOKEN` (gratuito su <https://account.mapbox.com/access-tokens/>),
+`CARTO_API_KEY` (gratuita su <https://carto.com/basemaps/apikey/>) e
+`THUNDERFOREST_API_KEY` (gratuita su <https://www.thunderforest.com/pricing/>, piano Hobby).
+Senza queste chiavi, Settings mostra solo le due opzioni gratuite senza chiave.
 
 ### Opzione B — Android Studio
 

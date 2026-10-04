@@ -42,6 +42,7 @@ fun RouteMapView(
     modifier: Modifier = Modifier,
     windArrows: List<WindArrowPoint>? = null,
     mapStyle: MapStyle = MapStyle.OSM_STANDARD,
+    highlightPoint: RoutePoint? = null,
 ) {
     AndroidView(
         // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned
@@ -67,7 +68,7 @@ fun RouteMapView(
                 val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
                 val polyline = Polyline(mapView).apply {
                     setPoints(geoPoints)
-                    outlinePaint.color = Color.parseColor("#B71C1C")
+                    outlinePaint.color = Color.parseColor("#E53935")
                     outlinePaint.strokeWidth = 9f
                 }
                 mapView.overlays.add(polyline)
@@ -78,8 +79,17 @@ fun RouteMapView(
                     mapView.overlays.add(WindArrowsOverlay(thinnedArrows))
                 }
 
-                val bbox = boundingBoxOf(geoPoints)
-                mapView.post { mapView.zoomToBoundingBox(bbox, false, 80) }
+                highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it)) }
+
+                // Re-fitting the camera on every update() (which fires on every recomposition,
+                // e.g. each time the scrub cursor moves) made the map visibly jump/flicker back
+                // to a full-route view while dragging a finger on a chart below. Only re-fit when
+                // the route itself actually changed, tracked via a tag on the view.
+                if (mapView.tag != points) {
+                    val bbox = boundingBoxOf(geoPoints)
+                    mapView.post { mapView.zoomToBoundingBox(bbox, false, 80) }
+                    mapView.tag = points
+                }
             }
             mapView.invalidate()
         },
@@ -87,11 +97,12 @@ fun RouteMapView(
 }
 
 /**
- * Resolves the user's chosen [MapStyle] to an osmdroid tile source. CARTO and Thunderforest
- * need an API key (set via local.properties / a GitHub Actions secret, same pattern as Strava's
- * credentials -- see SettingsRepository.MapStyle.requiresApiKey and the README); without one,
- * requests to those services simply won't return tiles, so callers should only offer them once
- * BuildConfig actually carries a non-blank key (SettingsScreen already gates the picker on this).
+ * Resolves the user's chosen [MapStyle] to an osmdroid tile source. Mapbox, CARTO and
+ * Thunderforest each need their own API key (set via local.properties / a GitHub Actions
+ * secret, same pattern as Strava's credentials -- see SettingsRepository.MapStyle.requiresApiKey
+ * and the README); without one, requests to those services simply won't return tiles, so callers
+ * should only offer them once BuildConfig actually carries a non-blank key (SettingsScreen
+ * already gates the picker on this).
  */
 private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
     MapStyle.OSM_STANDARD -> TileSourceFactory.MAPNIK
@@ -101,6 +112,12 @@ private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
     )
     MapStyle.THUNDERFOREST_OUTDOORS -> xyzTileSource(
         "ThunderforestOutdoors", 22, "https://tile.thunderforest.com/outdoors/", ".png?apikey=${BuildConfig.THUNDERFOREST_API_KEY}",
+    )
+    // Same provider Strava's own app uses (confirmed via its "Map Data Sources" panel: Mapbox,
+    // Maxar, Intermap -- the usual Mapbox "Outdoors" style stack). Classic v4 raster tiles, which
+    // (unlike the newer vector Style API) any z/x/y raster client like osmdroid can consume directly.
+    MapStyle.MAPBOX_OUTDOORS -> xyzTileSource(
+        "MapboxOutdoors", 20, "https://api.mapbox.com/v4/mapbox.outdoors/", ".png?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
     )
 }
 
@@ -150,6 +167,19 @@ private fun boundingBoxOf(points: List<GeoPoint>): BoundingBox {
     return BoundingBox(north, east, south, west)
 }
 
+/** A marker at the route point currently under a finger on any chart below the map. */
+private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val out = android.graphics.Point()
+        mapView.projection.toPixels(GeoPoint(point.lat, point.lon), out)
+        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E88E5"); style = Paint.Style.FILL }
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 9f, haloPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 6f, dotPaint)
+    }
+}
+
 /** Draws a rotated arrow at each sample point, pointing in the direction the wind blows towards. */
 private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Overlay() {
     // A white halo drawn behind the black arrow keeps it legible over both light and dark
@@ -165,13 +195,21 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.BLACK
+        style = Paint.Style.FILL
+    }
     // The tip always sits this many pixels from the route point -- calm or strong, it never
     // moves -- while the tail is what extends further away as wind speed increases, so the
-    // shaft (not the tip's distance from the route) is what grows with intensity.
-    private val tipOffsetPx = 14f
-    private val minShaftPx = 6f
-    private val maxShaftPx = 50f
-    private val maxSpeedForScaleKmh = 50.0
+    // shaft (not the tip's distance from the route) is what grows with intensity. Sized up from
+    // the first pass, which turned out too small/thin to read on a real device, with the shaft
+    // range narrowed to a realistic riding wind-speed span so the length difference is visible.
+    private val tipOffsetPx = 20f
+    private val minShaftPx = 12f
+    private val maxShaftPx = 70f
+    private val maxSpeedForScaleKmh = 40.0
+    private val lineStrokePx = 6f
+    private val haloStrokePx = 10f
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
@@ -193,9 +231,9 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
 
     private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float, shaftPx: Float) {
         val lengthPx = tipOffsetPx + shaftPx
-        val headPx = (tipOffsetPx + shaftPx * 0.35f).coerceAtMost(20f)
-        val lineStrokePx = (lengthPx * 0.14f).coerceAtLeast(4f)
-        val haloStrokePx = lineStrokePx + 5f
+        // A solid filled head reads far more reliably at this size than two thin open strokes,
+        // which blurred together with the halo into an illegible blob on a real screen.
+        val headPx = 18f
 
         // bearing 0 = pointing up (north); rotate clockwise for increasing degrees. The tip
         // sits at a fixed distance from the route point; only the tail moves further out.
@@ -206,24 +244,19 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         val tailX = cx + dx * lengthPx
         val tailY = cy + dy * lengthPx
 
-        // An open chevron (two strokes meeting at the tip, no fill or closing edge) rather
-        // than a solid filled triangle, matching Epic Ride Weather's minimal arrowhead.
-        val leftAngle = bearingRad + Math.toRadians(150.0).toFloat()
-        val rightAngle = bearingRad - Math.toRadians(150.0).toFloat()
-        val leftX = tipX + sin(leftAngle) * headPx
-        val leftY = tipY - cos(leftAngle) * headPx
-        val rightX = tipX + sin(rightAngle) * headPx
-        val rightY = tipY - cos(rightAngle) * headPx
+        val leftAngle = bearingRad + Math.toRadians(145.0).toFloat()
+        val rightAngle = bearingRad - Math.toRadians(145.0).toFloat()
         val headPath = Path().apply {
-            moveTo(leftX, leftY)
-            lineTo(tipX, tipY)
-            lineTo(rightX, rightY)
+            moveTo(tipX, tipY)
+            lineTo(tipX + sin(leftAngle) * headPx, tipY - cos(leftAngle) * headPx)
+            lineTo(tipX + sin(rightAngle) * headPx, tipY - cos(rightAngle) * headPx)
+            close()
         }
 
-        // Halo pass first (shaft + chevron outline), then the solid black stroke on top.
+        // Halo pass first (shaft + head outline), then the solid black shape on top.
         canvas.drawLine(tailX, tailY, tipX, tipY, haloPaint.apply { strokeWidth = haloStrokePx })
-        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.7f })
+        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.6f })
         canvas.drawLine(tailX, tailY, tipX, tipY, linePaint.apply { strokeWidth = lineStrokePx })
-        canvas.drawPath(headPath, linePaint.apply { strokeWidth = lineStrokePx })
+        canvas.drawPath(headPath, fillPaint)
     }
 }

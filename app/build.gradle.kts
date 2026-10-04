@@ -29,6 +29,7 @@ val stravaRedirectHost = "strava-callback"
 // are simply not offered (OSM Standard and OpenTopoMap need no key and are always available).
 val cartoApiKey: String = localProperties.getProperty("CARTO_API_KEY", "")
 val thunderforestApiKey: String = localProperties.getProperty("THUNDERFOREST_API_KEY", "")
+val mapboxAccessToken: String = localProperties.getProperty("MAPBOX_ACCESS_TOKEN", "")
 
 android {
     namespace = "com.windrm.app"
@@ -49,6 +50,7 @@ android {
         buildConfigField("String", "STRAVA_REDIRECT_HOST", "\"$stravaRedirectHost\"")
         buildConfigField("String", "CARTO_API_KEY", "\"$cartoApiKey\"")
         buildConfigField("String", "THUNDERFOREST_API_KEY", "\"$thunderforestApiKey\"")
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
 
         manifestPlaceholders["stravaRedirectScheme"] = stravaRedirectScheme
         manifestPlaceholders["stravaRedirectHost"] = stravaRedirectHost

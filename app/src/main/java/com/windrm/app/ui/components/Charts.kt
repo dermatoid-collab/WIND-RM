@@ -5,13 +5,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,9 +56,11 @@ private val Y_AXIS_WIDTH = 40.dp
  * top, gridlines with y-axis labels on both sides, one or more series, and a legend below.
  * Mirrors the layout used throughout the forecast screen (temperature, wind, elevation, etc.).
  *
- * Dragging a finger anywhere over the plot moves a shared scrub cursor ([scrubIndex]/[onScrub])
- * and shows each series' value at that instant in a floating card over the chart, with a
- * crosshair (vertical + per-series horizontal guide lines) marking exactly where they land.
+ * Pressing and dragging a finger anywhere over the plot moves a shared scrub cursor
+ * ([scrubIndex]/[onScrub]) and shows each series' value at that instant in a floating card that
+ * follows the touch, with a crosshair (vertical + per-series horizontal guide lines) marking
+ * exactly where they land. Lifting the finger clears the cursor ([onScrubEnd]), so the chart
+ * reads clean when nothing is being touched -- the common "press to inspect" pattern.
  */
 @Composable
 fun MultiSeriesChart(
@@ -69,6 +74,7 @@ fun MultiSeriesChart(
     chartHeight: Dp = 160.dp,
     scrubIndex: Int? = null,
     onScrub: ((Int) -> Unit)? = null,
+    onScrubEnd: (() -> Unit)? = null,
     scrubLabel: String? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -86,7 +92,7 @@ fun MultiSeriesChart(
 
         Row(Modifier.fillMaxWidth().height(chartHeight)) {
             YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = false, height = chartHeight)
-            Box(Modifier.weight(1f).fillMaxWidth().height(chartHeight)) {
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().height(chartHeight)) {
                 Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -110,6 +116,7 @@ fun MultiSeriesChart(
                                         pointer.consume()
                                     }
                                 }
+                                onScrubEnd?.invoke()
                             }
                         },
                 ) {
@@ -181,8 +188,15 @@ fun MultiSeriesChart(
                         }
                     }
                 }
-                if (scrubIndex != null) {
-                    ScrubTooltip(series, scrubIndex, yUnit, scrubLabel, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
+                if (scrubIndex != null && sampleCount > 1) {
+                    val fraction = scrubIndex.coerceIn(0, sampleCount - 1).toFloat() / (sampleCount - 1)
+                    val tooltipWidth = 170.dp
+                    val maxOffset = (maxWidth - tooltipWidth).coerceAtLeast(0.dp)
+                    val xOffset = (maxWidth * fraction - tooltipWidth / 2).coerceIn(0.dp, maxOffset)
+                    ScrubTooltip(
+                        series, scrubIndex, yUnit, scrubLabel,
+                        modifier = Modifier.offset(x = xOffset, y = 4.dp).widthIn(max = tooltipWidth),
+                    )
                 }
             }
             YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = true, height = chartHeight)
