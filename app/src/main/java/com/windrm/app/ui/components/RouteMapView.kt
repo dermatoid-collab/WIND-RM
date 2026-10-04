@@ -47,7 +47,7 @@ fun RouteMapView(
         },
         update = { mapView ->
             mapView.overlays.clear()
-            // OpenTopoMap's usage policy requires visible attribution; re-added every update()
+            // OSM's tile usage policy requires visible attribution; re-added every update()
             // since overlays.clear() above would otherwise drop it too.
             mapView.overlays.add(CopyrightOverlay(mapView.context))
             if (points.isNotEmpty()) {
@@ -74,12 +74,13 @@ fun RouteMapView(
 }
 
 private fun createMapView(context: Context): MapView = MapView(context).apply {
-    // OpenTopoMap: contour-line topographic style, closer to the Garmin-style maps the user
-    // is used to from other cycling apps, and free/no API key (unlike Garmin's own tiles).
-    setTileSource(TileSourceFactory.OpenTopo)
+    // OSM Standard (Mapnik): the familiar openstreetmap.org look, free and keyless, with no
+    // monthly request cap to track -- traded OpenTopoMap's contour-line styling for this
+    // cleaner, more legible roadmap style.
+    setTileSource(TileSourceFactory.MAPNIK)
     setMultiTouchControls(true)
     minZoomLevel = 4.0
-    maxZoomLevel = 17.0 // OpenTopoMap doesn't render tiles past z17
+    maxZoomLevel = 19.0
     // The enclosing screen is a scrollable Compose Column, which otherwise steals a one-finger
     // drag as a page scroll before osmdroid's own touch handling ever sees it. Telling the
     // parent not to intercept while a finger is down on the map lets a single-finger drag pan
@@ -118,7 +119,7 @@ private fun boundingBoxOf(points: List<GeoPoint>): BoundingBox {
 /** Draws a rotated arrow at each sample point, pointing in the direction the wind blows towards. */
 private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Overlay() {
     // A white halo drawn behind the black arrow keeps it legible over both light and dark
-    // terrain (forest greens, contour browns) on the OpenTopoMap tiles.
+    // map features (forest greens, water blues, road whites).
     private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
