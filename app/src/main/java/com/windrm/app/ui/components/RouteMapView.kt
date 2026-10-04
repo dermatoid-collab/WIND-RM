@@ -25,7 +25,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** A point along the route where a wind-direction arrow should be drawn, in meteorological "from" degrees. */
-data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double)
+data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double, val windSpeedKmh: Double)
 
 /**
  * osmdroid map showing the route polyline, and optionally a set of wind-direction arrows
@@ -135,10 +135,11 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
-    private val arrowLengthPx = 46f
-    private val arrowHeadPx = 18f
-    private val lineStrokePx = 7f
-    private val haloStrokePx = 12f
+    // Calm air gets a short stub, strong wind a long shaft; speeds at or above
+    // MAX_SPEED_FOR_SCALE_KMH all draw at the same maximum length.
+    private val minLengthPx = 16f
+    private val maxLengthPx = 58f
+    private val maxSpeedForScaleKmh = 50.0
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
@@ -148,25 +149,35 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
             projection.toPixels(GeoPoint(arrow.point.lat, arrow.point.lon), out)
             // Wind blows TOWARDS (from + 180); screen bearing 0deg = up/North in an unrotated map.
             val bearingRad = Math.toRadians((arrow.windFromDeg + 180.0) % 360.0)
-            drawArrow(canvas, out.x.toFloat(), out.y.toFloat(), bearingRad.toFloat())
+            val lengthPx = lengthForSpeed(arrow.windSpeedKmh)
+            drawArrow(canvas, out.x.toFloat(), out.y.toFloat(), bearingRad.toFloat(), lengthPx)
         }
     }
 
-    private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float) {
+    private fun lengthForSpeed(windSpeedKmh: Double): Float {
+        val t = (windSpeedKmh / maxSpeedForScaleKmh).coerceIn(0.0, 1.0)
+        return (minLengthPx + (maxLengthPx - minLengthPx) * t).toFloat()
+    }
+
+    private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float, lengthPx: Float) {
+        val headPx = lengthPx * 0.35f
+        val lineStrokePx = (lengthPx * 0.14f).coerceAtLeast(4f)
+        val haloStrokePx = lineStrokePx + 5f
+
         // bearing 0 = pointing up (north); rotate clockwise for increasing degrees.
         val dx = sin(bearingRad)
         val dy = -cos(bearingRad)
-        val tailX = cx - dx * arrowLengthPx / 2
-        val tailY = cy - dy * arrowLengthPx / 2
-        val tipX = cx + dx * arrowLengthPx / 2
-        val tipY = cy + dy * arrowLengthPx / 2
+        val tailX = cx - dx * lengthPx / 2
+        val tailY = cy - dy * lengthPx / 2
+        val tipX = cx + dx * lengthPx / 2
+        val tipY = cy + dy * lengthPx / 2
 
         val leftAngle = bearingRad + Math.toRadians(150.0).toFloat()
         val rightAngle = bearingRad - Math.toRadians(150.0).toFloat()
         val headPath = Path().apply {
             moveTo(tipX, tipY)
-            lineTo(tipX + sin(leftAngle) * arrowHeadPx, tipY - cos(leftAngle) * arrowHeadPx)
-            lineTo(tipX + sin(rightAngle) * arrowHeadPx, tipY - cos(rightAngle) * arrowHeadPx)
+            lineTo(tipX + sin(leftAngle) * headPx, tipY - cos(leftAngle) * headPx)
+            lineTo(tipX + sin(rightAngle) * headPx, tipY - cos(rightAngle) * headPx)
             close()
         }
 

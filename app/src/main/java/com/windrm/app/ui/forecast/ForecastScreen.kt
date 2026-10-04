@@ -205,7 +205,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 // The full-resolution track, not the sparse weather-sampling points below --
                 // otherwise the drawn line cuts corners on every curve between samples.
                 points = result.route.points,
-                windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg) },
+                windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
             )
         }
 
