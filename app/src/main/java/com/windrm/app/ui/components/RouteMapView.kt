@@ -135,10 +135,12 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
     }
-    // Calm air gets a short stub, strong wind a long shaft; speeds at or above
-    // MAX_SPEED_FOR_SCALE_KMH all draw at the same maximum length.
-    private val minLengthPx = 16f
-    private val maxLengthPx = 58f
+    // The tip always sits this many pixels from the route point -- calm or strong, it never
+    // moves -- while the tail is what extends further away as wind speed increases, so the
+    // shaft (not the tip's distance from the route) is what grows with intensity.
+    private val tipOffsetPx = 14f
+    private val minShaftPx = 6f
+    private val maxShaftPx = 50f
     private val maxSpeedForScaleKmh = 50.0
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
@@ -149,28 +151,30 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
             projection.toPixels(GeoPoint(arrow.point.lat, arrow.point.lon), out)
             // Wind blows TOWARDS (from + 180); screen bearing 0deg = up/North in an unrotated map.
             val bearingRad = Math.toRadians((arrow.windFromDeg + 180.0) % 360.0)
-            val lengthPx = lengthForSpeed(arrow.windSpeedKmh)
-            drawArrow(canvas, out.x.toFloat(), out.y.toFloat(), bearingRad.toFloat(), lengthPx)
+            val shaftPx = shaftForSpeed(arrow.windSpeedKmh)
+            drawArrow(canvas, out.x.toFloat(), out.y.toFloat(), bearingRad.toFloat(), shaftPx)
         }
     }
 
-    private fun lengthForSpeed(windSpeedKmh: Double): Float {
+    private fun shaftForSpeed(windSpeedKmh: Double): Float {
         val t = (windSpeedKmh / maxSpeedForScaleKmh).coerceIn(0.0, 1.0)
-        return (minLengthPx + (maxLengthPx - minLengthPx) * t).toFloat()
+        return (minShaftPx + (maxShaftPx - minShaftPx) * t).toFloat()
     }
 
-    private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float, lengthPx: Float) {
-        val headPx = lengthPx * 0.35f
+    private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float, shaftPx: Float) {
+        val lengthPx = tipOffsetPx + shaftPx
+        val headPx = (tipOffsetPx + shaftPx * 0.35f).coerceAtMost(20f)
         val lineStrokePx = (lengthPx * 0.14f).coerceAtLeast(4f)
         val haloStrokePx = lineStrokePx + 5f
 
-        // bearing 0 = pointing up (north); rotate clockwise for increasing degrees.
+        // bearing 0 = pointing up (north); rotate clockwise for increasing degrees. The tip
+        // sits at a fixed distance from the route point; only the tail moves further out.
         val dx = sin(bearingRad)
         val dy = -cos(bearingRad)
-        val tailX = cx - dx * lengthPx / 2
-        val tailY = cy - dy * lengthPx / 2
-        val tipX = cx + dx * lengthPx / 2
-        val tipY = cy + dy * lengthPx / 2
+        val tipX = cx + dx * tipOffsetPx
+        val tipY = cy + dy * tipOffsetPx
+        val tailX = cx + dx * lengthPx
+        val tailY = cy + dy * lengthPx
 
         val leftAngle = bearingRad + Math.toRadians(150.0).toFloat()
         val rightAngle = bearingRad - Math.toRadians(150.0).toFloat()
