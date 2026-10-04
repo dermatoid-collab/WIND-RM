@@ -17,10 +17,11 @@ import com.windrm.app.BuildConfig
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.settings.MapStyle
 import org.osmdroid.tileprovider.tilesource.ITileSource
+import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.tileprovider.tilesource.XYZTileSource
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.Overlay
@@ -95,15 +96,22 @@ fun RouteMapView(
 private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
     MapStyle.OSM_STANDARD -> TileSourceFactory.MAPNIK
     MapStyle.OPEN_TOPO -> TileSourceFactory.OpenTopo
-    MapStyle.CARTO_POSITRON -> XYZTileSource(
-        "CartoPositron", 0, 20, 256, ".png?api_key=${BuildConfig.CARTO_API_KEY}",
-        arrayOf("https://basemaps.cartocdn.com/light_all/"),
+    MapStyle.CARTO_POSITRON -> xyzTileSource(
+        "CartoPositron", 20, "https://basemaps.cartocdn.com/light_all/", ".png?api_key=${BuildConfig.CARTO_API_KEY}",
     )
-    MapStyle.THUNDERFOREST_OUTDOORS -> XYZTileSource(
-        "ThunderforestOutdoors", 0, 22, 256, ".png?apikey=${BuildConfig.THUNDERFOREST_API_KEY}",
-        arrayOf("https://tile.thunderforest.com/outdoors/"),
+    MapStyle.THUNDERFOREST_OUTDOORS -> xyzTileSource(
+        "ThunderforestOutdoors", 22, "https://tile.thunderforest.com/outdoors/", ".png?apikey=${BuildConfig.THUNDERFOREST_API_KEY}",
     )
 }
+
+/** A simple z/x/y raster tile source, built directly on osmdroid's base class for reliability
+ * across osmdroid versions (unlike the XYZTileSource convenience class, which isn't available
+ * in every release). */
+private fun xyzTileSource(name: String, maxZoom: Int, baseUrl: String, urlSuffix: String): OnlineTileSourceBase =
+    object : OnlineTileSourceBase(name, 0, maxZoom, 256, urlSuffix, arrayOf(baseUrl)) {
+        override fun getTileURLString(pMapTileIndex: Long): String =
+            baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex) + "/" + MapTileIndex.getY(pMapTileIndex) + urlSuffix
+    }
 
 private fun createMapView(context: Context): MapView = MapView(context).apply {
     setMultiTouchControls(true)
