@@ -126,10 +126,6 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.BLACK
-        style = Paint.Style.FILL
-    }
     private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
@@ -176,19 +172,24 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
         val tailX = cx + dx * lengthPx
         val tailY = cy + dy * lengthPx
 
+        // An open chevron (two strokes meeting at the tip, no fill or closing edge) rather
+        // than a solid filled triangle, matching Epic Ride Weather's minimal arrowhead.
         val leftAngle = bearingRad + Math.toRadians(150.0).toFloat()
         val rightAngle = bearingRad - Math.toRadians(150.0).toFloat()
+        val leftX = tipX + sin(leftAngle) * headPx
+        val leftY = tipY - cos(leftAngle) * headPx
+        val rightX = tipX + sin(rightAngle) * headPx
+        val rightY = tipY - cos(rightAngle) * headPx
         val headPath = Path().apply {
-            moveTo(tipX, tipY)
-            lineTo(tipX + sin(leftAngle) * headPx, tipY - cos(leftAngle) * headPx)
-            lineTo(tipX + sin(rightAngle) * headPx, tipY - cos(rightAngle) * headPx)
-            close()
+            moveTo(leftX, leftY)
+            lineTo(tipX, tipY)
+            lineTo(rightX, rightY)
         }
 
-        // Halo pass first (shaft + head outline), then the solid black shape on top.
+        // Halo pass first (shaft + chevron outline), then the solid black stroke on top.
         canvas.drawLine(tailX, tailY, tipX, tipY, haloPaint.apply { strokeWidth = haloStrokePx })
-        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.6f })
+        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.7f })
         canvas.drawLine(tailX, tailY, tipX, tipY, linePaint.apply { strokeWidth = lineStrokePx })
-        canvas.drawPath(headPath, fillPaint)
+        canvas.drawPath(headPath, linePaint.apply { strokeWidth = lineStrokePx })
     }
 }
