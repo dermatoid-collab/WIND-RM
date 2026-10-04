@@ -41,6 +41,9 @@ data class ChartSeries(
     val color: Color,
     val values: List<Float>,
     val filled: Boolean = true,
+    // Smoothing suits weather data (interpolated between hourly samples anyway), but elevation
+    // should trace the GPX recording exactly -- smoothing it would round off real grade changes.
+    val smooth: Boolean = true,
 )
 
 /** A horizontal colored band drawn behind the chart, e.g. air-quality severity ranges. */
@@ -147,17 +150,21 @@ fun MultiSeriesChart(
                         if (s.values.size < 2) return@forEach
                         val n = s.values.size
                         val stepX = size.width / (n - 1)
-                        val smoothPath = smoothLinePath(s.values, min, max, stepX, size.height)
+                        val linePath = if (s.smooth) {
+                            smoothLinePath(s.values, min, max, stepX, size.height)
+                        } else {
+                            rawLinePath(s.values, min, max, stepX, size.height)
+                        }
                         if (s.filled) {
                             val fillPath = Path().apply {
-                                addPath(smoothPath)
+                                addPath(linePath)
                                 lineTo((n - 1) * stepX, size.height)
                                 lineTo(0f, size.height)
                                 close()
                             }
                             drawPath(fillPath, color = s.color.copy(alpha = 0.28f))
                         }
-                        drawPath(smoothPath, color = s.color, style = Stroke(width = 1.6.dp.toPx()))
+                        drawPath(linePath, color = s.color, style = Stroke(width = 1.6.dp.toPx()))
                     }
                     if (scrubIndex != null && sampleCount > 1) {
                         val stepX = size.width / (sampleCount - 1)
@@ -227,6 +234,18 @@ private fun smoothLinePath(values: List<Float>, min: Float, max: Float, stepX: F
         path.quadraticTo(current.x, current.y, midX, midY)
     }
     path.lineTo(points.last().x, points.last().y)
+    return path
+}
+
+/** Straight segments through the exact recorded values -- no interpolation, for data (elevation) where rounding off real changes would misrepresent it. */
+private fun rawLinePath(values: List<Float>, min: Float, max: Float, stepX: Float, height: Float): Path {
+    val path = Path()
+    values.forEachIndexed { i, v ->
+        val fraction = ((v - min) / (max - min)).coerceIn(0f, 1f)
+        val x = i * stepX
+        val y = height * (1f - fraction)
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
     return path
 }
 

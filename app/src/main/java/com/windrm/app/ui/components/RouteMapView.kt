@@ -32,6 +32,9 @@ import kotlin.math.sin
 /** A point along the route where a wind-direction arrow should be drawn, in meteorological "from" degrees. */
 data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double, val windSpeedKmh: Double)
 
+/** What was last applied to a MapView, stashed in its tag so update() can skip redundant work. */
+private data class MapViewFitState(val style: MapStyle, val points: List<RoutePoint>)
+
 /**
  * osmdroid map showing the route polyline, and optionally a set of wind-direction arrows
  * (used by the forecast screen's "Wind Direction" section).
@@ -53,13 +56,21 @@ fun RouteMapView(
             createMapView(context)
         },
         update = { mapView ->
-            val tileSource = tileSourceFor(mapStyle)
-            mapView.setTileSource(tileSource)
-            // Each provider renders tiles up to a different zoom (OpenTopoMap stops at z17,
-            // others go further); capping the view to a fixed level regardless of source would
-            // either waste zoom range or request levels the source doesn't have tiles for.
-            mapView.minZoomLevel = tileSource.minimumZoomLevel.toDouble()
-            mapView.maxZoomLevel = tileSource.maximumZoomLevel.toDouble()
+            // update() re-runs on every recomposition (e.g. each time the scrub cursor moves),
+            // but calling setTileSource()/zoomToBoundingBox() unconditionally made the map
+            // visibly flicker/reset every single time, even though neither the style nor the
+            // route had actually changed. A tag on the view remembers what was last applied so
+            // each is only redone when it genuinely changes.
+            val lastState = mapView.tag as? MapViewFitState
+            if (lastState?.style != mapStyle) {
+                val tileSource = tileSourceFor(mapStyle)
+                mapView.setTileSource(tileSource)
+                // Each provider renders tiles up to a different zoom (OpenTopoMap stops at z17,
+                // others go further); capping the view to a fixed level regardless of source
+                // would either waste zoom range or request levels the source doesn't have tiles for.
+                mapView.minZoomLevel = tileSource.minimumZoomLevel.toDouble()
+                mapView.maxZoomLevel = tileSource.maximumZoomLevel.toDouble()
+            }
             mapView.overlays.clear()
             // OSM's tile usage policy requires visible attribution; re-added every update()
             // since overlays.clear() above would otherwise drop it too.
@@ -81,16 +92,12 @@ fun RouteMapView(
 
                 highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it)) }
 
-                // Re-fitting the camera on every update() (which fires on every recomposition,
-                // e.g. each time the scrub cursor moves) made the map visibly jump/flicker back
-                // to a full-route view while dragging a finger on a chart below. Only re-fit when
-                // the route itself actually changed, tracked via a tag on the view.
-                if (mapView.tag != points) {
+                if (lastState?.points != points) {
                     val bbox = boundingBoxOf(geoPoints)
                     mapView.post { mapView.zoomToBoundingBox(bbox, false, 80) }
-                    mapView.tag = points
                 }
             }
+            mapView.tag = MapViewFitState(mapStyle, points)
             mapView.invalidate()
         },
     )
@@ -114,10 +121,11 @@ private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
         "ThunderforestOutdoors", 22, "https://tile.thunderforest.com/outdoors/", ".png?apikey=${BuildConfig.THUNDERFOREST_API_KEY}",
     )
     // Same provider Strava's own app uses (confirmed via its "Map Data Sources" panel: Mapbox,
-    // Maxar, Intermap -- the usual Mapbox "Outdoors" style stack). Classic v4 raster tiles, which
-    // (unlike the newer vector Style API) any z/x/y raster client like osmdroid can consume directly.
+    // Maxar, Intermap -- the usual Mapbox "Outdoors" style stack). The classic v4 raster tile API
+    // returned nothing for newer accounts (it's been retired); this is Mapbox's current Static
+    // Tiles API, which renders a v1 style to plain raster tiles any z/x/y client can consume.
     MapStyle.MAPBOX_OUTDOORS -> xyzTileSource(
-        "MapboxOutdoors", 20, "https://api.mapbox.com/v4/mapbox.outdoors/", ".png?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
+        "MapboxOutdoors", 20, "https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/", "?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
     )
 }
 
@@ -173,10 +181,14 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
         if (shadow) return
         val out = android.graphics.Point()
         mapView.projection.toPixels(GeoPoint(point.lat, point.lon), out)
-        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+        val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
         val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E88E5"); style = Paint.Style.FILL }
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 9f, haloPaint)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 6f, dotPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 14f, dotPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 14f, ringPaint)
     }
 }
 
@@ -231,25 +243,29 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Over
 
     private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float, shaftPx: Float) {
         val lengthPx = tipOffsetPx + shaftPx
-        // A solid filled head reads far more reliably at this size than two thin open strokes,
-        // which blurred together with the halo into an illegible blob on a real screen.
-        val headPx = 18f
+        val headLengthPx = 16f
+        val headHalfWidthPx = 11f
 
         // bearing 0 = pointing up (north); rotate clockwise for increasing degrees. The tip
         // sits at a fixed distance from the route point; only the tail moves further out.
-        val dx = sin(bearingRad)
-        val dy = -cos(bearingRad)
-        val tipX = cx + dx * tipOffsetPx
-        val tipY = cy + dy * tipOffsetPx
-        val tailX = cx + dx * lengthPx
-        val tailY = cy + dy * lengthPx
+        val fx = sin(bearingRad)
+        val fy = -cos(bearingRad)
+        val tipX = cx + fx * tipOffsetPx
+        val tipY = cy + fy * tipOffsetPx
+        val tailX = cx + fx * lengthPx
+        val tailY = cy + fy * lengthPx
 
-        val leftAngle = bearingRad + Math.toRadians(145.0).toFloat()
-        val rightAngle = bearingRad - Math.toRadians(145.0).toFloat()
+        // Classic arrowhead: apex at the tip, base a fixed distance behind it along the shaft,
+        // perpendicular corners symmetric around that base -- an unambiguous "normal" arrow
+        // shape, unlike the angle-from-tip construction tried before, which read as inverted.
+        val px = -fy
+        val py = fx
+        val baseX = tipX - fx * headLengthPx
+        val baseY = tipY - fy * headLengthPx
         val headPath = Path().apply {
             moveTo(tipX, tipY)
-            lineTo(tipX + sin(leftAngle) * headPx, tipY - cos(leftAngle) * headPx)
-            lineTo(tipX + sin(rightAngle) * headPx, tipY - cos(rightAngle) * headPx)
+            lineTo(baseX + px * headHalfWidthPx, baseY + py * headHalfWidthPx)
+            lineTo(baseX - px * headHalfWidthPx, baseY - py * headHalfWidthPx)
             close()
         }
 

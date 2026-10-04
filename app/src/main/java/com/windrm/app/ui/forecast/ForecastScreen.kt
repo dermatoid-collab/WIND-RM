@@ -238,7 +238,7 @@ private fun ForecastContent(
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }),
+                    ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }, smooth = false),
                 ),
             )
             Text(
