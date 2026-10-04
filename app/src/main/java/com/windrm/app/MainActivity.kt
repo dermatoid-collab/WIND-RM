@@ -5,7 +5,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
+import com.windrm.app.settings.AppSettings
+import com.windrm.app.settings.ThemeMode
 import com.windrm.app.ui.navigation.WindRmNavHost
 import com.windrm.app.ui.theme.WindRmTheme
 import kotlinx.coroutines.launch
@@ -20,7 +25,13 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
 
         setContent {
-            WindRmTheme {
+            val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
+            val darkTheme = when (settings.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            WindRmTheme(darkTheme = darkTheme) {
                 WindRmNavHost(container)
             }
         }

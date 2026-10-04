@@ -24,6 +24,12 @@ val stravaClientSecret: String = localProperties.getProperty("STRAVA_CLIENT_SECR
 val stravaRedirectScheme = "windrm"
 val stravaRedirectHost = "strava-callback"
 
+// Same optional/never-committed pattern as Strava above, for the CARTO Positron and
+// Thunderforest Outdoors map styles offered in Settings. Without a key, those two options
+// are simply not offered (OSM Standard and OpenTopoMap need no key and are always available).
+val cartoApiKey: String = localProperties.getProperty("CARTO_API_KEY", "")
+val thunderforestApiKey: String = localProperties.getProperty("THUNDERFOREST_API_KEY", "")
+
 android {
     namespace = "com.windrm.app"
     compileSdk = 34
@@ -41,6 +47,8 @@ android {
         buildConfigField("String", "STRAVA_CLIENT_SECRET", "\"$stravaClientSecret\"")
         buildConfigField("String", "STRAVA_REDIRECT_SCHEME", "\"$stravaRedirectScheme\"")
         buildConfigField("String", "STRAVA_REDIRECT_HOST", "\"$stravaRedirectHost\"")
+        buildConfigField("String", "CARTO_API_KEY", "\"$cartoApiKey\"")
+        buildConfigField("String", "THUNDERFOREST_API_KEY", "\"$thunderforestApiKey\"")
 
         manifestPlaceholders["stravaRedirectScheme"] = stravaRedirectScheme
         manifestPlaceholders["stravaRedirectHost"] = stravaRedirectHost

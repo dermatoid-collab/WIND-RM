@@ -19,6 +19,8 @@ import com.windrm.app.ui.routedetail.RouteDetailScreen
 import com.windrm.app.ui.routedetail.RouteDetailViewModel
 import com.windrm.app.ui.routes.RoutesListScreen
 import com.windrm.app.ui.routes.RoutesListViewModel
+import com.windrm.app.ui.settings.SettingsScreen
+import com.windrm.app.ui.settings.SettingsViewModel
 
 @Composable
 fun WindRmNavHost(container: AppContainer) {
@@ -29,15 +31,26 @@ fun WindRmNavHost(container: AppContainer) {
             val appContext = LocalContext.current.applicationContext
             val viewModel = viewModel<HomeViewModel>(
                 factory = viewModelFactory {
-                    initializer { HomeViewModel(appContext, container.weatherRepository, container.routeRepository) }
+                    initializer { HomeViewModel(appContext, container.weatherRepository, container.routeRepository, container.settingsRepository) }
                 },
             )
             HomeScreen(
                 viewModel = viewModel,
                 onOpenRecent = { navController.navigate(Destination.RoutesList.path(0)) },
                 onOpenStrava = { navController.navigate(Destination.RoutesList.path(1)) },
+                onOpenSettings = { navController.navigate(Destination.Settings.route) },
                 onRouteImported = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
             )
+        }
+
+        composable(Destination.Settings.route) {
+            val appContext = LocalContext.current.applicationContext
+            val viewModel = viewModel<SettingsViewModel>(
+                factory = viewModelFactory {
+                    initializer { SettingsViewModel(appContext, container.settingsRepository, container.stravaAuthManager) }
+                },
+            )
+            SettingsScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -65,7 +78,7 @@ fun WindRmNavHost(container: AppContainer) {
             val routeId = backStackEntry.arguments?.getLong(Destination.RouteDetail.ARG_ROUTE_ID) ?: return@composable
             val viewModel = viewModel<RouteDetailViewModel>(
                 factory = viewModelFactory {
-                    initializer { RouteDetailViewModel(container.routeRepository, routeId) }
+                    initializer { RouteDetailViewModel(container.routeRepository, container.settingsRepository, routeId) }
                 },
             )
             RouteDetailScreen(
@@ -92,7 +105,7 @@ fun WindRmNavHost(container: AppContainer) {
             val viewModel = viewModel<ForecastViewModel>(
                 factory = viewModelFactory {
                     initializer {
-                        ForecastViewModel(container.routeRepository, container.weatherRepository, routeId, startEpoch, speed)
+                        ForecastViewModel(container.routeRepository, container.weatherRepository, container.settingsRepository, routeId, startEpoch, speed)
                     }
                 },
             )

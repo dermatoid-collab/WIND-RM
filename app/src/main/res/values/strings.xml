@@ -58,4 +58,28 @@
     <!-- Home -->
     <string name="location_permission_prompt">Allow location access to see the current weather here.</string>
     <string name="enable_location">Enable Location</string>
+    <string name="menu_settings">Settings</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_strava_connected">Connected</string>
+    <string name="settings_strava_not_connected">Not connected</string>
+    <string name="disconnect_strava">Disconnect</string>
+    <string name="settings_map">Map</string>
+    <string name="settings_map_style">Map style</string>
+    <string name="settings_requires_api_key">Requires an API key — see the README</string>
+    <string name="settings_forecast">Forecast defaults</string>
+    <string name="settings_default_speed">Default average speed</string>
+    <string name="settings_forecast_horizon">Planning horizon</string>
+    <string name="settings_days_suffix">days</string>
+    <string name="settings_home_location">Home location</string>
+    <string name="settings_home_location_gps">Using live GPS</string>
+    <string name="settings_home_location_fixed">Fixed: %1$s</string>
+    <string name="settings_use_current_location">Use current location as Home</string>
+    <string name="settings_use_live_gps">Use live GPS instead</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">version</string>
+    <string name="settings_attribution">Map data © OpenStreetMap contributors. Weather data by Open-Meteo.com. Activity, route and segment import by Strava.</string>
 </resources>

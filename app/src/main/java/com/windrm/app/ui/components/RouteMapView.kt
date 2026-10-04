@@ -13,8 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.windrm.app.BuildConfig
 import com.windrm.app.model.RoutePoint
+import com.windrm.app.settings.MapStyle
+import org.osmdroid.tileprovider.tilesource.ITileSource
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.XYZTileSource
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -36,6 +40,7 @@ fun RouteMapView(
     points: List<RoutePoint>,
     modifier: Modifier = Modifier,
     windArrows: List<WindArrowPoint>? = null,
+    mapStyle: MapStyle = MapStyle.OSM_STANDARD,
 ) {
     AndroidView(
         // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned
@@ -46,6 +51,13 @@ fun RouteMapView(
             createMapView(context)
         },
         update = { mapView ->
+            val tileSource = tileSourceFor(mapStyle)
+            mapView.setTileSource(tileSource)
+            // Each provider renders tiles up to a different zoom (OpenTopoMap stops at z17,
+            // others go further); capping the view to a fixed level regardless of source would
+            // either waste zoom range or request levels the source doesn't have tiles for.
+            mapView.minZoomLevel = tileSource.minimumZoomLevel.toDouble()
+            mapView.maxZoomLevel = tileSource.maximumZoomLevel.toDouble()
             mapView.overlays.clear()
             // OSM's tile usage policy requires visible attribution; re-added every update()
             // since overlays.clear() above would otherwise drop it too.
@@ -73,14 +85,28 @@ fun RouteMapView(
     )
 }
 
+/**
+ * Resolves the user's chosen [MapStyle] to an osmdroid tile source. CARTO and Thunderforest
+ * need an API key (set via local.properties / a GitHub Actions secret, same pattern as Strava's
+ * credentials -- see SettingsRepository.MapStyle.requiresApiKey and the README); without one,
+ * requests to those services simply won't return tiles, so callers should only offer them once
+ * BuildConfig actually carries a non-blank key (SettingsScreen already gates the picker on this).
+ */
+private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
+    MapStyle.OSM_STANDARD -> TileSourceFactory.MAPNIK
+    MapStyle.OPEN_TOPO -> TileSourceFactory.OpenTopo
+    MapStyle.CARTO_POSITRON -> XYZTileSource(
+        "CartoPositron", 0, 20, 256, ".png?api_key=${BuildConfig.CARTO_API_KEY}",
+        arrayOf("https://basemaps.cartocdn.com/light_all/"),
+    )
+    MapStyle.THUNDERFOREST_OUTDOORS -> XYZTileSource(
+        "ThunderforestOutdoors", 0, 22, 256, ".png?apikey=${BuildConfig.THUNDERFOREST_API_KEY}",
+        arrayOf("https://tile.thunderforest.com/outdoors/"),
+    )
+}
+
 private fun createMapView(context: Context): MapView = MapView(context).apply {
-    // OSM Standard (Mapnik): the familiar openstreetmap.org look, free and keyless, with no
-    // monthly request cap to track -- traded OpenTopoMap's contour-line styling for this
-    // cleaner, more legible roadmap style.
-    setTileSource(TileSourceFactory.MAPNIK)
     setMultiTouchControls(true)
-    minZoomLevel = 4.0
-    maxZoomLevel = 19.0
     // The enclosing screen is a scrollable Compose Column, which otherwise steals a one-finger
     // drag as a page scroll before osmdroid's own touch handling ever sees it. Telling the
     // parent not to intercept while a finger is down on the map lets a single-finger drag pan

@@ -10,6 +10,7 @@ import com.windrm.app.remote.strava.StravaTokenStore
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.StravaRepository
 import com.windrm.app.repository.WeatherRepository
+import com.windrm.app.settings.SettingsRepository
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -47,4 +48,5 @@ class AppContainer(context: Context) {
     val weatherRepository = WeatherRepository(weatherApi, airQualityApi)
     val stravaAuthManager = StravaAuthManager(context, stravaApi, stravaTokenStore)
     val stravaRepository = StravaRepository(stravaApi, stravaAuthManager)
+    val settingsRepository = SettingsRepository(context)
 }

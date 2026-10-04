@@ -37,6 +37,7 @@ import com.windrm.app.R
 import com.windrm.app.model.RouteForecastPoint
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.model.aqiLabel
+import com.windrm.app.settings.MapStyle
 import com.windrm.app.ui.components.AqiDial
 import com.windrm.app.ui.components.ChartBand
 import com.windrm.app.ui.components.ChartSeries
@@ -107,6 +108,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                     result = state.result,
                     scrubIndex = viewModel.scrubIndex,
                     onScrub = { viewModel.scrubIndex = it },
+                    mapStyle = viewModel.mapStyle,
                 )
             }
         }
@@ -142,7 +144,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScrub: (Int) -> Unit) {
+private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScrub: (Int) -> Unit, mapStyle: MapStyle) {
     val points = result.points
     if (points.isEmpty()) {
         ErrorContent(stringResource(R.string.forecast_error), onRetry = {})
@@ -210,6 +212,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 // otherwise the drawn line cuts corners on every curve between samples.
                 points = result.route.points,
                 windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
+                mapStyle = mapStyle,
             )
         }
 

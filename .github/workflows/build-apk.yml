@@ -28,10 +28,14 @@ jobs:
       # STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET as repository secrets. If they're
       # not set, this just writes empty values (same as not having a
       # local.properties at all) and the build proceeds normally without Strava.
+      # Same opt-in pattern for the CARTO_API_KEY / THUNDERFOREST_API_KEY secrets: without them,
+      # the "Map style" setting simply won't offer those two options.
       - name: Configure local.properties
         run: |
           echo "STRAVA_CLIENT_ID=${{ secrets.STRAVA_CLIENT_ID }}" >> local.properties
           echo "STRAVA_CLIENT_SECRET=${{ secrets.STRAVA_CLIENT_SECRET }}" >> local.properties
+          echo "CARTO_API_KEY=${{ secrets.CARTO_API_KEY }}" >> local.properties
+          echo "THUNDERFOREST_API_KEY=${{ secrets.THUNDERFOREST_API_KEY }}" >> local.properties
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace

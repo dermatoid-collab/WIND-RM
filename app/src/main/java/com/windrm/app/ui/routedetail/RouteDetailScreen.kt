@@ -91,7 +91,7 @@ fun RouteDetailScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            RouteMapView(points = route.points)
+            RouteMapView(points = route.points, mapStyle = viewModel.mapStyle)
 
             Column(Modifier.padding(16.dp)) {
                 Text("%.1f km · %.0f m↑".format(route.distanceKm, route.elevationGainM), style = MaterialTheme.typography.bodyMedium)
@@ -148,6 +148,7 @@ fun RouteDetailScreen(
         if (showTimeDialog) {
             StartTimeDialog(
                 initialDate = viewModel.plannedDate,
+                horizonDays = viewModel.forecastHorizonDays,
                 initialHour = if (viewModel.startsNow) Instant.now().atZone(java.time.ZoneId.systemDefault()).hour else viewModel.plannedHour,
                 initialMinute = if (viewModel.startsNow) Instant.now().atZone(java.time.ZoneId.systemDefault()).minute else viewModel.plannedMinute,
                 onDismiss = { showTimeDialog = false },
@@ -168,6 +169,7 @@ fun RouteDetailScreen(
 @Composable
 private fun StartTimeDialog(
     initialDate: LocalDate,
+    horizonDays: Long,
     initialHour: Int,
     initialMinute: Int,
     onDismiss: () -> Unit,
@@ -204,7 +206,7 @@ private fun StartTimeDialog(
 
     if (showDatePicker) {
         val today = remember { LocalDate.now() }
-        val maxDate = remember(today) { today.plusDays(FORECAST_HORIZON_DAYS) }
+        val maxDate = remember(today, horizonDays) { today.plusDays(horizonDays) }
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
             // Beyond this horizon Open-Meteo's high-resolution regional models fall back to lower

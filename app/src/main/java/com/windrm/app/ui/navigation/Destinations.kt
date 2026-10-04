@@ -3,6 +3,8 @@ package com.windrm.app.ui.navigation
 sealed class Destination(val route: String) {
     data object Home : Destination("home")
 
+    data object Settings : Destination("settings")
+
     data object RoutesList : Destination("routes/{initialTab}") {
         const val ARG_INITIAL_TAB = "initialTab"
         fun path(initialTab: Int = 0) = "routes/$initialTab"

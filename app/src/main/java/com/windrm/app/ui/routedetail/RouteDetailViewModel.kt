@@ -7,16 +7,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.model.Route
 import com.windrm.app.repository.RouteRepository
+import com.windrm.app.settings.MapStyle
+import com.windrm.app.settings.SettingsRepository
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Open-Meteo's practical hourly-forecast horizon; dates beyond this aren't offered in the picker. */
-const val FORECAST_HORIZON_DAYS = 15L
-
 class RouteDetailViewModel(
     private val routeRepository: RouteRepository,
+    private val settingsRepository: SettingsRepository,
     private val routeId: Long,
 ) : ViewModel() {
 
@@ -27,9 +27,18 @@ class RouteDetailViewModel(
     var plannedDate by mutableStateOf(LocalDate.now())
     var plannedHour by mutableStateOf(8)
     var plannedMinute by mutableStateOf(0)
+    var forecastHorizonDays by mutableStateOf(15L)
+        private set
+    var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
+        private set
 
     init {
         viewModelScope.launch {
+            val settings = settingsRepository.current()
+            avgSpeedKmh = settings.defaultAvgSpeedKmh
+            forecastHorizonDays = settings.forecastHorizonDays.toLong()
+            mapStyle = settings.mapStyle
+
             val loaded = routeRepository.getRoute(routeId)
             route = loaded
             loaded?.recordedAvgSpeedKmh?.let { avgSpeedKmh = it.coerceIn(5.0, 60.0) }

@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Umbrella
 import androidx.compose.material.icons.filled.WbSunny
@@ -54,6 +55,7 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onOpenRecent: () -> Unit,
     onOpenStrava: () -> Unit,
+    onOpenSettings: () -> Unit,
     onRouteImported: (Route) -> Unit,
 ) {
     val context = LocalContext.current
@@ -98,6 +100,7 @@ fun HomeScreen(
                     gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*"))
                 }
                 viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                MenuRow(Icons.Filled.Settings, stringResource(R.string.menu_settings), onOpenSettings)
             }
         }
     }
@@ -110,7 +113,7 @@ private fun WeatherSnapshotSection(viewModel: HomeViewModel, onRequestPermission
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         when {
-            !viewModel.hasLocationPermission -> {
+            !viewModel.hasLocationPermission && !viewModel.hasFixedHomeLocation -> {
                 Text(stringResource(R.string.location_permission_prompt), modifier = Modifier.padding(bottom = 12.dp))
                 Button(onClick = onRequestPermission) { Text(stringResource(R.string.enable_location)) }
             }

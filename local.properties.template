@@ -10,3 +10,10 @@ sdk.dir=/path/to/Android/sdk
 # which is windrm://strava-callback in full)
 STRAVA_CLIENT_ID=
 STRAVA_CLIENT_SECRET=
+
+# Optional: map style API keys, used by the "Map style" setting (Settings screen).
+# Without these, only OSM Standard and OpenTopoMap are offered (both free, no key needed).
+# CARTO Positron: free key at https://carto.com/basemaps/apikey/ (5M requests/month, non-commercial)
+# Thunderforest Outdoors: free key at https://www.thunderforest.com/pricing/ (150k tiles/month, Hobby tier)
+CARTO_API_KEY=
+THUNDERFOREST_API_KEY=
