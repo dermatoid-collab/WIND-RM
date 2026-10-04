@@ -153,7 +153,7 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        GaugesRow(current)
+        GaugesRow(points, current)
 
         HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
@@ -161,6 +161,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
             MultiSeriesChart(
                 title = stringResource(R.string.temperature),
                 xLabels = timeLabels,
+                scrubIndex = scrubIndex,
+                onScrub = onScrub,
                 series = listOf(
                     ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }),
                     ChartSeries("Feels Like (°C)", FeelsLikeColor, points.map { it.weather.feelsLikeC.toFloat() }),
@@ -173,6 +175,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 title = stringResource(R.string.precipitation_and_cloud_cover),
                 xLabels = timeLabels,
                 yRangeOverride = 0f..100f,
+                scrubIndex = scrubIndex,
+                onScrub = onScrub,
                 series = listOf(
                     ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false),
                     ChartSeries("Intensity", IntensityColor, points.map { it.weather.precipitationMm.toFloat() }, filled = false),
@@ -186,6 +190,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 title = stringResource(R.string.wind),
                 xLabels = timeLabels,
                 yUnit = " km/h",
+                scrubIndex = scrubIndex,
+                onScrub = onScrub,
                 series = listOf(
                     ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false),
                     ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }),
@@ -208,6 +214,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 title = stringResource(R.string.elevation),
                 xLabels = timeLabels,
                 yUnit = " m",
+                scrubIndex = scrubIndex,
+                onScrub = onScrub,
                 series = listOf(
                     ChartSeries("Elevation (m)", TempColor, points.map { (it.point.eleM ?: 0.0).toFloat() }),
                 ),
@@ -228,6 +236,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                 title = stringResource(R.string.daylight_and_uv),
                 xLabels = timeLabels,
                 yRangeOverride = 0f..12f,
+                scrubIndex = scrubIndex,
+                onScrub = onScrub,
                 series = listOf(
                     ChartSeries("Daylight", DaylightColor, points.map { if (it.weather.isDay) 12f else 0f }),
                     ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }),
@@ -259,6 +269,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
                     title = "AQI",
                     xLabels = timeLabels,
                     yRangeOverride = 0f..100f,
+                    scrubIndex = scrubIndex,
+                    onScrub = onScrub,
                     bands = listOf(
                         ChartBand(0f..20f, AqiGood),
                         ChartBand(20f..40f, AqiFair),
@@ -277,6 +289,8 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
             MultiSeriesChart(
                 title = stringResource(R.string.humidity_and_dew_point),
                 xLabels = timeLabels,
+                scrubIndex = scrubIndex,
+                onScrub = onScrub,
                 series = listOf(
                     ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }),
                     ChartSeries("Dew Point (°C)", DewPointColor, points.map { it.weather.dewPointC.toFloat() }),
@@ -300,34 +314,40 @@ private fun ForecastContent(result: RouteForecastResult, scrubIndex: Int, onScru
 }
 
 @Composable
-private fun GaugesRow(current: RouteForecastPoint) {
+private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPoint) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         SemiCircularGauge(
-            value = current.weather.temperatureC,
-            minValue = -10.0,
-            maxValue = 40.0,
+            rangeMin = points.minOf { it.weather.temperatureC },
+            rangeMax = points.maxOf { it.weather.temperatureC },
+            scaleMin = -10.0,
+            scaleMax = 40.0,
             label = stringResource(R.string.temperature),
             valueText = "${current.weather.temperatureC.roundToInt()}°C",
-            color = TempColor,
+            minColor = TempColor,
+            maxColor = FeelsLikeColor,
         )
         SemiCircularGauge(
-            value = current.weather.precipitationProbabilityPct,
-            minValue = 0.0,
-            maxValue = 100.0,
+            rangeMin = points.minOf { it.weather.precipitationProbabilityPct },
+            rangeMax = points.maxOf { it.weather.precipitationProbabilityPct },
+            scaleMin = 0.0,
+            scaleMax = 100.0,
             label = stringResource(R.string.precipitation),
             valueText = "${current.weather.precipitationProbabilityPct.roundToInt()}%",
-            color = PrecipColor,
+            minColor = TempColor,
+            maxColor = FeelsLikeColor,
         )
         SemiCircularGauge(
-            value = current.weather.windSpeedKmh,
-            minValue = 0.0,
-            maxValue = 80.0,
+            rangeMin = points.minOf { it.weather.windSpeedKmh },
+            rangeMax = points.maxOf { it.weather.windSpeedKmh },
+            scaleMin = 0.0,
+            scaleMax = 80.0,
             label = stringResource(R.string.wind),
             valueText = "${current.weather.windSpeedKmh.roundToInt()} km/h",
-            color = WindColor,
+            minColor = TempColor,
+            maxColor = FeelsLikeColor,
         )
     }
 }

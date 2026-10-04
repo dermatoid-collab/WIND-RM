@@ -18,44 +18,80 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
-/** A ~270° arc gauge, matching the "Temperature / Precipitation / Wind" dials at the top of a forecast. */
+/**
+ * A ~270° dual-ring arc gauge, matching the "Temperature / Precipitation / Wind" dials at the
+ * top of a forecast: the outer ring shows [rangeMax] and the inner ring [rangeMin] -- the
+ * highest/lowest value of that metric across the whole displayed forecast window -- each as a
+ * fraction of the fixed [scaleMin]..[scaleMax] scale, while the center text is the current
+ * (scrubbed) reading.
+ */
 @Composable
 fun SemiCircularGauge(
-    value: Double,
-    minValue: Double,
-    maxValue: Double,
+    rangeMin: Double,
+    rangeMax: Double,
+    scaleMin: Double,
+    scaleMax: Double,
     label: String,
     valueText: String,
-    color: Color,
+    minColor: Color,
+    maxColor: Color,
     modifier: Modifier = Modifier,
 ) {
-    val fraction = ((value - minValue) / (maxValue - minValue).coerceAtLeast(0.0001)).coerceIn(0.0, 1.0)
+    val scale = (scaleMax - scaleMin).coerceAtLeast(0.0001)
+    val minFraction = ((rangeMin - scaleMin) / scale).coerceIn(0.0, 1.0)
+    val maxFraction = ((rangeMax - scaleMin) / scale).coerceIn(0.0, 1.0)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(contentAlignment = Alignment.Center, modifier = modifier.size(96.dp)) {
             Canvas(modifier = Modifier.size(96.dp)) {
-                val strokeWidth = 10.dp.toPx()
+                val ringStroke = 7.dp.toPx()
+                val ringGap = 3.dp.toPx()
                 val startAngle = 135f
                 val sweepAngle = 270f
-                val arcSize = Size(size.width - strokeWidth, size.height - strokeWidth)
-                val topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
 
+                val outerTopLeft = Offset(ringStroke / 2, ringStroke / 2)
+                val outerSize = Size(size.width - ringStroke, size.height - ringStroke)
+                val innerInset = ringStroke + ringGap + ringStroke / 2
+                val innerTopLeft = Offset(innerInset, innerInset)
+                val innerSize = Size(size.width - innerInset * 2, size.height - innerInset * 2)
+
+                // Outer ring: rangeMax.
                 drawArc(
                     color = Color.LightGray.copy(alpha = 0.3f),
                     startAngle = startAngle,
                     sweepAngle = sweepAngle,
                     useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                    topLeft = outerTopLeft,
+                    size = outerSize,
+                    style = Stroke(width = ringStroke, cap = StrokeCap.Round),
                 )
                 drawArc(
-                    color = color,
+                    color = maxColor,
                     startAngle = startAngle,
-                    sweepAngle = (sweepAngle * fraction).toFloat(),
+                    sweepAngle = (sweepAngle * maxFraction).toFloat(),
                     useCenter = false,
-                    topLeft = topLeft,
-                    size = arcSize,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+                    topLeft = outerTopLeft,
+                    size = outerSize,
+                    style = Stroke(width = ringStroke, cap = StrokeCap.Round),
+                )
+
+                // Inner ring: rangeMin.
+                drawArc(
+                    color = Color.LightGray.copy(alpha = 0.3f),
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = innerTopLeft,
+                    size = innerSize,
+                    style = Stroke(width = ringStroke, cap = StrokeCap.Round),
+                )
+                drawArc(
+                    color = minColor,
+                    startAngle = startAngle,
+                    sweepAngle = (sweepAngle * minFraction).toFloat(),
+                    useCenter = false,
+                    topLeft = innerTopLeft,
+                    size = innerSize,
+                    style = Stroke(width = ringStroke, cap = StrokeCap.Round),
                 )
             }
             Text(valueText, style = MaterialTheme.typography.titleMedium)
