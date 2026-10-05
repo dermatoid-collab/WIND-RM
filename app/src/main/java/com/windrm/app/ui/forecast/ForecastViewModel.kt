@@ -34,6 +34,9 @@ class ForecastViewModel(
     /** Position (0..1 of the route's distance) currently under a finger on a chart or the slider; null = not touching. */
     var scrubFraction by mutableStateOf<Float?>(null)
 
+    /** Where the bottom slider was last released; stays put (unlike chart scrubbing) until moved again. */
+    var pinnedFraction by mutableStateOf<Float?>(null)
+
     var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
         private set
 
@@ -51,6 +54,7 @@ class ForecastViewModel(
             }
                 .onSuccess {
                     scrubFraction = null
+                    pinnedFraction = null
                     uiState = ForecastUiState.Success(it)
                 }
                 .onFailure { uiState = ForecastUiState.Error(it.message ?: "Couldn't calculate the forecast") }

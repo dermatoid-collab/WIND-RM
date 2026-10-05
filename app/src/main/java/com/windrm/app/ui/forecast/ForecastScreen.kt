@@ -111,6 +111,11 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                     scrubFraction = viewModel.scrubFraction,
                     onScrub = { viewModel.scrubFraction = it },
                     onScrubEnd = { viewModel.scrubFraction = null },
+                    pinnedFraction = viewModel.pinnedFraction,
+                    onSlide = {
+                        viewModel.scrubFraction = it
+                        viewModel.pinnedFraction = it
+                    },
                     mapStyle = viewModel.mapStyle,
                 )
             }
@@ -152,6 +157,8 @@ private fun ForecastContent(
     scrubFraction: Float?,
     onScrub: (Float) -> Unit,
     onScrubEnd: () -> Unit,
+    pinnedFraction: Float?,
+    onSlide: (Float) -> Unit,
     mapStyle: MapStyle,
 ) {
     val points = result.points
@@ -161,11 +168,13 @@ private fun ForecastContent(
     }
     val track = result.route.points
     val totalDistanceM = track.lastOrNull()?.distanceFromStartM ?: 0.0
-    val fraction = (scrubFraction ?: 0f).coerceIn(0f, 1f)
+    // A finger on a chart/slider wins; otherwise gauges, map dot and slider stay where the slider was left.
+    val position = scrubFraction ?: pinnedFraction
+    val fraction = (position ?: 0f).coerceIn(0f, 1f)
     val current = points[(fraction * points.lastIndex).roundToInt()]
     // Interpolated on the full-resolution track, so the map dot glides smoothly instead of
     // jumping between the ~3 km-spaced weather samples.
-    val highlightPoint = scrubFraction?.let { pointAtDistance(track, it * totalDistanceM) }
+    val highlightPoint = position?.let { pointAtDistance(track, it * totalDistanceM) }
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     val scrubLabel = "%.1f km, %s".format(fraction * totalDistanceM / 1000.0, timeFmt.format(timeAtFraction(points, fraction)))
@@ -349,7 +358,7 @@ private fun ForecastContent(
             }
             Slider(
                 value = fraction,
-                onValueChange = onScrub,
+                onValueChange = onSlide,
                 onValueChangeFinished = onScrubEnd,
             )
         }

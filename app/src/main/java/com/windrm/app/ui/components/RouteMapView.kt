@@ -103,7 +103,7 @@ fun RouteMapView(
 
                     // Start drawn first so the finish flag ends up on top when they coincide (a
                     // loop route), per the "finish must always show in front of start" requirement.
-                    mapView.overlays.add(StartFinishOverlay(geoPoints.first(), geoPoints.last()))
+                    mapView.overlays.add(StartFinishOverlay(geoPoints.first(), geoPoints.last(), mapView.resources.displayMetrics.density))
 
                     if (!windArrows.isNullOrEmpty()) {
                         // One arrow per weather-sample point was too dense to read; halve it.
@@ -220,9 +220,15 @@ private fun boundingBoxOf(points: List<GeoPoint>): BoundingBox {
 }
 
 /** Green dot at the route's start, checkered flag at its end (end always drawn on top when they coincide, e.g. a loop). */
-private class StartFinishOverlay(private val start: GeoPoint, private val finish: GeoPoint) : Overlay() {
+private class StartFinishOverlay(
+    private val start: GeoPoint,
+    private val finish: GeoPoint,
+    private val density: Float,
+) : Overlay() {
+    private val startRadius = 7f * density
+    private val flagSize = 12f * density
     private val startFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#43A047"); style = Paint.Style.FILL }
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 3f }
+    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f * density }
     private val blackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; style = Paint.Style.FILL }
     private val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
 
@@ -231,19 +237,18 @@ private class StartFinishOverlay(private val start: GeoPoint, private val finish
         val out = android.graphics.Point()
 
         mapView.projection.toPixels(start, out)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 10f, startFillPaint)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 10f, ringPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), startRadius, startFillPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), startRadius, ringPaint)
 
         mapView.projection.toPixels(finish, out)
         drawCheckeredFlag(canvas, out.x.toFloat(), out.y.toFloat())
     }
 
     private fun drawCheckeredFlag(canvas: Canvas, cx: Float, cy: Float) {
-        val size = 16f
-        val half = size / 2
-        canvas.drawCircle(cx, cy, half + 3f, whitePaint)
+        val half = flagSize / 2
+        canvas.drawCircle(cx, cy, half + 2f * density, whitePaint)
         val cells = 4
-        val cellSize = size / cells
+        val cellSize = flagSize / cells
         for (row in 0 until cells) {
             for (col in 0 until cells) {
                 if ((row + col) % 2 == 0) {
