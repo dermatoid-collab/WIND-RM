@@ -369,37 +369,49 @@ private fun ForecastContent(
 
 @Composable
 private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPoint) {
+    val minTemp = points.minOf { it.weather.temperatureC }
+    val maxTemp = points.maxOf { it.weather.temperatureC }
+    val minPrecip = points.minOf { it.weather.precipitationProbabilityPct }
+    val maxPrecip = points.maxOf { it.weather.precipitationProbabilityPct }
+    val minWind = points.minOf { it.weather.windSpeedKmh }
+    val maxWind = points.maxOf { it.weather.windSpeedKmh }
     Row(
         Modifier.fillMaxWidth().padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         SemiCircularGauge(
-            rangeMin = points.minOf { it.weather.temperatureC },
-            rangeMax = points.maxOf { it.weather.temperatureC },
+            rangeMin = minTemp,
+            rangeMax = maxTemp,
             scaleMin = -10.0,
             scaleMax = 40.0,
             label = stringResource(R.string.temperature),
             valueText = "${current.weather.temperatureC.roundToInt()}°C",
+            minText = "${minTemp.roundToInt()}°C",
+            maxText = "${maxTemp.roundToInt()}°C",
             minColor = TempColor,
             maxColor = FeelsLikeColor,
         )
         SemiCircularGauge(
-            rangeMin = points.minOf { it.weather.precipitationProbabilityPct },
-            rangeMax = points.maxOf { it.weather.precipitationProbabilityPct },
+            rangeMin = minPrecip,
+            rangeMax = maxPrecip,
             scaleMin = 0.0,
             scaleMax = 100.0,
             label = stringResource(R.string.precipitation),
             valueText = "${current.weather.precipitationProbabilityPct.roundToInt()}%",
+            minText = "${minPrecip.roundToInt()}%",
+            maxText = "${maxPrecip.roundToInt()}%",
             minColor = TempColor,
             maxColor = FeelsLikeColor,
         )
         SemiCircularGauge(
-            rangeMin = points.minOf { it.weather.windSpeedKmh },
-            rangeMax = points.maxOf { it.weather.windSpeedKmh },
+            rangeMin = minWind,
+            rangeMax = maxWind,
             scaleMin = 0.0,
             scaleMax = 80.0,
             label = stringResource(R.string.wind),
             valueText = "${current.weather.windSpeedKmh.roundToInt()} km/h",
+            minText = "${minWind.roundToInt()} km/h",
+            maxText = "${maxWind.roundToInt()} km/h",
             minColor = TempColor,
             maxColor = FeelsLikeColor,
         )

@@ -23,7 +23,8 @@ import kotlin.math.roundToInt
  * top of a forecast: the outer ring shows [rangeMax] and the inner ring [rangeMin] -- the
  * highest/lowest value of that metric across the whole displayed forecast window -- each as a
  * fraction of the fixed [scaleMin]..[scaleMax] scale, while the center text is the current
- * (scrubbed) reading.
+ * (scrubbed) reading. [maxText]/[minText] spell those two values out under the label, each in
+ * its ring's colour.
  */
 @Composable
 fun SemiCircularGauge(
@@ -33,6 +34,8 @@ fun SemiCircularGauge(
     scaleMax: Double,
     label: String,
     valueText: String,
+    minText: String,
+    maxText: String,
     minColor: Color,
     maxColor: Color,
     modifier: Modifier = Modifier,
@@ -97,6 +100,8 @@ fun SemiCircularGauge(
             Text(valueText, style = MaterialTheme.typography.titleMedium)
         }
         Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("max $maxText", fontSize = 12.sp, color = maxColor)
+        Text("min $minText", fontSize = 12.sp, color = minColor)
     }
 }
 
