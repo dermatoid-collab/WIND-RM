@@ -280,8 +280,8 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
 }
 
 /**
- * Wind arrows built from ONE fixed template -- a notched head with its tip at the origin pointing
- * straight up, shaft hanging below from the notch -- only translated onto the route point and
+ * Wind arrows built from ONE fixed template -- a solid triangular head with its tip at the origin
+ * pointing straight up, shaft hanging below from the centre of its base -- only translated onto the route point and
  * rotated with the canvas. The tip sits exactly on the track; the arrow lies upwind of it.
  *
  * Shaft length is relative to this route's own wind range (all sizes in dp):
@@ -290,9 +290,8 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
  * 10 km/h band (see [windBandColor]), so it stays comparable between rides.
  */
 private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, density: Float) : Overlay() {
-    private val headLength = 9f * density
+    private val headLength = 8f * density
     private val headHalfWidth = 5f * density
-    private val notchDepth = 3f * density
     private val minShaft = 4f * density
     private val maxShaft = 44f * density
     private val minSpeed = arrows.minOfOrNull { it.windSpeedKmh } ?: 0.0
@@ -311,7 +310,6 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
     private val headPath = Path().apply {
         moveTo(0f, 0f)
         lineTo(headHalfWidth, headLength)
-        lineTo(0f, headLength - notchDepth)
         lineTo(-headHalfWidth, headLength)
         close()
     }
@@ -341,8 +339,8 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
     private fun drawTemplate(canvas: Canvas, shaft: Float, color: Int) {
         shaftPaint.color = color
         headPaint.color = color
-        // Starts half a pixel inside the notch so no gap shows between shaft and head.
-        canvas.drawLine(0f, headLength - notchDepth - 0.5f, 0f, headLength + shaft, shaftPaint)
+        // Starts half a pixel inside the head so no gap shows between shaft and head.
+        canvas.drawLine(0f, headLength - 0.5f, 0f, headLength + shaft, shaftPaint)
         canvas.drawPath(headPath, headPaint)
     }
 }
