@@ -286,7 +286,8 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
  *
  * Shaft length is relative to this route's own wind range (all sizes in dp):
  * shaft = 4 + 40 * (v - vMin) / (vMax - vMin), so the calmest point gets the shortest arrow and the
- * windiest the longest, whatever the absolute speeds.
+ * windiest the longest, whatever the absolute speeds. Colour is absolute instead, one shade per
+ * 10 km/h band (see [windBandColor]), so it stays comparable between rides.
  */
 private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, density: Float) : Overlay() {
     private val headLength = 9f * density
@@ -326,7 +327,7 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
             canvas.save()
             canvas.translate(out.x.toFloat(), out.y.toFloat())
             canvas.rotate(bearingDeg)
-            drawTemplate(canvas, shaftFor(arrow.windSpeedKmh))
+            drawTemplate(canvas, shaftFor(arrow.windSpeedKmh), windBandColor(arrow.windSpeedKmh))
             canvas.restore()
         }
     }
@@ -337,9 +338,20 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
         return minShaft + (maxShaft - minShaft) * t
     }
 
-    private fun drawTemplate(canvas: Canvas, shaft: Float) {
+    private fun drawTemplate(canvas: Canvas, shaft: Float, color: Int) {
+        shaftPaint.color = color
+        headPaint.color = color
         // Starts half a pixel inside the notch so no gap shows between shaft and head.
         canvas.drawLine(0f, headLength - notchDepth - 0.5f, 0f, headLength + shaft, shaftPaint)
         canvas.drawPath(headPath, headPaint)
     }
+}
+
+/** Darker shades of green / blue / orange / red so they read over terrain greens and the red track. */
+private fun windBandColor(windSpeedKmh: Double): Int = when {
+    windSpeedKmh < 10.0 -> Color.parseColor("#1B5E20")
+    windSpeedKmh < 20.0 -> Color.parseColor("#0277BD")
+    windSpeedKmh < 30.0 -> Color.parseColor("#E65100")
+    windSpeedKmh < 40.0 -> Color.parseColor("#8E0000")
+    else -> Color.BLACK
 }
