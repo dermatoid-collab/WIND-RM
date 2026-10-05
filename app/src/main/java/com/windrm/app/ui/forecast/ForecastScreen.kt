@@ -169,7 +169,7 @@ private fun ForecastContent(
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     val scrubLabel = "%.1f km, %s".format(fraction * totalDistanceM / 1000.0, timeFmt.format(timeAtFraction(points, fraction)))
-    val elevationProfile = remember(track) { resampleElevation(track, ELEVATION_SAMPLES) }
+    val elevationProfile = remember(track) { track.map { (it.eleM ?: 0.0).toFloat() } }
     val daylightLevels = remember(result) {
         (0 until DAYLIGHT_BAR_SAMPLES).map { k ->
             val f = k.toFloat() / (DAYLIGHT_BAR_SAMPLES - 1)
@@ -253,9 +253,8 @@ private fun ForecastContent(
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    // The full-resolution GPX/Strava track resampled evenly by distance (the x
-                    // axis every chart shares), not the ~45 weather samples, which flatten real
-                    // climbs/descents into a crude staircase.
+                    // The full-resolution GPX/Strava track, not the ~45 weather samples, which
+                    // flatten real climbs/descents into a crude staircase.
                     ChartSeries("Elevation (m)", TempColor, elevationProfile, smooth = false, tooltipLabel = "Elevation", unit = " m", decimals = 0),
                 ),
             )
@@ -453,7 +452,6 @@ private fun shareForecast(context: android.content.Context, result: RouteForecas
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share)))
 }
 
-private const val ELEVATION_SAMPLES = 400
 private const val DAYLIGHT_BAR_SAMPLES = 200
 
 /** Position on the track [distanceM] from the start, linearly interpolated between its two neighbouring points. */
@@ -476,16 +474,6 @@ private fun pointAtDistance(track: List<RoutePoint>, distanceM: Double): RoutePo
         eleM = ele,
         distanceFromStartM = distanceM,
     )
-}
-
-/** [count] elevations evenly spaced by distance, so the profile lines up with the shared distance-based x axis. */
-private fun resampleElevation(track: List<RoutePoint>, count: Int): List<Float> {
-    if (track.isEmpty()) return emptyList()
-    val total = track.last().distanceFromStartM
-    if (track.size < 2 || total <= 0.0) return track.map { (it.eleM ?: 0.0).toFloat() }
-    return (0 until count).map { i ->
-        (pointAtDistance(track, total * i / (count - 1)).eleM ?: 0.0).toFloat()
-    }
 }
 
 /** Arrival time at a 0..1 position along the (evenly distance-spaced) forecast samples. */
