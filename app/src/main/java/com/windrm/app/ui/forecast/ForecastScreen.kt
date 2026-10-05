@@ -5,6 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,10 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -32,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.Surface
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.model.RouteForecastPoint
@@ -77,29 +81,11 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(routeTitle(state))
-                        subTitle(state)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-                    }
-                },
-                actions = {
-                    if (state is ForecastUiState.Success) {
-                        IconButton(onClick = { shareForecast(context, state.result) }) {
-                            Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                ),
+            CompactTopBar(
+                title = routeTitle(state),
+                subtitle = subTitle(state),
+                onBack = onBack,
+                onShare = (state as? ForecastUiState.Success)?.let { { shareForecast(context, it.result) } },
             )
         },
     ) { padding ->
@@ -112,13 +98,39 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                     scrubFraction = viewModel.scrubFraction,
                     onScrub = { viewModel.scrubFraction = it },
                     onScrubEnd = { viewModel.scrubFraction = null },
-                    pinnedFraction = viewModel.pinnedFraction,
-                    onSlide = {
-                        viewModel.scrubFraction = it
-                        viewModel.pinnedFraction = it
-                    },
                     mapStyle = viewModel.mapStyle,
                 )
+            }
+        }
+    }
+}
+
+/** Single-row orange bar: back, route name with start date/time, share -- as short as the touch targets allow. */
+@Composable
+private fun CompactTopBar(title: String, subtitle: String?, onBack: () -> Unit, onShare: (() -> Unit)?) {
+    Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
+        Row(
+            Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(48.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            subtitle?.let {
+                Text("  ·  $it", style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false)
+            }
+            Spacer(Modifier.weight(1f))
+            onShare?.let {
+                IconButton(onClick = it) {
+                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
+                }
             }
         }
     }
@@ -131,7 +143,7 @@ private fun routeTitle(state: ForecastUiState): String =
 @Composable
 private fun subTitle(state: ForecastUiState): String? {
     val result = (state as? ForecastUiState.Success)?.result ?: return null
-    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy 'alle' HH:mm").withZone(ZoneId.systemDefault())
+    val formatter = DateTimeFormatter.ofPattern("d MMM HH:mm").withZone(ZoneId.systemDefault())
     return formatter.format(result.startTime)
 }
 
@@ -158,8 +170,6 @@ private fun ForecastContent(
     scrubFraction: Float?,
     onScrub: (Float) -> Unit,
     onScrubEnd: () -> Unit,
-    pinnedFraction: Float?,
-    onSlide: (Float) -> Unit,
     mapStyle: MapStyle,
 ) {
     val points = result.points
@@ -169,13 +179,11 @@ private fun ForecastContent(
     }
     val track = result.route.points
     val totalDistanceM = track.lastOrNull()?.distanceFromStartM ?: 0.0
-    // A finger on a chart/slider wins; otherwise gauges, map dot and slider stay where the slider was left.
-    val position = scrubFraction ?: pinnedFraction
-    val fraction = (position ?: 0f).coerceIn(0f, 1f)
+    val fraction = (scrubFraction ?: 0f).coerceIn(0f, 1f)
     val current = points[(fraction * points.lastIndex).roundToInt()]
     // Interpolated on the full-resolution track, so the map dot glides smoothly instead of
     // jumping between the ~3 km-spaced weather samples.
-    val highlightPoint = position?.let { pointAtDistance(track, it * totalDistanceM) }
+    val highlightPoint = scrubFraction?.let { pointAtDistance(track, it * totalDistanceM) }
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     val scrubLabel = "%.1f km, %s".format(fraction * totalDistanceM / 1000.0, timeFmt.format(timeAtFraction(points, fraction)))
@@ -188,64 +196,12 @@ private fun ForecastContent(
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        GaugesRow(points, current)
-
-        HorizontalDivider(Modifier.padding(vertical = 8.dp))
-
-        SectionBox {
-            MultiSeriesChart(
-                title = stringResource(R.string.temperature),
-                xLabels = timeLabels,
-                scrubFraction = scrubFraction,
-                onScrub = onScrub,
-                onScrubEnd = onScrubEnd,
-                scrubLabel = scrubLabel,
-                series = listOf(
-                    ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }, tooltipLabel = "Temp.", unit = "°C"),
-                    ChartSeries("Feels Like (°C)", FeelsLikeColor, points.map { it.weather.feelsLikeC.toFloat() }, tooltipLabel = "Feels", unit = "°C"),
-                ),
-            )
-        }
-
-        SectionBox {
-            MultiSeriesChart(
-                title = stringResource(R.string.precipitation_and_cloud_cover),
-                xLabels = timeLabels,
-                yRangeOverride = 0f..100f,
-                scrubFraction = scrubFraction,
-                onScrub = onScrub,
-                onScrubEnd = onScrubEnd,
-                scrubLabel = scrubLabel,
-                series = listOf(
-                    ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false, tooltipLabel = "Prob.", unit = "%", decimals = 0),
-                    ChartSeries("Intensity", IntensityColor, points.map { it.weather.precipitationMm.toFloat() }, filled = false, tooltipLabel = "Intens."),
-                    ChartSeries("Cloud Cover (%)", CloudColor, points.map { it.weather.cloudCoverPct.toFloat() }, tooltipLabel = "Clouds", unit = "%", decimals = 0),
-                ),
-            )
-        }
-
-        SectionBox {
-            MultiSeriesChart(
-                title = stringResource(R.string.wind),
-                xLabels = timeLabels,
-                yUnit = " km/h",
-                scrubFraction = scrubFraction,
-                onScrub = onScrub,
-                onScrubEnd = onScrubEnd,
-                scrubLabel = scrubLabel,
-                series = listOf(
-                    ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false, tooltipLabel = "Wind", unit = " km/h", decimals = 0),
-                    ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }, tooltipLabel = "Gusts", unit = " km/h", decimals = 0),
-                ),
-            )
-        }
-
-        SectionBox {
-            Text(stringResource(R.string.wind_direction), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
+    // The map stays pinned on top (so the scrub dot is always visible); everything else scrolls under it.
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)) {
             RouteMapView(
-                // The full-resolution track, not the sparse weather-sampling points below --
-                // otherwise the drawn line cuts corners on every curve between samples.
+                // The full-resolution track, not the sparse weather-sampling points -- otherwise
+                // the drawn line cuts corners on every curve between samples.
                 points = result.route.points,
                 windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
                 mapStyle = mapStyle,
@@ -253,116 +209,158 @@ private fun ForecastContent(
             )
             WindSpeedLegend()
         }
+        HorizontalDivider()
+        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+            GaugesRow(points, current)
 
-        SectionBox {
-            MultiSeriesChart(
-                title = stringResource(R.string.elevation),
-                xLabels = timeLabels,
-                yUnit = " m",
-                scrubFraction = scrubFraction,
-                onScrub = onScrub,
-                onScrubEnd = onScrubEnd,
-                scrubLabel = scrubLabel,
-                series = listOf(
-                    // The full-resolution GPX/Strava track, not the ~45 weather samples, which
-                    // flatten real climbs/descents into a crude staircase.
-                    ChartSeries("Elevation (m)", TempColor, elevationProfile, smooth = false, tooltipLabel = "Elevation", unit = " m", decimals = 0),
-                ),
-            )
-            Text(
-                "%s: %.0f m↑    %s: %.1f km    %s: %.1f km/h".format(
-                    stringResource(R.string.elevation_gain_label), result.route.elevationGainM,
-                    stringResource(R.string.distance_label), result.route.distanceKm,
-                    stringResource(R.string.speed_label), result.avgSpeedKmh,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
-        SectionBox {
-            MultiSeriesChart(
-                title = stringResource(R.string.daylight_and_uv),
-                xLabels = timeLabels,
-                yRangeOverride = 0f..12f,
-                scrubFraction = scrubFraction,
-                onScrub = onScrub,
-                onScrubEnd = onScrubEnd,
-                scrubLabel = scrubLabel,
-                daylightBar = daylightLevels,
-                series = listOf(
-                    ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }, tooltipLabel = "UV index"),
-                ),
-            )
-            DaylightSummary(result, timeFmt)
-        }
-
-        if (points.any { it.airQuality != null }) {
             SectionBox {
-                Text(stringResource(R.string.air_quality), style = MaterialTheme.typography.headlineSmall)
-                val peak = result.peakAqi
-                if (peak != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
-                        AqiDial(
-                            value = peak.europeanAqi,
-                            maxValue = 120.0,
-                            label = stringResource(R.string.peak_aqi),
-                            subLabel = aqiLabel(peak.europeanAqi),
-                            color = aqiColor(peak.europeanAqi),
-                        )
-                        Column(Modifier.padding(start = 16.dp)) {
-                            Text(stringResource(R.string.main_pollutant), style = MaterialTheme.typography.labelMedium)
-                            Text(result.mainPollutant ?: "-", style = MaterialTheme.typography.titleMedium)
-                        }
-                    }
-                }
                 MultiSeriesChart(
-                    title = "AQI",
+                    title = stringResource(R.string.temperature),
+                    xLabels = timeLabels,
+                    scrubFraction = scrubFraction,
+                    onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
+                    scrubLabel = scrubLabel,
+                    series = listOf(
+                        ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }, tooltipLabel = "Temp.", unit = "°C"),
+                        ChartSeries("Feels Like (°C)", FeelsLikeColor, points.map { it.weather.feelsLikeC.toFloat() }, tooltipLabel = "Feels", unit = "°C"),
+                    ),
+                )
+            }
+
+            SectionBox {
+                MultiSeriesChart(
+                    title = stringResource(R.string.precipitation_and_cloud_cover),
                     xLabels = timeLabels,
                     yRangeOverride = 0f..100f,
                     scrubFraction = scrubFraction,
                     onScrub = onScrub,
                     onScrubEnd = onScrubEnd,
                     scrubLabel = scrubLabel,
-                    bands = listOf(
-                        ChartBand(0f..20f, AqiGood),
-                        ChartBand(20f..40f, AqiFair),
-                        ChartBand(40f..60f, AqiModerate),
-                        ChartBand(60f..80f, AqiPoor),
-                        ChartBand(80f..100f, AqiVeryPoor),
-                    ),
                     series = listOf(
-                        ChartSeries("European AQI", AqiSevere, points.map { (it.airQuality?.europeanAqi ?: 0.0).toFloat() }, tooltipLabel = "AQI", decimals = 0),
+                        ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false, tooltipLabel = "Prob.", unit = "%", decimals = 0),
+                        ChartSeries("Intensity", IntensityColor, points.map { it.weather.precipitationMm.toFloat() }, filled = false, tooltipLabel = "Intens."),
+                        ChartSeries("Cloud Cover (%)", CloudColor, points.map { it.weather.cloudCoverPct.toFloat() }, tooltipLabel = "Clouds", unit = "%", decimals = 0),
                     ),
                 )
             }
-        }
 
-        SectionBox {
-            MultiSeriesChart(
-                title = stringResource(R.string.humidity_and_dew_point),
-                xLabels = timeLabels,
-                scrubFraction = scrubFraction,
-                onScrub = onScrub,
-                onScrubEnd = onScrubEnd,
-                scrubLabel = scrubLabel,
-                series = listOf(
-                    ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }, tooltipLabel = "Humid.", unit = "%", decimals = 0),
-                    ChartSeries("Dew Point (°C)", DewPointColor, points.map { it.weather.dewPointC.toFloat() }, tooltipLabel = "Dew", unit = "°C"),
-                ),
-            )
-        }
-
-        SectionBox {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(timeFmt.format(points.first().arrivalTime), style = MaterialTheme.typography.bodySmall)
-                Text(timeFmt.format(points.last().arrivalTime), style = MaterialTheme.typography.bodySmall)
+            SectionBox {
+                MultiSeriesChart(
+                    title = stringResource(R.string.wind),
+                    xLabels = timeLabels,
+                    yUnit = " km/h",
+                    scrubFraction = scrubFraction,
+                    onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
+                    scrubLabel = scrubLabel,
+                    series = listOf(
+                        ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false, tooltipLabel = "Wind", unit = " km/h", decimals = 0),
+                        ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }, tooltipLabel = "Gusts", unit = " km/h", decimals = 0),
+                    ),
+                )
             }
-            Slider(
-                value = fraction,
-                onValueChange = onSlide,
-                onValueChangeFinished = onScrubEnd,
-            )
+
+            SectionBox {
+                MultiSeriesChart(
+                    title = stringResource(R.string.elevation),
+                    xLabels = timeLabels,
+                    yUnit = " m",
+                    scrubFraction = scrubFraction,
+                    onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
+                    scrubLabel = scrubLabel,
+                    series = listOf(
+                        // The full-resolution GPX/Strava track, not the ~45 weather samples, which
+                        // flatten real climbs/descents into a crude staircase.
+                        ChartSeries("Elevation (m)", TempColor, elevationProfile, smooth = false, tooltipLabel = "Elevation", unit = " m", decimals = 0),
+                    ),
+                )
+                Text(
+                    "%s: %.0f m↑    %s: %.1f km    %s: %.1f km/h".format(
+                        stringResource(R.string.elevation_gain_label), result.route.elevationGainM,
+                        stringResource(R.string.distance_label), result.route.distanceKm,
+                        stringResource(R.string.speed_label), result.avgSpeedKmh,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            SectionBox {
+                MultiSeriesChart(
+                    title = stringResource(R.string.daylight_and_uv),
+                    xLabels = timeLabels,
+                    yRangeOverride = 0f..12f,
+                    scrubFraction = scrubFraction,
+                    onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
+                    scrubLabel = scrubLabel,
+                    daylightBar = daylightLevels,
+                    series = listOf(
+                        ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }, tooltipLabel = "UV index"),
+                    ),
+                )
+                DaylightSummary(result, timeFmt)
+            }
+
+            if (points.any { it.airQuality != null }) {
+                SectionBox {
+                    Text(stringResource(R.string.air_quality), style = MaterialTheme.typography.headlineSmall)
+                    val peak = result.peakAqi
+                    if (peak != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                            AqiDial(
+                                value = peak.europeanAqi,
+                                maxValue = 120.0,
+                                label = stringResource(R.string.peak_aqi),
+                                subLabel = aqiLabel(peak.europeanAqi),
+                                color = aqiColor(peak.europeanAqi),
+                            )
+                            Column(Modifier.padding(start = 16.dp)) {
+                                Text(stringResource(R.string.main_pollutant), style = MaterialTheme.typography.labelMedium)
+                                Text(result.mainPollutant ?: "-", style = MaterialTheme.typography.titleMedium)
+                            }
+                        }
+                    }
+                    MultiSeriesChart(
+                        title = "AQI",
+                        xLabels = timeLabels,
+                        yRangeOverride = 0f..100f,
+                        scrubFraction = scrubFraction,
+                        onScrub = onScrub,
+                        onScrubEnd = onScrubEnd,
+                        scrubLabel = scrubLabel,
+                        bands = listOf(
+                            ChartBand(0f..20f, AqiGood),
+                            ChartBand(20f..40f, AqiFair),
+                            ChartBand(40f..60f, AqiModerate),
+                            ChartBand(60f..80f, AqiPoor),
+                            ChartBand(80f..100f, AqiVeryPoor),
+                        ),
+                        series = listOf(
+                            ChartSeries("European AQI", AqiSevere, points.map { (it.airQuality?.europeanAqi ?: 0.0).toFloat() }, tooltipLabel = "AQI", decimals = 0),
+                        ),
+                    )
+                }
+            }
+
+            SectionBox {
+                MultiSeriesChart(
+                    title = stringResource(R.string.humidity_and_dew_point),
+                    xLabels = timeLabels,
+                    scrubFraction = scrubFraction,
+                    onScrub = onScrub,
+                    onScrubEnd = onScrubEnd,
+                    scrubLabel = scrubLabel,
+                    series = listOf(
+                        ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }, tooltipLabel = "Humid.", unit = "%", decimals = 0),
+                        ChartSeries("Dew Point (°C)", DewPointColor, points.map { it.weather.dewPointC.toFloat() }, tooltipLabel = "Dew", unit = "°C"),
+                    ),
+                )
+            }
         }
     }
 }
