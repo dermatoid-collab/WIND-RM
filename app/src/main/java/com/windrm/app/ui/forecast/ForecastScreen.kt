@@ -206,6 +206,7 @@ private fun ForecastContent(
                 windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
                 mapStyle = mapStyle,
                 highlightPoint = highlightPoint,
+                height = 336.dp,
             )
             WindSpeedLegend()
         }

@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.windrm.app.BuildConfig
@@ -57,11 +58,12 @@ fun RouteMapView(
     windArrows: List<WindArrowPoint>? = null,
     mapStyle: MapStyle = MapStyle.OSM_STANDARD,
     highlightPoint: RoutePoint? = null,
+    height: Dp = 280.dp,
 ) {
     val mapRef = remember { MapViewRef() }
     // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
     // while the surrounding Column is scrolling, bleeding over the next section's title.
-    Box(modifier.fillMaxWidth().height(280.dp).clipToBounds()) {
+    Box(modifier.fillMaxWidth().height(height).clipToBounds()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
