@@ -312,7 +312,7 @@ private fun markerRingPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply
  * shaft = 4 + 18 * (v - vMin) / (vMax - vMin), so the calmest point gets the shortest arrow and the
  * windiest the longest, whatever the absolute speeds. Colour is absolute instead, one shade per
  * 10 km/h band (see [windBandColor]), so it stays comparable between rides. The [active] arrow (the
- * one matching the scrub position) gets a 3 dp white edge instead of 1 dp and is drawn last, on top.
+ * one matching the scrub position) gets a 2 dp white edge instead of 1 dp and is drawn last, on top.
  */
 private class WindArrowsOverlay(
     private val arrows: List<WindArrowPoint>,
@@ -324,7 +324,7 @@ private class WindArrowsOverlay(
     private val minShaft = 4f * density
     private val maxShaft = 22f * density
     private val outline = 1f * density
-    private val activeOutline = 3f * density
+    private val activeOutline = 2f * density
     private val minSpeed = arrows.minOfOrNull { it.windSpeedKmh } ?: 0.0
     private val maxSpeed = arrows.maxOfOrNull { it.windSpeedKmh } ?: 0.0
 
