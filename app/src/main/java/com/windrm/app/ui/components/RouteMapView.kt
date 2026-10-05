@@ -6,14 +6,27 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.MotionEvent
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ZoomOutMap
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.windrm.app.BuildConfig
+import com.windrm.app.R
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.settings.MapStyle
 import org.osmdroid.tileprovider.tilesource.ITileSource
@@ -26,8 +39,6 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
-import kotlin.math.cos
-import kotlin.math.sin
 
 /** A point along the route where a wind-direction arrow should be drawn, in meteorological "from" degrees. */
 data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double, val windSpeedKmh: Double)
@@ -47,64 +58,93 @@ fun RouteMapView(
     mapStyle: MapStyle = MapStyle.OSM_STANDARD,
     highlightPoint: RoutePoint? = null,
 ) {
-    AndroidView(
-        // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned
-        // bounds while the surrounding Column is scrolling, bleeding over the next section's
-        // title -- clipToBounds() forces the native view's drawing to stay inside this box.
-        modifier = modifier.fillMaxWidth().height(280.dp).clipToBounds(),
-        factory = { context ->
-            createMapView(context)
-        },
-        update = { mapView ->
-            // update() re-runs on every recomposition (e.g. each time the scrub cursor moves),
-            // but calling setTileSource()/zoomToBoundingBox() unconditionally made the map
-            // visibly flicker/reset every single time, even though neither the style nor the
-            // route had actually changed. A tag on the view remembers what was last applied so
-            // each is only redone when it genuinely changes.
-            val lastState = mapView.tag as? MapViewFitState
-            if (lastState?.style != mapStyle) {
-                val tileSource = tileSourceFor(mapStyle)
-                mapView.setTileSource(tileSource)
-                // Each provider renders tiles up to a different zoom (OpenTopoMap stops at z17,
-                // others go further); capping the view to a fixed level regardless of source
-                // would either waste zoom range or request levels the source doesn't have tiles for.
-                mapView.minZoomLevel = tileSource.minimumZoomLevel.toDouble()
-                mapView.maxZoomLevel = tileSource.maximumZoomLevel.toDouble()
+    val mapRef = remember { MapViewRef() }
+    // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
+    // while the surrounding Column is scrolling, bleeding over the next section's title.
+    Box(modifier.fillMaxWidth().height(280.dp).clipToBounds()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                createMapView(context).also { mapRef.view = it }
+            },
+            update = { mapView ->
+                // update() re-runs on every recomposition (e.g. each time the scrub cursor moves),
+                // but calling setTileSource()/zoomToBoundingBox() unconditionally made the map
+                // visibly flicker/reset every single time, even though neither the style nor the
+                // route had actually changed. A tag on the view remembers what was last applied so
+                // each is only redone when it genuinely changes.
+                val lastState = mapView.tag as? MapViewFitState
+                if (lastState?.style != mapStyle) {
+                    val tileSource = tileSourceFor(mapStyle)
+                    mapView.setTileSource(tileSource)
+                    // Each provider renders tiles up to a different zoom (OpenTopoMap stops at z17,
+                    // others go further); capping the view to a fixed level regardless of source
+                    // would either waste zoom range or request levels the source doesn't have tiles for.
+                    mapView.minZoomLevel = tileSource.minimumZoomLevel.toDouble()
+                    mapView.maxZoomLevel = tileSource.maximumZoomLevel.toDouble()
+                }
+                mapView.overlays.clear()
+                // OSM's tile usage policy requires visible attribution; re-added every update()
+                // since overlays.clear() above would otherwise drop it too.
+                mapView.overlays.add(CopyrightOverlay(mapView.context))
+                if (points.isNotEmpty()) {
+                    val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
+                    val polyline = Polyline(mapView).apply {
+                        setPoints(geoPoints)
+                        outlinePaint.color = Color.parseColor("#E53935")
+                        outlinePaint.strokeWidth = 9f
+                        // osmdroid draws each segment separately; with the default BUTT caps every
+                        // tiny GPX direction change leaves a notch, which read as a "fuzzy" line.
+                        outlinePaint.isAntiAlias = true
+                        outlinePaint.strokeCap = Paint.Cap.ROUND
+                        outlinePaint.strokeJoin = Paint.Join.ROUND
+                    }
+                    mapView.overlays.add(polyline)
+
+                    // Start drawn first so the finish flag ends up on top when they coincide (a
+                    // loop route), per the "finish must always show in front of start" requirement.
+                    mapView.overlays.add(StartFinishOverlay(geoPoints.first(), geoPoints.last()))
+
+                    if (!windArrows.isNullOrEmpty()) {
+                        // One arrow per weather-sample point was too dense to read; halve it.
+                        val thinnedArrows = windArrows.filterIndexed { index, _ -> index % 2 == 0 }
+                        mapView.overlays.add(WindArrowsOverlay(thinnedArrows, mapView.resources.displayMetrics.density))
+                    }
+
+                    highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it)) }
+
+                    if (lastState?.points != points) {
+                        val bbox = boundingBoxOf(geoPoints)
+                        mapView.post { mapView.zoomToBoundingBox(bbox, false, 80) }
+                    }
+                }
+                mapView.tag = MapViewFitState(mapStyle, points)
+                mapView.invalidate()
+            },
+        )
+        if (points.isNotEmpty()) {
+            Surface(
+                onClick = {
+                    mapRef.view?.zoomToBoundingBox(boundingBoxOf(points.map { GeoPoint(it.lat, it.lon) }), true, 80)
+                },
+                shape = CircleShape,
+                color = androidx.compose.ui.graphics.Color.White,
+                shadowElevation = 3.dp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            ) {
+                Icon(
+                    Icons.Filled.ZoomOutMap,
+                    contentDescription = stringResource(R.string.fit_route),
+                    tint = androidx.compose.ui.graphics.Color.DarkGray,
+                    modifier = Modifier.padding(8.dp).size(20.dp),
+                )
             }
-            mapView.overlays.clear()
-            // OSM's tile usage policy requires visible attribution; re-added every update()
-            // since overlays.clear() above would otherwise drop it too.
-            mapView.overlays.add(CopyrightOverlay(mapView.context))
-            if (points.isNotEmpty()) {
-                val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
-                val polyline = Polyline(mapView).apply {
-                    setPoints(geoPoints)
-                    outlinePaint.color = Color.parseColor("#E53935")
-                    outlinePaint.strokeWidth = 9f
-                }
-                mapView.overlays.add(polyline)
+        }
+    }
+}
 
-                // Start drawn first so the finish flag ends up on top when they coincide (a
-                // loop route), per the "finish must always show in front of start" requirement.
-                mapView.overlays.add(StartFinishOverlay(geoPoints.first(), geoPoints.last()))
-
-                if (!windArrows.isNullOrEmpty()) {
-                    // One arrow per weather-sample point was too dense to read; halve it.
-                    val thinnedArrows = windArrows.filterIndexed { index, _ -> index % 2 == 0 }
-                    mapView.overlays.add(WindArrowsOverlay(thinnedArrows))
-                }
-
-                highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it)) }
-
-                if (lastState?.points != points) {
-                    val bbox = boundingBoxOf(geoPoints)
-                    mapView.post { mapView.zoomToBoundingBox(bbox, false, 80) }
-                }
-            }
-            mapView.tag = MapViewFitState(mapStyle, points)
-            mapView.invalidate()
-        },
-    )
+private class MapViewRef {
+    var view: MapView? = null
 }
 
 /**
@@ -234,89 +274,74 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
     }
 }
 
-/** Draws a rotated arrow at each sample point, pointing in the direction the wind blows towards. */
-private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>) : Overlay() {
-    // A white halo drawn behind the black arrow keeps it legible over both light and dark
-    // map features (forest greens, water blues, road whites).
+/**
+ * Wind arrows built from ONE fixed template -- tip at the origin pointing straight up, shaft
+ * hanging below it from the centre of the head's base -- that is only translated onto the route
+ * point and rotated with the canvas. The tip sits exactly on the track; the arrow lies on the
+ * upwind side, so the wind visibly "arrives" at the route from the tail end.
+ *
+ * Shaft length (all sizes in dp): shaft = 6 + (34 - 6) * min(windKmh / 40, 1), drawn after a
+ * fixed 10dp head -- linear up to 40 km/h, saturated beyond it.
+ */
+private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, density: Float) : Overlay() {
+    private val headLength = 10f * density
+    private val headHalfWidth = 7f * density
+    private val minShaft = 6f * density
+    private val maxShaft = 34f * density
+    private val maxSpeedForScaleKmh = 40.0
+    private val shaftStroke = 3f * density
+    private val haloExtra = 2f * density
+
+    // White halo behind the black arrow keeps it legible over any map colour.
     private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val shaftPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
+        strokeWidth = shaftStroke
     }
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.FILL
     }
-    // The tip always sits this many pixels from the route point -- calm or strong, it never
-    // moves -- while the tail is what extends further away as wind speed increases, so the
-    // shaft (not the tip's distance from the route) is what grows with intensity. Sized up from
-    // the first pass, which turned out too small/thin to read on a real device, with the shaft
-    // range narrowed to a realistic riding wind-speed span so the length difference is visible.
-    private val tipOffsetPx = 20f
-    private val minShaftPx = 12f
-    private val maxShaftPx = 70f
-    private val maxSpeedForScaleKmh = 40.0
-    private val lineStrokePx = 6f
-    private val haloStrokePx = 10f
+    private val headPath = Path().apply {
+        moveTo(0f, 0f)
+        lineTo(-headHalfWidth, headLength)
+        lineTo(headHalfWidth, headLength)
+        close()
+    }
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
-        val projection = mapView.projection
         val out = android.graphics.Point()
         for (arrow in arrows) {
-            projection.toPixels(GeoPoint(arrow.point.lat, arrow.point.lon), out)
-            // Wind blows TOWARDS (from + 180); screen bearing 0deg = up/North in an unrotated map.
-            val bearingRad = Math.toRadians((arrow.windFromDeg + 180.0) % 360.0)
-            val shaftPx = shaftForSpeed(arrow.windSpeedKmh)
-            drawArrow(canvas, out.x.toFloat(), out.y.toFloat(), bearingRad.toFloat(), shaftPx)
+            mapView.projection.toPixels(GeoPoint(arrow.point.lat, arrow.point.lon), out)
+            // Template points up (north); wind blows TOWARDS from + 180, and canvas.rotate() is
+            // clockwise on screen -- the same sense as compass bearings.
+            val bearingDeg = ((arrow.windFromDeg + 180.0) % 360.0).toFloat()
+            canvas.save()
+            canvas.translate(out.x.toFloat(), out.y.toFloat())
+            canvas.rotate(bearingDeg)
+            drawTemplate(canvas, shaftFor(arrow.windSpeedKmh))
+            canvas.restore()
         }
     }
 
-    private fun shaftForSpeed(windSpeedKmh: Double): Float {
-        val t = (windSpeedKmh / maxSpeedForScaleKmh).coerceIn(0.0, 1.0)
-        return (minShaftPx + (maxShaftPx - minShaftPx) * t).toFloat()
+    private fun shaftFor(windSpeedKmh: Double): Float {
+        val t = (windSpeedKmh / maxSpeedForScaleKmh).coerceIn(0.0, 1.0).toFloat()
+        return minShaft + (maxShaft - minShaft) * t
     }
 
-    private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, bearingRad: Float, shaftPx: Float) {
-        val lengthPx = tipOffsetPx + shaftPx
-        val headLengthPx = 16f
-        val headHalfWidthPx = 11f
-
-        // bearing 0 = pointing up (north); rotate clockwise for increasing degrees.
-        val fx = sin(bearingRad)
-        val fy = -cos(bearingRad)
-        // The anchor is the PLAIN end, always this close to the route point regardless of wind
-        // speed; the pointed head is the end that moves further out as wind gets stronger -- the
-        // previous version had these swapped, so the head sat near the route and the shaft
-        // trailed off behind it, reading as backwards.
-        val anchorX = cx + fx * tipOffsetPx
-        val anchorY = cy + fy * tipOffsetPx
-        val headX = cx + fx * lengthPx
-        val headY = cy + fy * lengthPx
-
-        // Classic arrowhead: apex at the head end, base a fixed distance back towards the
-        // anchor, perpendicular corners symmetric around that base.
-        val px = -fy
-        val py = fx
-        val baseX = headX - fx * headLengthPx
-        val baseY = headY - fy * headLengthPx
-        val headPath = Path().apply {
-            moveTo(headX, headY)
-            lineTo(baseX + px * headHalfWidthPx, baseY + py * headHalfWidthPx)
-            lineTo(baseX - px * headHalfWidthPx, baseY - py * headHalfWidthPx)
-            close()
-        }
-
-        // Halo pass first (shaft + head outline), then the solid black shape on top.
-        canvas.drawLine(anchorX, anchorY, headX, headY, haloPaint.apply { strokeWidth = haloStrokePx })
-        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = haloStrokePx * 0.6f })
-        canvas.drawLine(anchorX, anchorY, headX, headY, linePaint.apply { strokeWidth = lineStrokePx })
-        canvas.drawPath(headPath, fillPaint)
+    private fun drawTemplate(canvas: Canvas, shaft: Float) {
+        val shaftEnd = headLength + shaft
+        canvas.drawLine(0f, headLength, 0f, shaftEnd, haloPaint.apply { strokeWidth = shaftStroke + 2 * haloExtra })
+        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = 2 * haloExtra })
+        canvas.drawLine(0f, headLength, 0f, shaftEnd, shaftPaint)
+        canvas.drawPath(headPath, headPaint)
     }
 }

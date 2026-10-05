@@ -31,8 +31,8 @@ class ForecastViewModel(
     var uiState by mutableStateOf<ForecastUiState>(ForecastUiState.Loading)
         private set
 
-    /** Index into the forecast points currently under a finger (chart or slider); null = not touching. */
-    var scrubIndex by mutableStateOf<Int?>(null)
+    /** Position (0..1 of the route's distance) currently under a finger on a chart or the slider; null = not touching. */
+    var scrubFraction by mutableStateOf<Float?>(null)
 
     var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
         private set
@@ -50,7 +50,7 @@ class ForecastViewModel(
                 weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh)
             }
                 .onSuccess {
-                    scrubIndex = null
+                    scrubFraction = null
                     uiState = ForecastUiState.Success(it)
                 }
                 .onFailure { uiState = ForecastUiState.Error(it.message ?: "Couldn't calculate the forecast") }

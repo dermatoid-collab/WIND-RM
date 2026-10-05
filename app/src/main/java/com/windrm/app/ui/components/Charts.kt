@@ -3,6 +3,8 @@ package com.windrm.app.ui.components
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,28 +12,30 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.windrm.app.ui.theme.DaylightColor
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -44,6 +48,11 @@ data class ChartSeries(
     // Smoothing suits weather data (interpolated between hourly samples anyway), but elevation
     // should trace the GPX recording exactly -- smoothing it would round off real grade changes.
     val smooth: Boolean = true,
+    /** Short name shown in the scrub tooltip; the legend keeps the full [label]. */
+    val tooltipLabel: String = label,
+    /** Unit appended to the tooltip value, e.g. "°C", "%", " km/h". */
+    val unit: String = "",
+    val decimals: Int = 1,
 )
 
 /** A horizontal colored band drawn behind the chart, e.g. air-quality severity ranges. */
@@ -53,17 +62,16 @@ data class ChartBand(
 )
 
 private val Y_AXIS_WIDTH = 40.dp
+private val NIGHT_COLOR = Color(0xFF37474F)
 
 /**
  * A lightweight line/area chart (no external charting library): draws a shared time axis on
  * top, gridlines with y-axis labels on both sides, one or more series, and a legend below.
- * Mirrors the layout used throughout the forecast screen (temperature, wind, elevation, etc.).
  *
- * Pressing and dragging a finger anywhere over the plot moves a shared scrub cursor
- * ([scrubIndex]/[onScrub]) and shows each series' value at that instant in a floating card that
- * follows the touch, with a crosshair (vertical + per-series horizontal guide lines) marking
- * exactly where they land. Lifting the finger clears the cursor ([onScrubEnd]), so the chart
- * reads clean when nothing is being touched -- the common "press to inspect" pattern.
+ * Every series is spread evenly across the full width regardless of how many values it has, so
+ * the x axis is a 0..1 fraction of the route's distance. Pressing and dragging over the plot
+ * reports that fraction ([onScrub]) and shows each series' value there in a card placed beside
+ * the finger; lifting the finger clears it ([onScrubEnd]) -- the common "press to inspect" pattern.
  */
 @Composable
 fun MultiSeriesChart(
@@ -75,15 +83,18 @@ fun MultiSeriesChart(
     yRangeOverride: ClosedFloatingPointRange<Float>? = null,
     bands: List<ChartBand> = emptyList(),
     chartHeight: Dp = 160.dp,
-    scrubIndex: Int? = null,
-    onScrub: ((Int) -> Unit)? = null,
+    scrubFraction: Float? = null,
+    onScrub: ((Float) -> Unit)? = null,
     onScrubEnd: (() -> Unit)? = null,
     scrubLabel: String? = null,
+    /** Optional daylight strip above the plot: light levels 0 (night) .. 1 (full day), evenly spread like a series. */
+    daylightBar: List<Float>? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
 
         TimeAxisLabels(xLabels)
+        if (!daylightBar.isNullOrEmpty()) DaylightBar(daylightBar)
 
         val allValues = series.flatMap { it.values }.ifEmpty { listOf(0f) }
         val step = niceStep(allValues)
@@ -91,7 +102,6 @@ fun MultiSeriesChart(
         val rawMax = yRangeOverride?.endInclusive ?: (ceil(allValues.max() / step) * step)
         val min = if (rawMin == rawMax) rawMin - 1f else rawMin
         val max = if (rawMin == rawMax) rawMax + 1f else rawMax
-        val sampleCount = series.maxOfOrNull { it.values.size } ?: 0
 
         Row(Modifier.fillMaxWidth().height(chartHeight)) {
             YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = false, height = chartHeight)
@@ -100,22 +110,20 @@ fun MultiSeriesChart(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(chartHeight)
-                        .pointerInput(sampleCount, onScrub) {
-                            if (onScrub == null || sampleCount < 2) return@pointerInput
-                            fun indexForX(x: Float): Int {
-                                val stepX = size.width.toFloat() / (sampleCount - 1)
-                                return (x / stepX).roundToInt().coerceIn(0, sampleCount - 1)
-                            }
+                        .pointerInput(onScrub) {
+                            val scrub = onScrub ?: return@pointerInput
+                            fun fractionForX(x: Float): Float =
+                                if (size.width <= 0) 0f else (x / size.width).coerceIn(0f, 1f)
                             awaitEachGesture {
                                 val down = awaitFirstDown()
-                                onScrub(indexForX(down.position.x))
+                                scrub(fractionForX(down.position.x))
                                 down.consume()
                                 var pointer = down
                                 while (pointer.pressed) {
                                     val event = awaitPointerEvent()
                                     pointer = event.changes.first()
                                     if (pointer.pressed) {
-                                        onScrub(indexForX(pointer.position.x))
+                                        scrub(fractionForX(pointer.position.x))
                                         pointer.consume()
                                     }
                                 }
@@ -131,7 +139,7 @@ fun MultiSeriesChart(
                         drawRect(
                             color = band.color.copy(alpha = 0.18f),
                             topLeft = Offset(0f, top),
-                            size = androidx.compose.ui.geometry.Size(size.width, bottom - top),
+                            size = Size(size.width, bottom - top),
                         )
                     }
                     val gridColor = Color.LightGray.copy(alpha = 0.4f)
@@ -166,17 +174,12 @@ fun MultiSeriesChart(
                         }
                         drawPath(linePath, color = s.color, style = Stroke(width = 1.6.dp.toPx()))
                     }
-                    if (scrubIndex != null && sampleCount > 1) {
-                        // scrubIndex lives in the shared time axis's sample space (sampleCount
-                        // entries); a series can have a different, denser resolution (e.g.
-                        // elevation's full GPX track vs. the ~45 weather samples), so its own
-                        // value is looked up via the touched fraction, not the raw shared index.
-                        val scrubFraction = scrubIndex.coerceIn(0, sampleCount - 1).toFloat() / (sampleCount - 1)
-                        val x = size.width * scrubFraction
+                    if (scrubFraction != null) {
+                        val f = scrubFraction.coerceIn(0f, 1f)
+                        val x = size.width * f
                         series.forEach { s ->
-                            val v = s.valueAtFraction(scrubFraction) ?: return@forEach
-                            val fraction = ((v - min) / (max - min)).coerceIn(0f, 1f)
-                            val y = size.height * (1f - fraction)
+                            val v = s.valueAtFraction(f) ?: return@forEach
+                            val y = size.height * (1f - ((v - min) / (max - min)).coerceIn(0f, 1f))
                             drawLine(
                                 color = s.color.copy(alpha = 0.6f),
                                 start = Offset(0f, y),
@@ -191,29 +194,36 @@ fun MultiSeriesChart(
                             strokeWidth = 1.5.dp.toPx(),
                         )
                         series.forEach { s ->
-                            val v = s.valueAtFraction(scrubFraction) ?: return@forEach
-                            val fraction = ((v - min) / (max - min)).coerceIn(0f, 1f)
-                            val y = size.height * (1f - fraction)
+                            val v = s.valueAtFraction(f) ?: return@forEach
+                            val y = size.height * (1f - ((v - min) / (max - min)).coerceIn(0f, 1f))
                             drawCircle(color = Color.White, radius = 5.dp.toPx(), center = Offset(x, y))
                             drawCircle(color = s.color, radius = 3.5.dp.toPx(), center = Offset(x, y))
                         }
                     }
                 }
-                if (scrubIndex != null && sampleCount > 1) {
-                    val fraction = scrubIndex.coerceIn(0, sampleCount - 1).toFloat() / (sampleCount - 1)
-                    val tooltipWidth = 170.dp
-                    val maxOffset = (maxWidth - tooltipWidth).coerceAtLeast(0.dp)
-                    val xOffset = (maxWidth * fraction - tooltipWidth / 2).coerceIn(0.dp, maxOffset)
+                if (scrubFraction != null) {
+                    val f = scrubFraction.coerceIn(0f, 1f)
                     ScrubTooltip(
-                        series, fraction, yUnit, scrubLabel,
-                        modifier = Modifier.offset(x = xOffset, y = 4.dp).widthIn(max = tooltipWidth),
+                        series, f, scrubLabel,
+                        // Placed beside the finger -- right of it on the left half, left of it on
+                        // the right half -- so the card never hides the point being inspected.
+                        modifier = Modifier.layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                            val width = constraints.maxWidth
+                            val touchX = (width * f).roundToInt()
+                            val gap = 12.dp.roundToPx()
+                            val preferredX = if (f <= 0.5f) touchX + gap else touchX - gap - placeable.width
+                            val x = preferredX.coerceIn(0, (width - placeable.width).coerceAtLeast(0))
+                            val y = 4.dp.roundToPx()
+                            layout(width, placeable.height + y) { placeable.place(x, y) }
+                        },
                     )
                 }
             }
             YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = true, height = chartHeight)
         }
 
-        if (series.isNotEmpty() && series.any { it.label.isNotEmpty() }) {
+        if (series.any { it.label.isNotEmpty() }) {
             Legend(series)
         }
     }
@@ -272,6 +282,27 @@ private fun TimeAxisLabels(labels: List<String>) {
     }
 }
 
+/** Yellow daylight strip aligned with the plot, like the original app: fades to dark through twilight. */
+@Composable
+private fun DaylightBar(levels: List<Float>) {
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = Y_AXIS_WIDTH, end = Y_AXIS_WIDTH, bottom = 4.dp)
+            .height(12.dp)
+            .clip(RoundedCornerShape(3.dp)),
+    ) {
+        if (levels.size == 1) {
+            drawRect(lerp(NIGHT_COLOR, DaylightColor, levels[0].coerceIn(0f, 1f)))
+            return@Canvas
+        }
+        val stops = levels.mapIndexed { i, level ->
+            i.toFloat() / (levels.size - 1) to lerp(NIGHT_COLOR, DaylightColor, level.coerceIn(0f, 1f))
+        }.toTypedArray()
+        drawRect(Brush.horizontalGradient(*stops))
+    }
+}
+
 @Composable
 private fun YAxisLabels(min: Float, max: Float, unit: String, modifier: Modifier, alignEnd: Boolean, height: Dp) {
     Column(
@@ -287,9 +318,15 @@ private fun YAxisLabels(min: Float, max: Float, unit: String, modifier: Modifier
 
 private fun formatAxisValue(v: Float): String = if (v == v.toInt().toFloat()) v.toInt().toString() else "%.1f".format(v)
 
-/** Floating card anchored at the chart's top-start corner, showing the scrubbed instant's values. */
+/** Rounds to [decimals] places and drops a trailing ".0", e.g. 12.0 -> "12", 12.34 -> "12.3". */
+private fun formatValue(v: Float, decimals: Int): String {
+    if (decimals <= 0) return v.roundToInt().toString()
+    return "%.${decimals}f".format(v).trimEnd('0').trimEnd('.', ',')
+}
+
+/** Floating card showing every series' value at the scrubbed position. */
 @Composable
-private fun ScrubTooltip(series: List<ChartSeries>, fraction: Float, yUnit: String, label: String?, modifier: Modifier = Modifier) {
+private fun ScrubTooltip(series: List<ChartSeries>, fraction: Float, label: String?, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .shadow(2.dp, RoundedCornerShape(8.dp))
@@ -299,16 +336,14 @@ private fun ScrubTooltip(series: List<ChartSeries>, fraction: Float, yUnit: Stri
     ) {
         label?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
         series.forEach { s ->
-            val v = s.valueAtFraction(fraction) ?: return@forEach
             if (s.label.isEmpty()) return@forEach
-            Text("${s.label}: ${formatAxisValue(v)}$yUnit", color = s.color, style = MaterialTheme.typography.bodyMedium)
+            val v = s.valueAtFraction(fraction) ?: return@forEach
+            Text("${s.tooltipLabel}: ${formatValue(v, s.decimals)}${s.unit}", color = s.color, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
 
-/** Maps a 0..1 position along the shared time axis into this series' own index space -- needed
- * because a series can have a different resolution than the shared sample count (e.g. elevation's
- * full GPX track vs. the sparser weather samples the other series use). */
+/** The value at a 0..1 position along the x axis, in this series' own index space. */
 private fun ChartSeries.valueAtFraction(fraction: Float): Float? {
     if (values.isEmpty()) return null
     val idx = (fraction * (values.size - 1)).roundToInt().coerceIn(0, values.lastIndex)
@@ -319,7 +354,7 @@ private fun ChartSeries.valueAtFraction(fraction: Float): Float? {
 private fun Legend(series: List<ChartSeries>) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
     ) {
         series.filter { it.label.isNotEmpty() }.forEach { s ->
             Row(verticalAlignment = Alignment.CenterVertically) {

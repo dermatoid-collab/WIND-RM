@@ -21,7 +21,6 @@
     <string name="strava_no_activities">No activities found.</string>
     <string name="strava_no_routes">No routes found.</string>
     <string name="strava_no_segments">No segments found.</string>
-    <string name="strava_import">Import</string>
 
     <!-- Route detail -->
     <string name="starting">Starting</string>
@@ -51,6 +50,7 @@
     <string name="forecast_error">Couldn\'t download the forecast. Check your connection and try again.</string>
     <string name="retry">Retry</string>
     <string name="share">Share</string>
+    <string name="fit_route">Fit route</string>
     <string name="elevation_gain_label">Elevation Gain</string>
     <string name="distance_label">Distance</string>
     <string name="speed_label">Speed</string>

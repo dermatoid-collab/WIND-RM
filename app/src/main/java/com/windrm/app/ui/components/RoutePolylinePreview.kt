@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 
@@ -57,7 +59,7 @@ fun RoutePolylinePreview(points: List<Pair<Double, Double>>, modifier: Modifier 
                 val y = offsetY + ((maxLat - lat).toFloat() / latSpan.toFloat()) * drawnHeight
                 if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
             }
-            drawPath(path, color = PREVIEW_LINE, style = Stroke(width = 2.5.dp.toPx()))
+            drawPath(path, color = PREVIEW_LINE, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
     }
 }

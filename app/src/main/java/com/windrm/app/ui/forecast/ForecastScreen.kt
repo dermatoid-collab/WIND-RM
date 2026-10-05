@@ -35,7 +35,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.model.RouteForecastPoint
+import com.windrm.app.model.DaylightInfo
 import com.windrm.app.model.RouteForecastResult
+import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.aqiLabel
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.ui.components.AqiDial
@@ -52,7 +54,6 @@ import com.windrm.app.ui.theme.AqiPoor
 import com.windrm.app.ui.theme.AqiSevere
 import com.windrm.app.ui.theme.AqiVeryPoor
 import com.windrm.app.ui.theme.CloudColor
-import com.windrm.app.ui.theme.DaylightColor
 import com.windrm.app.ui.theme.DewPointColor
 import com.windrm.app.ui.theme.FeelsLikeColor
 import com.windrm.app.ui.theme.GustColor
@@ -62,6 +63,7 @@ import com.windrm.app.ui.theme.PrecipColor
 import com.windrm.app.ui.theme.TempColor
 import com.windrm.app.ui.theme.UvColor
 import com.windrm.app.ui.theme.WindColor
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -106,9 +108,9 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                 is ForecastUiState.Error -> ErrorContent(state.message, onRetry = viewModel::load)
                 is ForecastUiState.Success -> ForecastContent(
                     result = state.result,
-                    scrubIndex = viewModel.scrubIndex,
-                    onScrub = { viewModel.scrubIndex = it },
-                    onScrubEnd = { viewModel.scrubIndex = null },
+                    scrubFraction = viewModel.scrubFraction,
+                    onScrub = { viewModel.scrubFraction = it },
+                    onScrubEnd = { viewModel.scrubFraction = null },
                     mapStyle = viewModel.mapStyle,
                 )
             }
@@ -147,8 +149,8 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 @Composable
 private fun ForecastContent(
     result: RouteForecastResult,
-    scrubIndex: Int?,
-    onScrub: (Int) -> Unit,
+    scrubFraction: Float?,
+    onScrub: (Float) -> Unit,
     onScrubEnd: () -> Unit,
     mapStyle: MapStyle,
 ) {
@@ -157,11 +159,24 @@ private fun ForecastContent(
         ErrorContent(stringResource(R.string.forecast_error), onRetry = {})
         return
     }
-    val current = points[(scrubIndex ?: 0).coerceIn(0, points.lastIndex)]
-    val highlightPoint = scrubIndex?.let { points[it.coerceIn(0, points.lastIndex)].point }
+    val track = result.route.points
+    val totalDistanceM = track.lastOrNull()?.distanceFromStartM ?: 0.0
+    val fraction = (scrubFraction ?: 0f).coerceIn(0f, 1f)
+    val current = points[(fraction * points.lastIndex).roundToInt()]
+    // Interpolated on the full-resolution track, so the map dot glides smoothly instead of
+    // jumping between the ~3 km-spaced weather samples.
+    val highlightPoint = scrubFraction?.let { pointAtDistance(track, it * totalDistanceM) }
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
-    val scrubLabel = "%.0f km, %s".format(current.point.distanceFromStartM / 1000.0, timeFmt.format(current.arrivalTime))
+    val scrubLabel = "%.1f km, %s".format(fraction * totalDistanceM / 1000.0, timeFmt.format(timeAtFraction(points, fraction)))
+    val elevationProfile = remember(track) { resampleElevation(track, ELEVATION_SAMPLES) }
+    val daylightLevels = remember(result) {
+        (0 until DAYLIGHT_BAR_SAMPLES).map { k ->
+            val f = k.toFloat() / (DAYLIGHT_BAR_SAMPLES - 1)
+            val nearest = points[(f * points.lastIndex).roundToInt()]
+            lightLevel(timeAtFraction(points, f), result.daylight, fallbackIsDay = nearest.weather.isDay)
+        }
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         GaugesRow(points, current)
@@ -172,13 +187,13 @@ private fun ForecastContent(
             MultiSeriesChart(
                 title = stringResource(R.string.temperature),
                 xLabels = timeLabels,
-                scrubIndex = scrubIndex,
+                scrubFraction = scrubFraction,
                 onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }),
-                    ChartSeries("Feels Like (°C)", FeelsLikeColor, points.map { it.weather.feelsLikeC.toFloat() }),
+                    ChartSeries("Temperature (°C)", TempColor, points.map { it.weather.temperatureC.toFloat() }, tooltipLabel = "Temp.", unit = "°C"),
+                    ChartSeries("Feels Like (°C)", FeelsLikeColor, points.map { it.weather.feelsLikeC.toFloat() }, tooltipLabel = "Feels", unit = "°C"),
                 ),
             )
         }
@@ -188,14 +203,14 @@ private fun ForecastContent(
                 title = stringResource(R.string.precipitation_and_cloud_cover),
                 xLabels = timeLabels,
                 yRangeOverride = 0f..100f,
-                scrubIndex = scrubIndex,
+                scrubFraction = scrubFraction,
                 onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false),
-                    ChartSeries("Intensity", IntensityColor, points.map { it.weather.precipitationMm.toFloat() }, filled = false),
-                    ChartSeries("Cloud Cover (%)", CloudColor, points.map { it.weather.cloudCoverPct.toFloat() }),
+                    ChartSeries("Probability (%)", PrecipColor, points.map { it.weather.precipitationProbabilityPct.toFloat() }, filled = false, tooltipLabel = "Prob.", unit = "%", decimals = 0),
+                    ChartSeries("Intensity", IntensityColor, points.map { it.weather.precipitationMm.toFloat() }, filled = false, tooltipLabel = "Intens."),
+                    ChartSeries("Cloud Cover (%)", CloudColor, points.map { it.weather.cloudCoverPct.toFloat() }, tooltipLabel = "Clouds", unit = "%", decimals = 0),
                 ),
             )
         }
@@ -205,13 +220,13 @@ private fun ForecastContent(
                 title = stringResource(R.string.wind),
                 xLabels = timeLabels,
                 yUnit = " km/h",
-                scrubIndex = scrubIndex,
+                scrubFraction = scrubFraction,
                 onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false),
-                    ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }),
+                    ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false, tooltipLabel = "Wind", unit = " km/h", decimals = 0),
+                    ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }, tooltipLabel = "Gusts", unit = " km/h", decimals = 0),
                 ),
             )
         }
@@ -233,15 +248,15 @@ private fun ForecastContent(
                 title = stringResource(R.string.elevation),
                 xLabels = timeLabels,
                 yUnit = " m",
-                scrubIndex = scrubIndex,
+                scrubFraction = scrubFraction,
                 onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    // The full-resolution GPX/Strava track, not the sparse weather-sampling
-                    // points used by the other charts -- those are only ~45 points over a whole
-                    // route, which flattens real climbs/descents into a crude staircase.
-                    ChartSeries("Elevation (m)", TempColor, result.route.points.map { (it.eleM ?: 0.0).toFloat() }, smooth = false),
+                    // The full-resolution GPX/Strava track resampled evenly by distance (the x
+                    // axis every chart shares), not the ~45 weather samples, which flatten real
+                    // climbs/descents into a crude staircase.
+                    ChartSeries("Elevation (m)", TempColor, elevationProfile, smooth = false, tooltipLabel = "Elevation", unit = " m", decimals = 0),
                 ),
             )
             Text(
@@ -260,13 +275,13 @@ private fun ForecastContent(
                 title = stringResource(R.string.daylight_and_uv),
                 xLabels = timeLabels,
                 yRangeOverride = 0f..12f,
-                scrubIndex = scrubIndex,
+                scrubFraction = scrubFraction,
                 onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
+                daylightBar = daylightLevels,
                 series = listOf(
-                    ChartSeries("Daylight", DaylightColor, points.map { if (it.weather.isDay) 12f else 0f }),
-                    ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }),
+                    ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }, tooltipLabel = "UV index"),
                 ),
             )
             DaylightSummary(result, timeFmt)
@@ -295,7 +310,7 @@ private fun ForecastContent(
                     title = "AQI",
                     xLabels = timeLabels,
                     yRangeOverride = 0f..100f,
-                    scrubIndex = scrubIndex,
+                    scrubFraction = scrubFraction,
                     onScrub = onScrub,
                     onScrubEnd = onScrubEnd,
                     scrubLabel = scrubLabel,
@@ -307,7 +322,7 @@ private fun ForecastContent(
                         ChartBand(80f..100f, AqiVeryPoor),
                     ),
                     series = listOf(
-                        ChartSeries("European AQI", AqiSevere, points.map { (it.airQuality?.europeanAqi ?: 0.0).toFloat() }),
+                        ChartSeries("European AQI", AqiSevere, points.map { (it.airQuality?.europeanAqi ?: 0.0).toFloat() }, tooltipLabel = "AQI", decimals = 0),
                     ),
                 )
             }
@@ -317,13 +332,13 @@ private fun ForecastContent(
             MultiSeriesChart(
                 title = stringResource(R.string.humidity_and_dew_point),
                 xLabels = timeLabels,
-                scrubIndex = scrubIndex,
+                scrubFraction = scrubFraction,
                 onScrub = onScrub,
                 onScrubEnd = onScrubEnd,
                 scrubLabel = scrubLabel,
                 series = listOf(
-                    ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }),
-                    ChartSeries("Dew Point (°C)", DewPointColor, points.map { it.weather.dewPointC.toFloat() }),
+                    ChartSeries("Humidity (%)", HumidityColor, points.map { it.weather.humidityPct.toFloat() }, tooltipLabel = "Humid.", unit = "%", decimals = 0),
+                    ChartSeries("Dew Point (°C)", DewPointColor, points.map { it.weather.dewPointC.toFloat() }, tooltipLabel = "Dew", unit = "°C"),
                 ),
             )
         }
@@ -334,11 +349,9 @@ private fun ForecastContent(
                 Text(timeFmt.format(points.last().arrivalTime), style = MaterialTheme.typography.bodySmall)
             }
             Slider(
-                value = (scrubIndex ?: 0).toFloat(),
-                onValueChange = { onScrub(it.roundToInt()) },
+                value = fraction,
+                onValueChange = onScrub,
                 onValueChangeFinished = onScrubEnd,
-                valueRange = 0f..(points.lastIndex).toFloat().coerceAtLeast(0f),
-                steps = (points.size - 2).coerceAtLeast(0),
             )
         }
     }
@@ -386,11 +399,11 @@ private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPo
 @Composable
 private fun DaylightSummary(result: RouteForecastResult, formatter: DateTimeFormatter) {
     val d = result.daylight
-    Column(Modifier.padding(top = 8.dp)) {
-        d.sunrise?.let { Text("${stringResource(R.string.sunrise)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyMedium) }
-        d.sunset?.let { Text("${stringResource(R.string.sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyMedium) }
-        d.civilSunrise?.let { Text("${stringResource(R.string.civil_sunrise)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodySmall) }
-        d.civilSunset?.let { Text("${stringResource(R.string.civil_sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodySmall) }
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        d.sunrise?.let { Text("${stringResource(R.string.sunrise)}: ${formatter.format(it)}", style = MaterialTheme.typography.titleMedium) }
+        d.sunset?.let { Text("${stringResource(R.string.sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.titleMedium) }
+        d.civilSunrise?.let { Text("${stringResource(R.string.civil_sunrise)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyLarge) }
+        d.civilSunset?.let { Text("${stringResource(R.string.civil_sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyLarge) }
     }
 }
 
@@ -438,4 +451,73 @@ private fun shareForecast(context: android.content.Context, result: RouteForecas
         putExtra(Intent.EXTRA_TEXT, text)
     }
     context.startActivity(Intent.createChooser(intent, context.getString(R.string.share)))
+}
+
+private const val ELEVATION_SAMPLES = 400
+private const val DAYLIGHT_BAR_SAMPLES = 200
+
+/** Position on the track [distanceM] from the start, linearly interpolated between its two neighbouring points. */
+private fun pointAtDistance(track: List<RoutePoint>, distanceM: Double): RoutePoint {
+    if (track.size < 2) return track.first()
+    var lo = 0
+    var hi = track.lastIndex
+    while (hi - lo > 1) {
+        val mid = (lo + hi) / 2
+        if (track[mid].distanceFromStartM <= distanceM) lo = mid else hi = mid
+    }
+    val a = track[lo]
+    val b = track[hi]
+    val span = b.distanceFromStartM - a.distanceFromStartM
+    val t = if (span <= 0.0) 0.0 else ((distanceM - a.distanceFromStartM) / span).coerceIn(0.0, 1.0)
+    val ele = if (a.eleM != null && b.eleM != null) a.eleM + (b.eleM - a.eleM) * t else a.eleM ?: b.eleM
+    return RoutePoint(
+        lat = a.lat + (b.lat - a.lat) * t,
+        lon = a.lon + (b.lon - a.lon) * t,
+        eleM = ele,
+        distanceFromStartM = distanceM,
+    )
+}
+
+/** [count] elevations evenly spaced by distance, so the profile lines up with the shared distance-based x axis. */
+private fun resampleElevation(track: List<RoutePoint>, count: Int): List<Float> {
+    if (track.isEmpty()) return emptyList()
+    val total = track.last().distanceFromStartM
+    if (track.size < 2 || total <= 0.0) return track.map { (it.eleM ?: 0.0).toFloat() }
+    return (0 until count).map { i ->
+        (pointAtDistance(track, total * i / (count - 1)).eleM ?: 0.0).toFloat()
+    }
+}
+
+/** Arrival time at a 0..1 position along the (evenly distance-spaced) forecast samples. */
+private fun timeAtFraction(points: List<RouteForecastPoint>, fraction: Float): Instant {
+    if (points.size < 2) return points.first().arrivalTime
+    val pos = fraction.coerceIn(0f, 1f) * points.lastIndex
+    val i = pos.toInt().coerceAtMost(points.lastIndex - 1)
+    val t = pos - i
+    val a = points[i].arrivalTime.toEpochMilli()
+    val b = points[i + 1].arrivalTime.toEpochMilli()
+    return Instant.ofEpochMilli(a + ((b - a) * t).toLong())
+}
+
+/**
+ * 0 = night, 1 = full daylight: ramps up from civil dawn to sunrise and back down from sunset to
+ * civil dusk, giving the bar its faded twilight edges.
+ */
+private fun lightLevel(time: Instant, d: DaylightInfo, fallbackIsDay: Boolean): Float {
+    val sunrise = d.sunrise
+    val sunset = d.sunset
+    if (sunrise == null || sunset == null) return if (fallbackIsDay) 1f else 0f
+    val dawn = d.civilSunrise ?: sunrise.minusSeconds(1800)
+    val dusk = d.civilSunset ?: sunset.plusSeconds(1800)
+    fun ramp(from: Instant, to: Instant): Float {
+        val span = (to.toEpochMilli() - from.toEpochMilli()).toFloat()
+        return if (span <= 0f) 1f else ((time.toEpochMilli() - from.toEpochMilli()) / span).coerceIn(0f, 1f)
+    }
+    return when {
+        time.isBefore(dawn) -> 0f
+        time.isBefore(sunrise) -> ramp(dawn, sunrise)
+        !time.isAfter(sunset) -> 1f
+        time.isBefore(dusk) -> 1f - ramp(sunset, dusk)
+        else -> 0f
+    }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -192,7 +193,7 @@ private fun RecentRoutesTab(routes: List<Route>, onSelected: (Route) -> Unit, on
 @Composable
 private fun RouteCard(route: Route, onClick: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             RoutePolylinePreview(points = route.points.map { it.lat to it.lon })
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
@@ -309,19 +310,16 @@ private fun StravaSegmentsList(viewModel: RoutesListViewModel, onImported: (Rout
 
 @Composable
 private fun StravaActivityCard(activity: StravaActivitySummary, importing: Boolean, onImport: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            RoutePolylinePreview(points = mapPoints(activity.map))
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(activity.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                activity.start_date?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (activity.moving_time > 0) Text(formatDuration(activity.moving_time), style = MaterialTheme.typography.bodyMedium)
-                    Text("%.1f km".format(activity.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
-                    Text("${activity.total_elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
-                    if (activity.average_speed > 0) Text("%.1f km/h".format(activity.average_speed * 3.6), style = MaterialTheme.typography.bodyMedium)
-                }
-                ImportButton(importing, onImport)
+    ImportableCard(importing, onImport) {
+        RoutePolylinePreview(points = mapPoints(activity.map))
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(activity.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            activity.start_date?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (activity.moving_time > 0) Text(formatDuration(activity.moving_time), style = MaterialTheme.typography.bodyMedium)
+                Text("%.1f km".format(activity.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                Text("${activity.total_elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                if (activity.average_speed > 0) Text("%.1f km/h".format(activity.average_speed * 3.6), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -329,17 +327,14 @@ private fun StravaActivityCard(activity: StravaActivitySummary, importing: Boole
 
 @Composable
 private fun StravaRouteCard(route: StravaRouteSummary, importing: Boolean, onImport: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            RoutePolylinePreview(points = mapPoints(route.map))
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                route.created_at?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("%.1f km".format(route.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
-                    Text("${route.elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
-                }
-                ImportButton(importing, onImport)
+    ImportableCard(importing, onImport) {
+        RoutePolylinePreview(points = mapPoints(route.map))
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            route.created_at?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("%.1f km".format(route.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                Text("${route.elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -347,26 +342,27 @@ private fun StravaRouteCard(route: StravaRouteSummary, importing: Boolean, onImp
 
 @Composable
 private fun StravaSegmentCard(segment: StravaSegmentSummary, importing: Boolean, onImport: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            RoutePolylinePreview(points = mapPoints(segment.map))
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(segment.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("%.1f km".format(segment.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
-                    Text("${(segment.elevation_high - segment.elevation_low).roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
-                    Text("%.1f%%".format(segment.average_grade), style = MaterialTheme.typography.bodyMedium)
-                }
-                ImportButton(importing, onImport)
+    ImportableCard(importing, onImport) {
+        RoutePolylinePreview(points = mapPoints(segment.map))
+        Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            Text(segment.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("%.1f km".format(segment.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
+                Text("${(segment.elevation_high - segment.elevation_low).roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
+                Text("%.1f%%".format(segment.average_grade), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
 }
 
+/** The whole card is the import tap target; a spinner replaces the trailing space while importing. */
 @Composable
-private fun ImportButton(importing: Boolean, onImport: () -> Unit) {
-    TextButton(onClick = onImport, enabled = !importing) {
-        if (importing) CircularProgressIndicator(modifier = Modifier.size(16.dp)) else Text(stringResource(R.string.strava_import))
+private fun ImportableCard(importing: Boolean, onImport: () -> Unit, content: @Composable RowScope.() -> Unit) {
+    Card(onClick = onImport, enabled = !importing, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            content()
+            if (importing) CircularProgressIndicator(modifier = Modifier.padding(start = 8.dp).size(20.dp), strokeWidth = 2.dp)
+        }
     }
 }
 
