@@ -111,7 +111,7 @@ fun RouteMapView(
                         mapView.overlays.add(WindArrowsOverlay(thinnedArrows, mapView.resources.displayMetrics.density))
                     }
 
-                    highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it)) }
+                    highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it, mapView.resources.displayMetrics.density)) }
 
                     if (lastState?.points != points) {
                         val bbox = boundingBoxOf(geoPoints)
@@ -219,64 +219,75 @@ private fun boundingBoxOf(points: List<GeoPoint>): BoundingBox {
     return BoundingBox(north, east, south, west)
 }
 
-/** Green dot at the route's start, checkered flag at its end (end always drawn on top when they coincide, e.g. a loop). */
+/** Green dot at the route's start, checkered dot at its end (end always drawn on top when they coincide, e.g. a loop). */
 private class StartFinishOverlay(
     private val start: GeoPoint,
     private val finish: GeoPoint,
     private val density: Float,
 ) : Overlay() {
-    private val startRadius = 7f * density
-    private val flagSize = 12f * density
+    private val radius = MARKER_DIAMETER_DP / 2 * density
     private val startFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#43A047"); style = Paint.Style.FILL }
-    private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.STROKE; strokeWidth = 2f * density }
+    private val ringPaint = markerRingPaint(density)
     private val blackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK; style = Paint.Style.FILL }
     private val whitePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+    private val clip = Path()
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
         val out = android.graphics.Point()
 
         mapView.projection.toPixels(start, out)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), startRadius, startFillPaint)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), startRadius, ringPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), radius, startFillPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), radius, ringPaint)
 
         mapView.projection.toPixels(finish, out)
-        drawCheckeredFlag(canvas, out.x.toFloat(), out.y.toFloat())
+        drawCheckeredDot(canvas, out.x.toFloat(), out.y.toFloat())
     }
 
-    private fun drawCheckeredFlag(canvas: Canvas, cx: Float, cy: Float) {
-        val half = flagSize / 2
-        canvas.drawCircle(cx, cy, half + 2f * density, whitePaint)
+    private fun drawCheckeredDot(canvas: Canvas, cx: Float, cy: Float) {
+        canvas.save()
+        clip.reset()
+        clip.addCircle(cx, cy, radius, Path.Direction.CW)
+        canvas.clipPath(clip)
+        canvas.drawCircle(cx, cy, radius, whitePaint)
         val cells = 4
-        val cellSize = flagSize / cells
+        val cellSize = 2 * radius / cells
         for (row in 0 until cells) {
             for (col in 0 until cells) {
                 if ((row + col) % 2 == 0) {
-                    val left = cx - half + col * cellSize
-                    val top = cy - half + row * cellSize
+                    val left = cx - radius + col * cellSize
+                    val top = cy - radius + row * cellSize
                     canvas.drawRect(left, top, left + cellSize, top + cellSize, blackPaint)
                 }
             }
         }
-        canvas.drawRect(cx - half, cy - half, cx + half, cy + half, ringPaint)
+        canvas.restore()
+        canvas.drawCircle(cx, cy, radius, ringPaint)
     }
 }
 
-/** A marker at the route point currently under a finger on any chart below the map. */
-private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
+/** A marker at the route point currently under a finger on a chart, or where the slider was left. */
+private class HighlightOverlay(private val point: RoutePoint, density: Float) : Overlay() {
+    private val radius = MARKER_DIAMETER_DP / 2 * density
+    private val ringPaint = markerRingPaint(density)
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E88E5"); style = Paint.Style.FILL }
+
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
         val out = android.graphics.Point()
         mapView.projection.toPixels(GeoPoint(point.lat, point.lon), out)
-        val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 4f
-        }
-        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E88E5"); style = Paint.Style.FILL }
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 14f, dotPaint)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 14f, ringPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), radius, dotPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), radius, ringPaint)
     }
+}
+
+/** Start, finish and position markers all share one size: 12 dp across with a 2 dp white ring. */
+private const val MARKER_DIAMETER_DP = 12f
+
+private fun markerRingPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    color = Color.WHITE
+    style = Paint.Style.STROKE
+    strokeWidth = 2f * density
 }
 
 /**
