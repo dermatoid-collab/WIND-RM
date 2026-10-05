@@ -47,6 +47,7 @@ import com.windrm.app.ui.components.MultiSeriesChart
 import com.windrm.app.ui.components.RouteMapView
 import com.windrm.app.ui.components.SemiCircularGauge
 import com.windrm.app.ui.components.WindArrowPoint
+import com.windrm.app.ui.components.WindSpeedLegend
 import com.windrm.app.ui.theme.AqiFair
 import com.windrm.app.ui.theme.AqiGood
 import com.windrm.app.ui.theme.AqiModerate
@@ -250,6 +251,7 @@ private fun ForecastContent(
                 mapStyle = mapStyle,
                 highlightPoint = highlightPoint,
             )
+            WindSpeedLegend()
         }
 
         SectionBox {

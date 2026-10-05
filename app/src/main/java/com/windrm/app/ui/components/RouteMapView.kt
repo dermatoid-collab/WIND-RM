@@ -367,12 +367,3 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
         canvas.drawPath(headPath, headPaint)
     }
 }
-
-/** Darker shades of green / blue / orange / red so they read over terrain greens and the red track. */
-private fun windBandColor(windSpeedKmh: Double): Int = when {
-    windSpeedKmh < 10.0 -> Color.parseColor("#1B5E20")
-    windSpeedKmh < 20.0 -> Color.parseColor("#0277BD")
-    windSpeedKmh < 30.0 -> Color.parseColor("#E65100")
-    windSpeedKmh < 40.0 -> Color.parseColor("#8E0000")
-    else -> Color.BLACK
-}
