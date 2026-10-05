@@ -92,7 +92,7 @@ fun RouteMapView(
                     val polyline = Polyline(mapView).apply {
                         setPoints(geoPoints)
                         outlinePaint.color = Color.parseColor("#E53935")
-                        outlinePaint.strokeWidth = 9f
+                        outlinePaint.strokeWidth = 3f * mapView.resources.displayMetrics.density
                         // osmdroid draws each segment separately; with the default BUTT caps every
                         // tiny GPX direction change leaves a notch, which read as a "fuzzy" line.
                         outlinePaint.isAntiAlias = true
