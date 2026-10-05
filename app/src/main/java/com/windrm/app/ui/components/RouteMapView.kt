@@ -280,35 +280,28 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
 }
 
 /**
- * Wind arrows built from ONE fixed template -- tip at the origin pointing straight up, shaft
- * hanging below it from the centre of the head's base -- that is only translated onto the route
- * point and rotated with the canvas. The tip sits exactly on the track; the arrow lies on the
- * upwind side, so the wind visibly "arrives" at the route from the tail end.
+ * Wind arrows built from ONE fixed template -- a notched head with its tip at the origin pointing
+ * straight up, shaft hanging below from the notch -- only translated onto the route point and
+ * rotated with the canvas. The tip sits exactly on the track; the arrow lies upwind of it.
  *
- * Shaft length (all sizes in dp): shaft = 6 + (34 - 6) * min(windKmh / 40, 1), drawn after a
- * fixed 10dp head -- linear up to 40 km/h, saturated beyond it.
+ * Shaft length is relative to this route's own wind range (all sizes in dp):
+ * shaft = 4 + 40 * (v - vMin) / (vMax - vMin), so the calmest point gets the shortest arrow and the
+ * windiest the longest, whatever the absolute speeds.
  */
 private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, density: Float) : Overlay() {
-    private val headLength = 10f * density
-    private val headHalfWidth = 7f * density
-    private val minShaft = 6f * density
-    private val maxShaft = 34f * density
-    private val maxSpeedForScaleKmh = 40.0
-    private val shaftStroke = 3f * density
-    private val haloExtra = 2f * density
+    private val headLength = 9f * density
+    private val headHalfWidth = 5f * density
+    private val notchDepth = 3f * density
+    private val minShaft = 4f * density
+    private val maxShaft = 44f * density
+    private val minSpeed = arrows.minOfOrNull { it.windSpeedKmh } ?: 0.0
+    private val maxSpeed = arrows.maxOfOrNull { it.windSpeedKmh } ?: 0.0
 
-    // White halo behind the black arrow keeps it legible over any map colour.
-    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
     private val shaftPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeWidth = shaftStroke
+        strokeCap = Paint.Cap.BUTT
+        strokeWidth = 2.5f * density
     }
     private val headPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
@@ -316,8 +309,9 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
     }
     private val headPath = Path().apply {
         moveTo(0f, 0f)
-        lineTo(-headHalfWidth, headLength)
         lineTo(headHalfWidth, headLength)
+        lineTo(0f, headLength - notchDepth)
+        lineTo(-headHalfWidth, headLength)
         close()
     }
 
@@ -338,15 +332,14 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
     }
 
     private fun shaftFor(windSpeedKmh: Double): Float {
-        val t = (windSpeedKmh / maxSpeedForScaleKmh).coerceIn(0.0, 1.0).toFloat()
+        val range = maxSpeed - minSpeed
+        val t = if (range <= 0.0) 1f else ((windSpeedKmh - minSpeed) / range).coerceIn(0.0, 1.0).toFloat()
         return minShaft + (maxShaft - minShaft) * t
     }
 
     private fun drawTemplate(canvas: Canvas, shaft: Float) {
-        val shaftEnd = headLength + shaft
-        canvas.drawLine(0f, headLength, 0f, shaftEnd, haloPaint.apply { strokeWidth = shaftStroke + 2 * haloExtra })
-        canvas.drawPath(headPath, haloPaint.apply { strokeWidth = 2 * haloExtra })
-        canvas.drawLine(0f, headLength, 0f, shaftEnd, shaftPaint)
+        // Starts half a pixel inside the notch so no gap shows between shaft and head.
+        canvas.drawLine(0f, headLength - notchDepth - 0.5f, 0f, headLength + shaft, shaftPaint)
         canvas.drawPath(headPath, headPaint)
     }
 }
