@@ -58,6 +58,8 @@ fun RouteMapView(
     windArrows: List<WindArrowPoint>? = null,
     mapStyle: MapStyle = MapStyle.OSM_STANDARD,
     highlightPoint: RoutePoint? = null,
+    /** Scrub position (0..1 of the route); the arrow nearest to it gets a thicker white edge. */
+    scrubFraction: Float? = null,
     height: Dp = 280.dp,
 ) {
     val mapRef = remember { MapViewRef() }
@@ -110,7 +112,16 @@ fun RouteMapView(
                     if (!windArrows.isNullOrEmpty()) {
                         // One arrow per weather-sample point was too dense to read; halve it.
                         val thinnedArrows = windArrows.filterIndexed { index, _ -> index % 2 == 0 }
-                        mapView.overlays.add(WindArrowsOverlay(thinnedArrows, mapView.resources.displayMetrics.density))
+                        // Weather samples are evenly spaced by distance, so sample i sits at i / (n - 1)
+                        // of the route; on an out-and-back road this picks the outbound or return arrow
+                        // by where the finger is, not by which one happens to be closer on the map.
+                        val active = scrubFraction?.let { f ->
+                            val last = (windArrows.size - 1).coerceAtLeast(1)
+                            windArrows.indices.filter { it % 2 == 0 }
+                                .minByOrNull { kotlin.math.abs(it.toFloat() / last - f) }
+                                ?.let { windArrows[it] }
+                        }
+                        mapView.overlays.add(WindArrowsOverlay(thinnedArrows, mapView.resources.displayMetrics.density, active))
                     }
 
                     highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it, mapView.resources.displayMetrics.density)) }
@@ -300,14 +311,20 @@ private fun markerRingPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply
  * Shaft length is relative to this route's own wind range (all sizes in dp):
  * shaft = 4 + 18 * (v - vMin) / (vMax - vMin), so the calmest point gets the shortest arrow and the
  * windiest the longest, whatever the absolute speeds. Colour is absolute instead, one shade per
- * 10 km/h band (see [windBandColor]), so it stays comparable between rides.
+ * 10 km/h band (see [windBandColor]), so it stays comparable between rides. The [active] arrow (the
+ * one matching the scrub position) gets a 3 dp white edge instead of 1 dp and is drawn last, on top.
  */
-private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, density: Float) : Overlay() {
+private class WindArrowsOverlay(
+    private val arrows: List<WindArrowPoint>,
+    density: Float,
+    private val active: WindArrowPoint? = null,
+) : Overlay() {
     private val headLength = 8f * density
     private val headHalfWidth = 5f * density
     private val minShaft = 4f * density
     private val maxShaft = 22f * density
     private val outline = 1f * density
+    private val activeOutline = 3f * density
     private val minSpeed = arrows.minOfOrNull { it.windSpeedKmh } ?: 0.0
     private val maxSpeed = arrows.maxOfOrNull { it.windSpeedKmh } ?: 0.0
 
@@ -338,18 +355,23 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
-        val out = android.graphics.Point()
         for (arrow in arrows) {
-            mapView.projection.toPixels(GeoPoint(arrow.point.lat, arrow.point.lon), out)
-            // Template points up (north); wind blows TOWARDS from + 180, and canvas.rotate() is
-            // clockwise on screen -- the same sense as compass bearings.
-            val bearingDeg = ((arrow.windFromDeg + 180.0) % 360.0).toFloat()
-            canvas.save()
-            canvas.translate(out.x.toFloat(), out.y.toFloat())
-            canvas.rotate(bearingDeg)
-            drawTemplate(canvas, shaftFor(arrow.windSpeedKmh), windBandColor(arrow.windSpeedKmh))
-            canvas.restore()
+            if (arrow !== active) drawArrow(canvas, mapView, arrow, outline)
         }
+        active?.let { drawArrow(canvas, mapView, it, activeOutline) }
+    }
+
+    private fun drawArrow(canvas: Canvas, mapView: MapView, arrow: WindArrowPoint, edge: Float) {
+        val out = android.graphics.Point()
+        mapView.projection.toPixels(GeoPoint(arrow.point.lat, arrow.point.lon), out)
+        // Template points up (north); wind blows TOWARDS from + 180, and canvas.rotate() is
+        // clockwise on screen -- the same sense as compass bearings.
+        val bearingDeg = ((arrow.windFromDeg + 180.0) % 360.0).toFloat()
+        canvas.save()
+        canvas.translate(out.x.toFloat(), out.y.toFloat())
+        canvas.rotate(bearingDeg)
+        drawTemplate(canvas, shaftFor(arrow.windSpeedKmh), windBandColor(arrow.windSpeedKmh), edge)
+        canvas.restore()
     }
 
     private fun shaftFor(windSpeedKmh: Double): Float {
@@ -358,12 +380,12 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
         return minShaft + (maxShaft - minShaft) * t
     }
 
-    private fun drawTemplate(canvas: Canvas, shaft: Float, color: Int) {
+    private fun drawTemplate(canvas: Canvas, shaft: Float, color: Int, edge: Float) {
         shaftPaint.color = color
         headPaint.color = color
         val shaftEnd = headLength + shaft
-        canvas.drawLine(0f, headLength, 0f, shaftEnd + outline, outlinePaint.apply { strokeWidth = shaftPaint.strokeWidth + 2 * outline })
-        canvas.drawPath(headPath, outlinePaint.apply { strokeWidth = 2 * outline })
+        canvas.drawLine(0f, headLength, 0f, shaftEnd + edge, outlinePaint.apply { strokeWidth = shaftPaint.strokeWidth + 2 * edge })
+        canvas.drawPath(headPath, outlinePaint.apply { strokeWidth = 2 * edge })
         // Starts half a pixel inside the head so no gap shows between shaft and head.
         canvas.drawLine(0f, headLength - 0.5f, 0f, shaftEnd, shaftPaint)
         canvas.drawPath(headPath, headPaint)
