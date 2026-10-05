@@ -285,7 +285,7 @@ private class HighlightOverlay(private val point: RoutePoint) : Overlay() {
  * rotated with the canvas. The tip sits exactly on the track; the arrow lies upwind of it.
  *
  * Shaft length is relative to this route's own wind range (all sizes in dp):
- * shaft = 4 + 40 * (v - vMin) / (vMax - vMin), so the calmest point gets the shortest arrow and the
+ * shaft = 4 + 18 * (v - vMin) / (vMax - vMin), so the calmest point gets the shortest arrow and the
  * windiest the longest, whatever the absolute speeds. Colour is absolute instead, one shade per
  * 10 km/h band (see [windBandColor]), so it stays comparable between rides.
  */
@@ -293,10 +293,19 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
     private val headLength = 8f * density
     private val headHalfWidth = 5f * density
     private val minShaft = 4f * density
-    private val maxShaft = 44f * density
+    private val maxShaft = 22f * density
+    private val outline = 1f * density
     private val minSpeed = arrows.minOfOrNull { it.windSpeedKmh } ?: 0.0
     private val maxSpeed = arrows.maxOfOrNull { it.windSpeedKmh } ?: 0.0
 
+    // Thin white edge so the arrow stays legible over busy terrain without the heavy halo of
+    // earlier versions, which competed with the map.
+    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.BUTT
+        strokeJoin = Paint.Join.ROUND
+    }
     private val shaftPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
@@ -339,8 +348,11 @@ private class WindArrowsOverlay(private val arrows: List<WindArrowPoint>, densit
     private fun drawTemplate(canvas: Canvas, shaft: Float, color: Int) {
         shaftPaint.color = color
         headPaint.color = color
+        val shaftEnd = headLength + shaft
+        canvas.drawLine(0f, headLength, 0f, shaftEnd + outline, outlinePaint.apply { strokeWidth = shaftPaint.strokeWidth + 2 * outline })
+        canvas.drawPath(headPath, outlinePaint.apply { strokeWidth = 2 * outline })
         // Starts half a pixel inside the head so no gap shows between shaft and head.
-        canvas.drawLine(0f, headLength - 0.5f, 0f, headLength + shaft, shaftPaint)
+        canvas.drawLine(0f, headLength - 0.5f, 0f, shaftEnd, shaftPaint)
         canvas.drawPath(headPath, headPaint)
     }
 }
