@@ -59,6 +59,7 @@ import com.windrm.app.ui.theme.AqiPoor
 import com.windrm.app.ui.theme.AqiSevere
 import com.windrm.app.ui.theme.AqiVeryPoor
 import com.windrm.app.ui.theme.CloudColor
+import com.windrm.app.ui.theme.DaylightColor
 import com.windrm.app.ui.theme.DewPointColor
 import com.windrm.app.ui.theme.FeelsLikeColor
 import com.windrm.app.ui.theme.GustColor
@@ -295,13 +296,20 @@ private fun ForecastContent(
                 MultiSeriesChart(
                     title = stringResource(R.string.daylight_and_uv),
                     xLabels = timeLabels,
-                    yRangeOverride = 0f..12f,
+                    yRangeOverride = 0f..UV_SCALE_MAX,
                     scrubFraction = scrubFraction,
                     onScrub = onScrub,
                     onScrubEnd = onScrubEnd,
                     scrubLabel = scrubLabel,
                     daylightBar = daylightLevels,
                     series = listOf(
+                        // Same light level as the bar above (0 at night, ramping through civil
+                        // twilight to full daylight), drawn from 0 up to the top of the 0..12 scale.
+                        ChartSeries(
+                            "Daylight", DaylightColor, daylightLevels.map { it * UV_SCALE_MAX },
+                            filled = false, smooth = false,
+                            tooltipLabel = "Daylight", unit = "%", decimals = 0, tooltipFactor = 100f / UV_SCALE_MAX,
+                        ),
                         ChartSeries("UV Index", UvColor, points.map { it.weather.uvIndex.toFloat() }, tooltipLabel = "UV index"),
                     ),
                 )
@@ -476,6 +484,7 @@ private fun shareForecast(context: android.content.Context, result: RouteForecas
 }
 
 private const val DAYLIGHT_BAR_SAMPLES = 200
+private const val UV_SCALE_MAX = 12f
 
 /** Position on the track [distanceM] from the start, linearly interpolated between its two neighbouring points. */
 private fun pointAtDistance(track: List<RoutePoint>, distanceM: Double): RoutePoint {

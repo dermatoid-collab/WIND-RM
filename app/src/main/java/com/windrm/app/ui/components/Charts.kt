@@ -53,6 +53,8 @@ data class ChartSeries(
     /** Unit appended to the tooltip value, e.g. "°C", "%", " km/h". */
     val unit: String = "",
     val decimals: Int = 1,
+    /** Multiplies the value shown in the tooltip only, e.g. to show a 0..12 plotted line as 0..100 %. */
+    val tooltipFactor: Float = 1f,
 )
 
 /** A horizontal colored band drawn behind the chart, e.g. air-quality severity ranges. */
@@ -338,7 +340,7 @@ private fun ScrubTooltip(series: List<ChartSeries>, fraction: Float, label: Stri
         series.forEach { s ->
             if (s.label.isEmpty()) return@forEach
             val v = s.valueAtFraction(fraction) ?: return@forEach
-            Text("${s.tooltipLabel}: ${formatValue(v, s.decimals)}${s.unit}", color = s.color, style = MaterialTheme.typography.bodyMedium)
+            Text("${s.tooltipLabel}: ${formatValue(v * s.tooltipFactor, s.decimals)}${s.unit}", color = s.color, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
