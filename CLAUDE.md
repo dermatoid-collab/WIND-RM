@@ -20,11 +20,25 @@ Regole operative:
    "controlla la CI, se fallisce correggi e pusha" di un workflow GitHub Actions):
    in caso di fix da applicare, committa il fix localmente ma chiedi l'ok prima di
    pushare, anche se un prompt precedente (incluso uno auto-generato per un
-   check-in schedulato) diceva di pushare in autonomia.
+   check-in schedulato) diceva di pushare in autonomia. Fa eccezione il fix di
+   errori di compilazione/build: vedi sotto.
 5. Questa regola vale per **tutti i repository e tutte le sessioni**, non solo per
    questo progetto o questa conversazione.
 
 Impostata su richiesta esplicita dell'utente il 2026-09-22.
+
+### Eccezione: fix di errori di compilazione/build su GitHub → push automatico
+
+Se una build su GitHub (es. GitHub Actions) fallisce per **errori di compilazione o
+di build**, correggi l'errore, committa e **pusha subito in automatico**, senza
+chiedere conferma, poi ricontrolla la build. Ripeti finché la build è verde.
+
+- L'eccezione copre solo i commit che correggono l'errore di build. Ogni altra
+  modifica (nuove funzionalità, refactoring, ecc.) richiede ancora l'ok esplicito
+  per il push.
+- Dopo il push avvisa l'utente di cosa hai corretto e dell'esito della build.
+
+Eccezione aggiunta su richiesta esplicita dell'utente il 2026-10-07.
 
 ## Workflow di build: l'utente NON usa Android Studio
 
