@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.view.MotionEvent
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.windrm.app.BuildConfig
 import com.windrm.app.R
+import com.windrm.app.domain.cropPoints
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteStop
 import com.windrm.app.settings.MapStyle
@@ -67,18 +69,22 @@ fun RouteMapView(
     /** Scrub position (0..1 of the route); the arrow nearest to it gets a thicker white edge. */
     scrubFraction: Float? = null,
     markers: List<MapMarker> = emptyList(),
+    /** Only this part of the track (metres from the start) is drawn; the map stays fitted to the whole route. */
+    cropRangeM: ClosedFloatingPointRange<Double>? = null,
     /** Planned stops, drawn as clock pins. */
     stops: List<RouteStop> = emptyList(),
     /** Tap on a stop pin (its index in [stops]); null = pins aren't tappable. */
     onStopTap: ((Int) -> Unit)? = null,
     /** Tap anywhere else on the map; null = taps are ignored (normal panning still works). */
     onMapTap: ((lat: Double, lon: Double) -> Unit)? = null,
+    /** Dp.Unspecified = fill the height the parent gives it (e.g. a weighted Column slot). */
     height: Dp = 280.dp,
 ) {
     val mapRef = remember { MapViewRef() }
     // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
     // while the surrounding Column is scrolling, bleeding over the next section's title.
-    Box(modifier.fillMaxWidth().height(height).clipToBounds()) {
+    val sized = if (height == Dp.Unspecified) modifier.fillMaxWidth().fillMaxHeight() else modifier.fillMaxWidth().height(height)
+    Box(sized.clipToBounds()) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { context ->
@@ -119,8 +125,10 @@ fun RouteMapView(
                 }
                 if (points.isNotEmpty()) {
                     val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
+                    val shownPoints = cropRangeM?.let { cropPoints(points, it.start, it.endInclusive) } ?: points
+                    val shownGeoPoints = shownPoints.map { GeoPoint(it.lat, it.lon) }
                     val polyline = Polyline(mapView).apply {
-                        setPoints(geoPoints)
+                        setPoints(shownGeoPoints)
                         outlinePaint.color = Color.parseColor("#E53935")
                         outlinePaint.strokeWidth = 3f * mapView.resources.displayMetrics.density
                         // osmdroid draws each segment separately; with the default BUTT caps every
@@ -133,7 +141,7 @@ fun RouteMapView(
 
                     // Start drawn first so the finish flag ends up on top when they coincide (a
                     // loop route), per the "finish must always show in front of start" requirement.
-                    mapView.overlays.add(StartFinishOverlay(geoPoints.first(), geoPoints.last(), mapView.resources.displayMetrics.density))
+                    mapView.overlays.add(StartFinishOverlay(shownGeoPoints.first(), shownGeoPoints.last(), mapView.resources.displayMetrics.density))
 
                     if (!windArrows.isNullOrEmpty()) {
                         // One arrow per weather-sample point was too dense to read; halve it.
@@ -153,7 +161,7 @@ fun RouteMapView(
                     val density = mapView.resources.displayMetrics.density
                     highlightPoint?.let { mapView.overlays.add(PointMarkerOverlay(it, HIGHLIGHT_ARGB, density)) }
                     markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
-                    if (stops.isNotEmpty()) mapView.overlays.add(StopsOverlay(stops, density, onStopTap))
+                    if (stops.isNotEmpty()) mapView.overlays.add(StopsOverlay(stops, density, onStopTap, cropRangeM))
 
                     if (lastState?.points != points) {
                         val bbox = boundingBoxOf(geoPoints)
@@ -328,7 +336,11 @@ private class StopsOverlay(
     private val stops: List<RouteStop>,
     private val density: Float,
     private val onTap: ((Int) -> Unit)?,
+    /** Stops outside it are cropped away from the ride: neither drawn nor tappable. */
+    private val cropRangeM: ClosedFloatingPointRange<Double>? = null,
 ) : Overlay() {
+    private fun visible(stop: RouteStop) = cropRangeM == null || stop.distanceM in cropRangeM
+
     private val radius = 10f * density
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = STOP_ARGB; style = Paint.Style.FILL }
     private val ringPaint = markerRingPaint(density)
@@ -343,6 +355,7 @@ private class StopsOverlay(
         if (shadow) return
         val out = android.graphics.Point()
         for (stop in stops) {
+            if (!visible(stop)) continue
             mapView.projection.toPixels(GeoPoint(stop.lat, stop.lon), out)
             val x = out.x.toFloat()
             val y = out.y.toFloat()
@@ -358,7 +371,7 @@ private class StopsOverlay(
         val callback = onTap ?: return false
         val out = android.graphics.Point()
         val hitRadius = 24f * density
-        val hit = stops.indices.minByOrNull { i ->
+        val hit = stops.indices.filter { visible(stops[it]) }.minByOrNull { i ->
             mapView.projection.toPixels(GeoPoint(stops[i].lat, stops[i].lon), out)
             kotlin.math.hypot(out.x - e.x, out.y - e.y)
         } ?: return false

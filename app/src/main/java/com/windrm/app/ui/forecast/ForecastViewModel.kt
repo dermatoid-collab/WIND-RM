@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.domain.cropped
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.WeatherRepository
@@ -28,6 +29,8 @@ class ForecastViewModel(
     private val startEpochS: Long,
     private val speedKmh: Double,
     private val pacing: PacingMode,
+    /** Kept part of the route, metres from its start (the route screen's crop slider). */
+    private val cropRangeM: ClosedFloatingPointRange<Double>,
 ) : ViewModel() {
 
     var uiState by mutableStateOf<ForecastUiState>(ForecastUiState.Loading)
@@ -48,7 +51,8 @@ class ForecastViewModel(
         viewModelScope.launch {
             uiState = ForecastUiState.Loading
             runCatching {
-                val route = routeRepository.getRoute(routeId) ?: error("Route not found")
+                val route = (routeRepository.getRoute(routeId) ?: error("Route not found"))
+                    .cropped(cropRangeM.start, cropRangeM.endInclusive)
                 val profile = settingsRepository.current().riderProfile
                 weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh, pacing, profile)
             }

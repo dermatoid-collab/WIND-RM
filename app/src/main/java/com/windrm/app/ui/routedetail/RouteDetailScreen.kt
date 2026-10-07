@@ -1,5 +1,27 @@
 package com.windrm.app.ui.routedetail
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.RangeSlider
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import com.windrm.app.domain.cropped
+import com.windrm.app.model.Route
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,9 +32,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddLocationAlt
@@ -27,15 +47,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -43,8 +59,6 @@ import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -76,27 +90,47 @@ import java.util.Locale
 fun RouteDetailScreen(
     viewModel: RouteDetailViewModel,
     onBack: () -> Unit,
-    onForecast: (startEpochS: Long, speedKmh: Double, pacing: PacingMode) -> Unit,
+    onForecast: (startEpochS: Long, speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
 ) {
     val route = viewModel.route
+    // The part actually ridden: header stats and the forecast follow the crop slider.
+    val ridden = remember(route, viewModel.cropRange) {
+        route?.let { r -> viewModel.cropRangeM().let { r.cropped(it.start, it.endInclusive) } }
+    }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault()).withZone(ZoneId.systemDefault()) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(route?.name ?: "") },
-                navigationIcon = {
+            // Hand-built so it can grow to three lines (name, ride summary, date), centred like the original app.
+            Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
+                Row(
+                    Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                     }
-                },
-                actions = {
-                    route?.let { FavoriteButton(isFavorite = it.isFavorite, onClick = viewModel::toggleFavorite, tint = Color.White) }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                ),
-            )
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(route?.name ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleLarge)
+                        ridden?.let { r ->
+                            Text(rideSummary(r, viewModel.avgSpeedKmh), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        }
+                        route?.let { r ->
+                            // The route's own creation date (the import date when unknown).
+                            Text(
+                                dateFormatter.format(Instant.ofEpochMilli(r.originalDateEpochMs ?: r.createdAtEpochMs)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.8f),
+                            )
+                        }
+                    }
+                    if (route != null) {
+                        FavoriteButton(isFavorite = route.isFavorite, onClick = viewModel::toggleFavorite, tint = Color.White)
+                    } else {
+                        Spacer(Modifier.size(48.dp))
+                    }
+                }
+            }
         },
     ) { padding ->
         if (route == null) {
@@ -107,20 +141,83 @@ fun RouteDetailScreen(
         var showTimeDialog by remember { mutableStateOf(false) }
         var placingStop by remember { mutableStateOf(false) }
         var editingStop by remember { mutableStateOf<StopEdit?>(null) }
-        val plannedLabelFormatter = remember { DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault()) }
-        // Same format as the route lists; the route's own creation date, the import date if unknown.
-        val routeDateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault()) }
+        val plannedLabelFormatter = remember { DateTimeFormatter.ofPattern("MMM d, yyyy 'at' HH:mm", Locale.getDefault()) }
+        var speedText by remember { mutableStateOf(formatSpeedInput(viewModel.avgSpeedKmh)) }
+        // The VM may adopt the recorded pace once the route loads; mirror it unless the user is typing.
+        LaunchedEffect(viewModel.avgSpeedKmh) {
+            if (speedText.replace(',', '.').toDoubleOrNull() != viewModel.avgSpeedKmh) speedText = formatSpeedInput(viewModel.avgSpeedKmh)
+        }
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Box {
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            FormRow(icon = Icons.Filled.Event, onClick = { showTimeDialog = true }) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.starting), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (viewModel.startsNow) {
+                            stringResource(R.string.starting_now)
+                        } else {
+                            viewModel.plannedDate.atTime(viewModel.plannedHour, viewModel.plannedMinute).format(plannedLabelFormatter)
+                        },
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                    HorizontalDivider(Modifier.padding(top = 8.dp))
+                }
+                IconButton(onClick = { showTimeDialog = true }) {
+                    Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.starting))
+                }
+            }
+
+            FormRow(icon = Icons.Filled.Speed) {
+                TextField(
+                    value = speedText,
+                    onValueChange = { text ->
+                        speedText = text
+                        text.replace(',', '.').toDoubleOrNull()?.let { viewModel.avgSpeedKmh = it.coerceIn(1.0, 80.0) }
+                    },
+                    label = { Text(stringResource(R.string.average_speed)) },
+                    suffix = {
+                        val mode = stringResource(if (viewModel.pacingMode == PacingMode.REALISTIC) R.string.pacing_realistic else R.string.pacing_constant)
+                        Text("${stringResource(R.string.km_h)} · $mode")
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                    ),
+                    modifier = Modifier.weight(1f),
+                )
+                // Swaps the speed model: constant average vs. realistic (gradient-aware) pacing.
+                IconButton(onClick = {
+                    viewModel.pacingMode = if (viewModel.pacingMode == PacingMode.CONSTANT) PacingMode.REALISTIC else PacingMode.CONSTANT
+                }) {
+                    Icon(Icons.Filled.SwapHoriz, contentDescription = stringResource(R.string.pacing_mode))
+                }
+            }
+
+            Button(
+                onClick = {
+                    onForecast(viewModel.computeStartInstant().epochSecond, viewModel.avgSpeedKmh, viewModel.pacingMode, viewModel.cropRangeM())
+                },
+                shape = RoundedCornerShape(4.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp),
+            ) {
+                Text(stringResource(R.string.forecast_route).uppercase(), style = MaterialTheme.typography.titleMedium)
+            }
+
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+            ) {
                 RouteMapView(
                     points = route.points,
                     mapStyle = viewModel.mapStyle,
+                    cropRangeM = viewModel.cropRangeM(),
                     stops = route.stops,
                     onStopTap = { index -> editingStop = StopEdit(index, route.stops[index]) },
                     onMapTap = if (placingStop) {
@@ -131,6 +228,7 @@ fun RouteDetailScreen(
                     } else {
                         null
                     },
+                    height = Dp.Unspecified,
                 )
                 Surface(
                     onClick = { placingStop = !placingStop },
@@ -162,87 +260,15 @@ fun RouteDetailScreen(
                 }
             }
 
-            Column(Modifier.padding(16.dp)) {
-                Text("%.1f km · %.0f m↑".format(route.distanceKm, route.elevationGainM), style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    routeDateFormatter.format(Instant.ofEpochMilli(route.originalDateEpochMs ?: route.createdAtEpochMs)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (route.stops.isNotEmpty()) {
-                    Text(
-                        stringResource(R.string.stops_summary, route.stops.size, formatStopDuration(route.stops.sumOf { it.durationMin })),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Text(
-                    stringResource(R.string.starting),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 20.dp),
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        if (viewModel.startsNow) {
-                            stringResource(R.string.starting_now)
-                        } else {
-                            viewModel.plannedDate.atTime(viewModel.plannedHour, viewModel.plannedMinute).format(plannedLabelFormatter)
-                        },
-                        style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.weight(1f),
-                    )
-                    IconButton(onClick = { showTimeDialog = true }) {
-                        Icon(Icons.Filled.Schedule, contentDescription = null)
-                    }
-                }
-
-                Text(
-                    stringResource(R.string.average_speed),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 20.dp),
-                )
-                OutlinedTextField(
-                    value = if (viewModel.avgSpeedKmh == viewModel.avgSpeedKmh.toInt().toDouble()) {
-                        viewModel.avgSpeedKmh.toInt().toString()
-                    } else {
-                        "%.1f".format(viewModel.avgSpeedKmh)
-                    },
-                    onValueChange = { text ->
-                        text.toDoubleOrNull()?.let { viewModel.avgSpeedKmh = it.coerceIn(1.0, 80.0) }
-                    },
-                    suffix = { Text(stringResource(R.string.km_h)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-
-                Text(
-                    stringResource(R.string.pacing_mode),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
-                )
-                val pacingOptions = listOf(
-                    PacingMode.CONSTANT to stringResource(R.string.pacing_constant),
-                    PacingMode.REALISTIC to stringResource(R.string.pacing_realistic),
-                )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    pacingOptions.forEachIndexed { index, (mode, label) ->
-                        SegmentedButton(
-                            selected = viewModel.pacingMode == mode,
-                            onClick = { viewModel.pacingMode = mode },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = pacingOptions.size),
-                        ) { Text(label) }
-                    }
-                }
-
-                Button(
-                    onClick = { onForecast(viewModel.computeStartInstant().epochSecond, viewModel.avgSpeedKmh, viewModel.pacingMode) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                ) {
-                    Text(stringResource(R.string.forecast_route))
-                }
-            }
+            // Two thumbs: drag them in to cut the start and/or the end off the ride.
+            RangeSlider(
+                value = viewModel.cropRange,
+                onValueChange = { range ->
+                    if (range.endInclusive - range.start >= MIN_CROP_FRACTION) viewModel.cropRange = range
+                },
+                valueRange = 0f..1f,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            )
         }
 
         if (showTimeDialog) {
@@ -408,3 +434,32 @@ private fun StopDurationDialog(
 
 private fun formatStopDuration(minutes: Int): String =
     if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"
+
+private const val MIN_CROP_FRACTION = 0.02f
+
+/** A form line in the style of the original app: leading icon, content, optional trailing action. */
+@Composable
+private fun FormRow(icon: ImageVector, onClick: (() -> Unit)? = null, content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(start = 16.dp, end = 8.dp, top = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp).size(28.dp))
+        content()
+    }
+}
+
+/** "133 km  3,371 m↑  25 km/h  5h 19m": the ridden part, its time including planned stops. */
+private fun rideSummary(route: Route, avgSpeedKmh: Double): String {
+    val ridingMin = if (avgSpeedKmh > 0) route.distanceKm / avgSpeedKmh * 60 else 0.0
+    val totalMin = (ridingMin + route.stops.sumOf { it.durationMin }).roundToInt()
+    return "%.0f km  %,d m↑  %s km/h  %dh %02dm".format(
+        route.distanceKm, route.elevationGainM.roundToInt(), formatSpeedInput(avgSpeedKmh), totalMin / 60, totalMin % 60,
+    )
+}
+
+private fun formatSpeedInput(speedKmh: Double): String =
+    if (speedKmh == speedKmh.toInt().toDouble()) speedKmh.toInt().toString() else "%.1f".format(speedKmh)

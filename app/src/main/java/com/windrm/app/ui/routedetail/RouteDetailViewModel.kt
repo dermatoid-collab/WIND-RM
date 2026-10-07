@@ -28,6 +28,14 @@ class RouteDetailViewModel(
     var avgSpeedKmh by mutableStateOf(25.0)
     var startsNow by mutableStateOf(true)
     var pacingMode by mutableStateOf(PacingMode.CONSTANT)
+
+    /** Kept part of the route, as fractions of its length (the two thumbs of the crop slider). */
+    var cropRange by mutableStateOf(0f..1f)
+
+    private val totalDistanceM: Double get() = route?.points?.lastOrNull()?.distanceFromStartM ?: 0.0
+
+    fun cropRangeM(): ClosedFloatingPointRange<Double> =
+        (cropRange.start * totalDistanceM)..(cropRange.endInclusive * totalDistanceM)
     var plannedDate by mutableStateOf(LocalDate.now())
     var plannedHour by mutableStateOf(8)
     var plannedMinute by mutableStateOf(0)
@@ -51,7 +59,9 @@ class RouteDetailViewModel(
 
     /** Snaps a tap to the nearest track point; that point's distance is where the stop sits. */
     fun stopAt(lat: Double, lon: Double, durationMin: Int = DEFAULT_STOP_MIN): RouteStop? {
-        val points = route?.points ?: return null
+        val range = cropRangeM()
+        // Only the kept part of a cropped route: a stop in the cut-off part would never be reached.
+        val points = route?.points?.filter { it.distanceFromStartM in range } ?: return null
         val nearest = points.minByOrNull { haversineMeters(lat, lon, it.lat, it.lon) } ?: return null
         return RouteStop(nearest.distanceFromStartM, nearest.lat, nearest.lon, durationMin)
     }

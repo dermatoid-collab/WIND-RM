@@ -89,8 +89,8 @@ fun WindRmNavHost(container: AppContainer) {
             RouteDetailScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onForecast = { startEpochS, speedKmh, pacing ->
-                    navController.navigate(Destination.Forecast.path(routeId, startEpochS, speedKmh, pacing))
+                onForecast = { startEpochS, speedKmh, pacing, crop ->
+                    navController.navigate(Destination.Forecast.path(routeId, startEpochS, speedKmh, pacing, crop.start, crop.endInclusive))
                 },
             )
         }
@@ -102,6 +102,8 @@ fun WindRmNavHost(container: AppContainer) {
                 navArgument(Destination.Forecast.ARG_START_EPOCH) { type = NavType.LongType },
                 navArgument(Destination.Forecast.ARG_SPEED) { type = NavType.FloatType },
                 navArgument(Destination.Forecast.ARG_PACING) { type = NavType.StringType },
+                navArgument(Destination.Forecast.ARG_CROP_START) { type = NavType.FloatType },
+                navArgument(Destination.Forecast.ARG_CROP_END) { type = NavType.FloatType },
             ),
         ) { backStackEntry ->
             val args = backStackEntry.arguments ?: return@composable
@@ -110,10 +112,11 @@ fun WindRmNavHost(container: AppContainer) {
             val speed = args.getFloat(Destination.Forecast.ARG_SPEED).toDouble()
             val pacing = args.getString(Destination.Forecast.ARG_PACING)
                 ?.let { runCatching { PacingMode.valueOf(it) }.getOrNull() } ?: PacingMode.CONSTANT
+            val crop = args.getFloat(Destination.Forecast.ARG_CROP_START).toDouble()..args.getFloat(Destination.Forecast.ARG_CROP_END).toDouble()
             val viewModel = viewModel<ForecastViewModel>(
                 factory = viewModelFactory {
                     initializer {
-                        ForecastViewModel(container.routeRepository, container.weatherRepository, container.settingsRepository, routeId, startEpoch, speed, pacing)
+                        ForecastViewModel(container.routeRepository, container.weatherRepository, container.settingsRepository, routeId, startEpoch, speed, pacing, crop)
                     }
                 },
             )
