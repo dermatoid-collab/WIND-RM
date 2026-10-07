@@ -31,14 +31,19 @@ Impostata su richiesta esplicita dell'utente il 2026-09-22.
 
 Se una build su GitHub (es. GitHub Actions) fallisce per **errori di compilazione o
 di build**, correggi l'errore, committa e **pusha subito in automatico**, senza
-chiedere conferma, poi ricontrolla la build. Ripeti finché la build è verde.
+chiedere conferma, poi ricontrolla la build.
 
+- **Massimo 2 build automatiche** di fila: se dopo il secondo push automatico di
+  fix la build è ancora rossa, committa la correzione successiva in locale e
+  **chiedi conferma** prima di pushare. Il conteggio riparte da zero quando la
+  build torna verde.
 - L'eccezione copre solo i commit che correggono l'errore di build. Ogni altra
   modifica (nuove funzionalità, refactoring, ecc.) richiede ancora l'ok esplicito
   per il push.
 - Dopo il push avvisa l'utente di cosa hai corretto e dell'esito della build.
 
-Eccezione aggiunta su richiesta esplicita dell'utente il 2026-10-07.
+Eccezione aggiunta su richiesta esplicita dell'utente il 2026-10-07 (limite di 2 build
+automatiche aggiunto lo stesso giorno).
 
 ## Workflow di build: l'utente NON usa Android Studio
 
