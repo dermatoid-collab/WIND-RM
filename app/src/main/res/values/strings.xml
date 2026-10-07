@@ -55,6 +55,12 @@
     <string name="retry">Retry</string>
     <string name="share">Share</string>
     <string name="share_forecast">Share forecast</string>
+    <string name="ride_quality">Ride quality</string>
+    <string name="ride_quality_title">Ride: %1$s</string>
+    <string name="ride_green">green</string>
+    <string name="ride_yellow">yellow</string>
+    <string name="ride_red">red</string>
+    <string name="ride_all_within_limits">All values are within the limits.</string>
     <string name="share_as_image">Image (JPG)</string>
     <string name="share_as_pdf">PDF (single page)</string>
     <string name="share_failed">Couldn\'t create the file to share.</string>

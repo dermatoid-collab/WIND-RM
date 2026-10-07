@@ -10,10 +10,14 @@ import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.height
@@ -55,6 +59,9 @@ import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.model.RouteForecastPoint
 import com.windrm.app.model.DaylightInfo
+import com.windrm.app.domain.RideLevel
+import com.windrm.app.domain.RideQuality
+import com.windrm.app.domain.RideQualityEvaluator
 import com.windrm.app.model.AirQualityPoint
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.model.RoutePoint
@@ -98,6 +105,8 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
     val state = viewModel.uiState
     var showStartPicker by remember { mutableStateOf(false) }
     var showShareChoice by remember { mutableStateOf(false) }
+    var showQuality by remember { mutableStateOf(false) }
+    val quality = (state as? ForecastUiState.Success)?.result?.let { remember(it) { RideQualityEvaluator.evaluate(it) } }
     // The pinned map and the scrolling content are recorded separately so the share export can
     // stitch the whole page together, including the parts scrolled out of view.
     val mapLayer = rememberGraphicsLayer()
@@ -110,6 +119,8 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
         topBar = {
             CompactTopBar(
                 title = routeTitle(state),
+                quality = quality,
+                onQualityClick = { showQuality = true },
                 onBack = onBack,
                 onShare = (state as? ForecastUiState.Success)?.let { { showShareChoice = true } },
                 onStartTime = (state as? ForecastUiState.Success)?.let {
@@ -169,6 +180,10 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
         )
     }
 
+    if (showQuality && quality != null) {
+        RideQualityDialog(quality, onDismiss = { showQuality = false })
+    }
+
     if (showStartPicker) {
         StartTimePickerDialog(
             initialStart = java.time.Instant.ofEpochSecond(viewModel.startEpochS),
@@ -185,7 +200,14 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
 
 /** Single-row orange bar: back, route name, share -- as short as the touch targets allow. */
 @Composable
-private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Unit)?, onStartTime: (() -> Unit)?) {
+private fun CompactTopBar(
+    title: String,
+    quality: RideQuality?,
+    onQualityClick: () -> Unit,
+    onBack: () -> Unit,
+    onShare: (() -> Unit)?,
+    onStartTime: (() -> Unit)?,
+) {
     Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(48.dp),
@@ -194,6 +216,7 @@ private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Uni
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
             }
+            quality?.let { TrafficLight(it.level, onClick = onQualityClick) }
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,
@@ -213,6 +236,77 @@ private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Uni
             }
         }
     }
+}
+
+private val LIGHT_RED = Color(0xFFD7261E)
+private val LIGHT_YELLOW = Color(0xFFF2B400)
+private val LIGHT_GREEN = Color(0xFF2E9E44)
+private val LIGHT_OFF = Color(0xFF555555)
+
+private fun RideLevel.color(): Color = when (this) {
+    RideLevel.RED -> LIGHT_RED
+    RideLevel.YELLOW -> LIGHT_YELLOW
+    RideLevel.GREEN -> LIGHT_GREEN
+}
+
+/** Mini vertical traffic light for the ride quality: three lamps, the current level lit; tap for details. */
+@Composable
+private fun TrafficLight(level: RideLevel, onClick: () -> Unit) {
+    val description = stringResource(R.string.ride_quality)
+    Box(
+        Modifier
+            .size(width = 30.dp, height = 48.dp)
+            .clickable(onClickLabel = description, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .size(width = 14.dp, height = 34.dp)
+                .background(Color(0xFF2B2B2B), RoundedCornerShape(4.dp)),
+            verticalArrangement = Arrangement.SpaceEvenly,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            listOf(RideLevel.RED, RideLevel.YELLOW, RideLevel.GREEN).forEach { lamp ->
+                Box(Modifier.size(8.dp).background(if (lamp == level) lamp.color() else LIGHT_OFF, CircleShape))
+            }
+        }
+    }
+}
+
+/** What turned the light yellow or red: each metric's worst point, with where and when. */
+@Composable
+private fun RideQualityDialog(quality: RideQuality, onDismiss: () -> Unit) {
+    val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
+    val levelName = stringResource(
+        when (quality.level) {
+            RideLevel.GREEN -> R.string.ride_green
+            RideLevel.YELLOW -> R.string.ride_yellow
+            RideLevel.RED -> R.string.ride_red
+        },
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.ride_quality_title, levelName)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (quality.issues.isEmpty()) {
+                    Text(stringResource(R.string.ride_all_within_limits))
+                }
+                quality.issues.forEach { issue ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(12.dp).background(issue.level.color(), CircleShape))
+                        Text(issue.text, modifier = Modifier.weight(1f).padding(start = 10.dp))
+                        Text(
+                            "km %.0f · %s".format(issue.distanceKm, timeFmt.format(issue.time)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
+    )
 }
 
 @Composable
