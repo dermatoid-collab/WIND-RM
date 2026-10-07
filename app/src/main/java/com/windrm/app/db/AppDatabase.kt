@@ -25,10 +25,11 @@ abstract class AppDatabase : RoomDatabase() {
     }
 }
 
-/** Adds the Favorites flag and the route's original date without dropping the user's saved routes. */
+/** Adds favorites, the route's original date and planned stops without dropping the user's saved routes. */
 private val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE routes ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
         db.execSQL("ALTER TABLE routes ADD COLUMN originalDateEpochMs INTEGER")
+        db.execSQL("ALTER TABLE routes ADD COLUMN stopsJson TEXT NOT NULL DEFAULT '[]'")
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.windrm.app.BuildConfig
 import com.windrm.app.R
 import com.windrm.app.model.RoutePoint
+import com.windrm.app.model.RouteStop
 import com.windrm.app.settings.MapStyle
 import org.osmdroid.tileprovider.tilesource.ITileSource
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
@@ -37,7 +38,9 @@ import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
+import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.views.overlay.CopyrightOverlay
+import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
 
@@ -64,6 +67,12 @@ fun RouteMapView(
     /** Scrub position (0..1 of the route); the arrow nearest to it gets a thicker white edge. */
     scrubFraction: Float? = null,
     markers: List<MapMarker> = emptyList(),
+    /** Planned stops, drawn as clock pins. */
+    stops: List<RouteStop> = emptyList(),
+    /** Tap on a stop pin (its index in [stops]); null = pins aren't tappable. */
+    onStopTap: ((Int) -> Unit)? = null,
+    /** Tap anywhere else on the map; null = taps are ignored (normal panning still works). */
+    onMapTap: ((lat: Double, lon: Double) -> Unit)? = null,
     height: Dp = 280.dp,
 ) {
     val mapRef = remember { MapViewRef() }
@@ -95,6 +104,19 @@ fun RouteMapView(
                 // OSM's tile usage policy requires visible attribution; re-added every update()
                 // since overlays.clear() above would otherwise drop it too.
                 mapView.overlays.add(CopyrightOverlay(mapView.context))
+                // Bottom of the stack, so the stop pins above it get first pick of a tap.
+                onMapTap?.let { callback ->
+                    mapView.overlays.add(
+                        MapEventsOverlay(object : MapEventsReceiver {
+                            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                                callback(p.latitude, p.longitude)
+                                return true
+                            }
+
+                            override fun longPressHelper(p: GeoPoint): Boolean = false
+                        }),
+                    )
+                }
                 if (points.isNotEmpty()) {
                     val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
                     val polyline = Polyline(mapView).apply {
@@ -131,6 +153,7 @@ fun RouteMapView(
                     val density = mapView.resources.displayMetrics.density
                     highlightPoint?.let { mapView.overlays.add(PointMarkerOverlay(it, HIGHLIGHT_ARGB, density)) }
                     markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
+                    if (stops.isNotEmpty()) mapView.overlays.add(StopsOverlay(stops, density, onStopTap))
 
                     if (lastState?.points != points) {
                         val bbox = boundingBoxOf(geoPoints)
@@ -300,9 +323,56 @@ private class PointMarkerOverlay(private val point: RoutePoint, argb: Int, densi
     }
 }
 
+/** Clock pins for planned stops; a tap within ~24 dp of one reports its index. */
+private class StopsOverlay(
+    private val stops: List<RouteStop>,
+    private val density: Float,
+    private val onTap: ((Int) -> Unit)?,
+) : Overlay() {
+    private val radius = 10f * density
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = STOP_ARGB; style = Paint.Style.FILL }
+    private val ringPaint = markerRingPaint(density)
+    private val handPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 1.8f * density
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val out = android.graphics.Point()
+        for (stop in stops) {
+            mapView.projection.toPixels(GeoPoint(stop.lat, stop.lon), out)
+            val x = out.x.toFloat()
+            val y = out.y.toFloat()
+            canvas.drawCircle(x, y, radius, fillPaint)
+            canvas.drawCircle(x, y, radius, ringPaint)
+            // Clock hands at ten past twelve.
+            canvas.drawLine(x, y, x, y - radius * 0.6f, handPaint)
+            canvas.drawLine(x, y, x + radius * 0.45f, y + radius * 0.2f, handPaint)
+        }
+    }
+
+    override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
+        val callback = onTap ?: return false
+        val out = android.graphics.Point()
+        val hitRadius = 24f * density
+        val hit = stops.indices.minByOrNull { i ->
+            mapView.projection.toPixels(GeoPoint(stops[i].lat, stops[i].lon), out)
+            kotlin.math.hypot(out.x - e.x, out.y - e.y)
+        } ?: return false
+        mapView.projection.toPixels(GeoPoint(stops[hit].lat, stops[hit].lon), out)
+        if (kotlin.math.hypot(out.x - e.x, out.y - e.y) > hitRadius) return false
+        callback(hit)
+        return true
+    }
+}
+
 /** Start, finish and position markers all share one size: 12 dp across with a 2 dp white ring. */
 private const val MARKER_DIAMETER_DP = 12f
 private const val HIGHLIGHT_ARGB = 0xFF1E88E5.toInt()
+private const val STOP_ARGB = 0xFFE5532D.toInt()
 
 private fun markerRingPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     color = Color.WHITE

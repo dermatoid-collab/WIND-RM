@@ -27,6 +27,9 @@ interface RouteDao {
     @Query("UPDATE routes SET isFavorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: Long, favorite: Boolean)
 
+    @Query("UPDATE routes SET stopsJson = :stopsJson WHERE id = :id")
+    suspend fun setStops(id: Long, stopsJson: String)
+
     @Query("DELETE FROM routes WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

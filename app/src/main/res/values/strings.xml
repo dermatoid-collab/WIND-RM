@@ -93,5 +93,12 @@
     <string name="pacing_mode">Speed model</string>
     <string name="pacing_constant">Constant</string>
     <string name="pacing_realistic">Realistic</string>
+    <string name="add_stop">Add a stop</string>
+    <string name="stop_place_hint">Tap the route where you\'ll stop</string>
+    <string name="stop_duration">Stop duration</string>
+    <string name="stop_longer">5 minutes longer</string>
+    <string name="stop_shorter">5 minutes shorter</string>
+    <string name="remove_stop">Remove stop</string>
+    <string name="stops_summary">%1$d stop(s) · %2$s</string>
     <string name="settings_attribution">Map data © OpenStreetMap contributors. Weather data by Open-Meteo.com. Activity, route and segment import by Strava.</string>
 </resources>

@@ -8,6 +8,7 @@ import java.time.Instant
  * Estimates when the rider will reach each sampled point. [PacingMode.REALISTIC] spreads the ride
  * time by gradient ([TerrainPacing]); [PacingMode.CONSTANT] uses the GPX's own recorded pace when
  * available ([Route.hasTimestamps]), otherwise a constant average speed from the route start.
+ * Either way, every point past a planned stop ([Route.stops]) is pushed back by its duration.
  */
 object ArrivalTimeCalculator {
     fun arrivalTimes(
@@ -18,17 +19,16 @@ object ArrivalTimeCalculator {
         pacing: PacingMode = PacingMode.CONSTANT,
         profile: RiderProfile = RiderProfile(),
     ): List<Instant> {
-        if (pacing == PacingMode.REALISTIC) {
-            return TerrainPacing.offsetsSeconds(route.points, samples.map { it.distanceFromStartM }, avgSpeedKmh, profile)
-                .map { startTime.plusSeconds(it) }
-        }
-        return samples.map { point ->
-            val offsetSeconds = if (route.hasTimestamps && point.timeOffsetS != null) {
-                point.timeOffsetS
-            } else {
-                estimateOffsetSeconds(point, avgSpeedKmh)
+        val ridingOffsets: List<Long> = if (pacing == PacingMode.REALISTIC) {
+            TerrainPacing.offsetsSeconds(route.points, samples.map { it.distanceFromStartM }, avgSpeedKmh, profile)
+        } else {
+            samples.map { point ->
+                if (route.hasTimestamps && point.timeOffsetS != null) point.timeOffsetS else estimateOffsetSeconds(point, avgSpeedKmh)
             }
-            startTime.plusSeconds(offsetSeconds)
+        }
+        return samples.mapIndexed { index, point ->
+            val stopSeconds = route.stops.filter { it.distanceM < point.distanceFromStartM }.sumOf { it.durationMin * 60L }
+            startTime.plusSeconds(ridingOffsets[index] + stopSeconds)
         }
     }
 

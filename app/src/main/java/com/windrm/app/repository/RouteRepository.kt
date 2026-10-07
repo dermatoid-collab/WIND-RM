@@ -3,6 +3,7 @@ package com.windrm.app.repository
 import com.windrm.app.db.RouteDao
 import com.windrm.app.db.RouteEntity
 import com.windrm.app.model.Route
+import com.windrm.app.model.RouteStop
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -20,6 +21,9 @@ class RouteRepository(private val dao: RouteDao) {
         dao.getByStravaRouteId(stravaRouteId)?.toRoute()
 
     suspend fun setFavorite(routeId: Long, favorite: Boolean) = dao.setFavorite(routeId, favorite)
+
+    suspend fun setStops(routeId: Long, stops: List<RouteStop>) =
+        dao.setStops(routeId, RouteEntity.encodeStops(stops.sortedBy { it.distanceM }))
 
     suspend fun deleteRoute(route: Route) {
         dao.deleteById(route.id)

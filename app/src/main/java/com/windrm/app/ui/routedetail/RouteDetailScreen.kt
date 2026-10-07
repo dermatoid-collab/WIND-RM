@@ -6,12 +6,20 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,7 +36,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.model.RouteStop
 import com.windrm.app.ui.routes.FavoriteButton
 import com.windrm.app.ui.components.RouteMapView
 import java.time.DayOfWeek
@@ -94,6 +105,8 @@ fun RouteDetailScreen(
         }
 
         var showTimeDialog by remember { mutableStateOf(false) }
+        var placingStop by remember { mutableStateOf(false) }
+        var editingStop by remember { mutableStateOf<StopEdit?>(null) }
         val plannedLabelFormatter = remember { DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault()) }
         // Same format as the route lists; the route's own creation date, the import date if unknown.
         val routeDateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault()) }
@@ -104,7 +117,50 @@ fun RouteDetailScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState()),
         ) {
-            RouteMapView(points = route.points, mapStyle = viewModel.mapStyle)
+            Box {
+                RouteMapView(
+                    points = route.points,
+                    mapStyle = viewModel.mapStyle,
+                    stops = route.stops,
+                    onStopTap = { index -> editingStop = StopEdit(index, route.stops[index]) },
+                    onMapTap = if (placingStop) {
+                        { lat, lon ->
+                            placingStop = false
+                            viewModel.stopAt(lat, lon)?.let { editingStop = StopEdit(null, it) }
+                        }
+                    } else {
+                        null
+                    },
+                )
+                Surface(
+                    onClick = { placingStop = !placingStop },
+                    shape = CircleShape,
+                    color = if (placingStop) MaterialTheme.colorScheme.primary else Color.White,
+                    shadowElevation = 3.dp,
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.AddLocationAlt,
+                        contentDescription = stringResource(R.string.add_stop),
+                        tint = if (placingStop) Color.White else Color.DarkGray,
+                        modifier = Modifier.padding(8.dp).size(20.dp),
+                    )
+                }
+                if (placingStop) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.Black.copy(alpha = 0.7f),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.stop_place_hint),
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+            }
 
             Column(Modifier.padding(16.dp)) {
                 Text("%.1f km · %.0f m↑".format(route.distanceKm, route.elevationGainM), style = MaterialTheme.typography.bodyMedium)
@@ -113,6 +169,13 @@ fun RouteDetailScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (route.stops.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.stops_summary, route.stops.size, formatStopDuration(route.stops.sumOf { it.durationMin })),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 Text(
                     stringResource(R.string.starting),
@@ -197,6 +260,21 @@ fun RouteDetailScreen(
                     viewModel.setPlannedTime(date, hour, minute)
                     showTimeDialog = false
                 },
+            )
+        }
+
+        editingStop?.let { edit ->
+            StopDurationDialog(
+                initialMinutes = edit.stop.durationMin,
+                onConfirm = { minutes ->
+                    if (edit.index == null) viewModel.addStop(edit.stop.copy(durationMin = minutes)) else viewModel.updateStop(edit.index, minutes)
+                    editingStop = null
+                },
+                onDelete = {
+                    edit.index?.let(viewModel::removeStop)
+                    editingStop = null
+                },
+                onDismiss = { editingStop = null },
             )
         }
     }
@@ -285,3 +363,48 @@ private fun mondayFirstLocale(): Locale {
     // Week start is regional data, so borrowing a Monday-first region keeps the language's month and day names.
     return Locale(default.language, "GB")
 }
+
+/** A stop being created ([index] null) or edited (its position in the route's stop list). */
+private data class StopEdit(val index: Int?, val stop: RouteStop)
+
+private const val STOP_STEP_MIN = 5
+private const val STOP_MAX_MIN = 600
+
+/** Duration picker in the style of Epic Ride Weather: up / down in 5-minute steps, X removes the stop. */
+@Composable
+private fun StopDurationDialog(
+    initialMinutes: Int,
+    onConfirm: (Int) -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var minutes by remember { mutableStateOf(initialMinutes) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.stop_duration)) },
+        text = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
+                    Text(formatStopDuration(minutes), style = MaterialTheme.typography.headlineMedium)
+                }
+                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilledTonalButton(onClick = { minutes = (minutes + STOP_STEP_MIN).coerceAtMost(STOP_MAX_MIN) }) {
+                        Icon(Icons.Filled.ArrowUpward, contentDescription = stringResource(R.string.stop_longer))
+                    }
+                    FilledTonalButton(onClick = { minutes = (minutes - STOP_STEP_MIN).coerceAtLeast(STOP_STEP_MIN) }) {
+                        Icon(Icons.Filled.ArrowDownward, contentDescription = stringResource(R.string.stop_shorter))
+                    }
+                    FilledTonalButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.remove_stop))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(minutes) }) { Text("OK") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
+    )
+}
+
+private fun formatStopDuration(minutes: Int): String =
+    if (minutes >= 60) "${minutes / 60}h ${minutes % 60}m" else "${minutes}m"

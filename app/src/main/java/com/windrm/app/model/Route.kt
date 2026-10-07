@@ -17,6 +17,15 @@ data class RoutePoint(
     val timeOffsetS: Long? = null,
 )
 
+/** A planned break along the route: the ride resumes [durationMin] minutes later from the same point. */
+@Serializable
+data class RouteStop(
+    val distanceM: Double,
+    val lat: Double,
+    val lon: Double,
+    val durationMin: Int,
+)
+
 /** A saved route: an imported GPX track or a Strava activity, ready to be forecast. */
 data class Route(
     val id: Long = 0,
@@ -37,6 +46,8 @@ data class Route(
      * own time), as opposed to [createdAtEpochMs], when it was imported into the app. Null if unknown.
      */
     val originalDateEpochMs: Long? = null,
+    /** Planned breaks, in route order; they push back every arrival time after them. */
+    val stops: List<RouteStop> = emptyList(),
 ) {
     val startPoint: RoutePoint? get() = points.firstOrNull()
 

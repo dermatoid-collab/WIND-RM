@@ -222,6 +222,7 @@ private fun ForecastContent(
                 highlightPoint = highlightPoint,
                 scrubFraction = scrubFraction,
                 markers = gaugeMarkers,
+                stops = result.route.stops,
                 height = 336.dp,
             )
             WindSpeedLegend()

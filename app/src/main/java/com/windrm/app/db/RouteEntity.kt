@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteSource
+import com.windrm.app.model.RouteStop
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -28,6 +29,7 @@ data class RouteEntity(
     // Default matches the 1 -> 2 migration's DEFAULT 0, so Room's schema check agrees.
     @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
     val originalDateEpochMs: Long? = null,
+    @ColumnInfo(defaultValue = "'[]'") val stopsJson: String = "[]",
 ) {
     fun toRoute(): Route = Route(
         id = id,
@@ -41,6 +43,7 @@ data class RouteEntity(
         stravaRouteId = stravaRouteId,
         isFavorite = isFavorite,
         originalDateEpochMs = originalDateEpochMs,
+        stops = json.decodeFromString(stopsJson),
     )
 
     companion object {
@@ -56,7 +59,10 @@ data class RouteEntity(
             stravaRouteId = route.stravaRouteId,
             isFavorite = route.isFavorite,
             originalDateEpochMs = route.originalDateEpochMs,
+            stopsJson = encodeStops(route.stops),
         )
+
+        fun encodeStops(stops: List<RouteStop>): String = json.encodeToString(stops)
     }
 }
 

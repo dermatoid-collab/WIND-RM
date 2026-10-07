@@ -6,7 +6,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.domain.haversineMeters
 import com.windrm.app.model.Route
+import com.windrm.app.model.RouteStop
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.SettingsRepository
@@ -47,6 +49,32 @@ class RouteDetailViewModel(
         }
     }
 
+    /** Snaps a tap to the nearest track point; that point's distance is where the stop sits. */
+    fun stopAt(lat: Double, lon: Double, durationMin: Int = DEFAULT_STOP_MIN): RouteStop? {
+        val points = route?.points ?: return null
+        val nearest = points.minByOrNull { haversineMeters(lat, lon, it.lat, it.lon) } ?: return null
+        return RouteStop(nearest.distanceFromStartM, nearest.lat, nearest.lon, durationMin)
+    }
+
+    fun addStop(stop: RouteStop) = saveStops((route?.stops.orEmpty() + stop).sortedBy { it.distanceM })
+
+    fun updateStop(index: Int, durationMin: Int) {
+        val stops = route?.stops ?: return
+        if (index !in stops.indices) return
+        saveStops(stops.mapIndexed { i, s -> if (i == index) s.copy(durationMin = durationMin) else s })
+    }
+
+    fun removeStop(index: Int) {
+        val stops = route?.stops ?: return
+        saveStops(stops.filterIndexed { i, _ -> i != index })
+    }
+
+    private fun saveStops(stops: List<RouteStop>) {
+        val current = route ?: return
+        route = current.copy(stops = stops)
+        viewModelScope.launch { routeRepository.setStops(current.id, stops) }
+    }
+
     fun toggleFavorite() {
         val current = route ?: return
         val updated = current.copy(isFavorite = !current.isFavorite)
@@ -71,3 +99,5 @@ class RouteDetailViewModel(
         plannedDate.atTime(plannedHour, plannedMinute).atZone(ZoneId.systemDefault()).toInstant()
     }
 }
+
+const val DEFAULT_STOP_MIN = 30
