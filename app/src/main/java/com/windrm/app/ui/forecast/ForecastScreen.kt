@@ -1,6 +1,14 @@
 package com.windrm.app.ui.forecast
 
-import android.content.Intent
+import android.widget.Toast
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,13 +97,21 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val state = viewModel.uiState
     var showStartPicker by remember { mutableStateOf(false) }
+    var showShareChoice by remember { mutableStateOf(false) }
+    // The pinned map and the scrolling content are recorded separately so the share export can
+    // stitch the whole page together, including the parts scrolled out of view.
+    val mapLayer = rememberGraphicsLayer()
+    val chartsLayer = rememberGraphicsLayer()
+    val scope = rememberCoroutineScope()
+    val pageBackground = MaterialTheme.colorScheme.background.toArgb()
+    val pageText = MaterialTheme.colorScheme.onBackground.toArgb()
 
     Scaffold(
         topBar = {
             CompactTopBar(
                 title = routeTitle(state),
                 onBack = onBack,
-                onShare = (state as? ForecastUiState.Success)?.let { { shareForecast(context, it.result) } },
+                onShare = (state as? ForecastUiState.Success)?.let { { showShareChoice = true } },
                 onStartTime = (state as? ForecastUiState.Success)?.let {
                     {
                         viewModel.loadStartPickerWeather()
@@ -115,9 +131,42 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                     onScrub = { viewModel.scrubFraction = it },
                     onScrubEnd = { viewModel.scrubFraction = null },
                     mapStyle = viewModel.mapStyle,
+                    mapLayer = mapLayer,
+                    chartsLayer = chartsLayer,
                 )
             }
         }
+    }
+
+    val success = state as? ForecastUiState.Success
+    if (showShareChoice && success != null) {
+        fun export(format: ShareFormat) {
+            showShareChoice = false
+            scope.launch {
+                runCatching {
+                    val parts = listOf(mapLayer, chartsLayer).map { it.toImageBitmap().asAndroidBitmap() }
+                    shareForecastPage(context, success.result, parts, pageBackground, pageText, format)
+                }.onFailure {
+                    Toast.makeText(context, context.getString(R.string.share_failed), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showShareChoice = false },
+            title = { Text(stringResource(R.string.share_forecast)) },
+            text = {
+                Column {
+                    TextButton(onClick = { export(ShareFormat.JPG) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.share_as_image), modifier = Modifier.fillMaxWidth())
+                    }
+                    TextButton(onClick = { export(ShareFormat.PDF) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.share_as_pdf), modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showShareChoice = false }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 
     if (showStartPicker) {
@@ -194,6 +243,8 @@ private fun ForecastContent(
     onScrub: (Float) -> Unit,
     onScrubEnd: () -> Unit,
     mapStyle: MapStyle,
+    mapLayer: GraphicsLayer,
+    chartsLayer: GraphicsLayer,
 ) {
     val points = result.points
     if (points.isEmpty()) {
@@ -230,7 +281,15 @@ private fun ForecastContent(
 
     // The map stays pinned on top (so the scrub dot is always visible); everything else scrolls under it.
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .drawWithContent {
+                    mapLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(mapLayer)
+                }
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+        ) {
             RouteMapView(
                 // The full-resolution track, not the sparse weather-sampling points -- otherwise
                 // the drawn line cuts corners on every curve between samples.
@@ -246,7 +305,17 @@ private fun ForecastContent(
             WindSpeedLegend()
         }
         HorizontalDivider()
-        Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                // After verticalScroll, so this sees the full-height content, not just the visible part.
+                .drawWithContent {
+                    chartsLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(chartsLayer)
+                },
+        ) {
             GaugesRow(points, current, onGaugeHeld = { heldGauge = it })
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
@@ -555,24 +624,6 @@ private fun timeAxisLabels(points: List<RouteForecastPoint>, count: Int = 6): Li
     }
 }
 
-private fun shareForecast(context: android.content.Context, result: RouteForecastResult) {
-    val formatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
-    val first = result.points.firstOrNull()?.weather
-    val text = buildString {
-        appendLine("WIND-RM · ${result.route.name}")
-        appendLine("Starting: ${formatter.format(result.startTime)}")
-        appendLine("%.1f km · %.0f m↑".format(result.route.distanceKm, result.route.elevationGainM))
-        if (first != null) {
-            appendLine("At the start: ${first.temperatureC.roundToInt()}°C, wind ${first.windSpeedKmh.roundToInt()} km/h")
-        }
-        result.peakAqi?.let { appendLine("Peak AQI: ${it.europeanAqi.roundToInt()} (${aqiLabel(it.europeanAqi)})") }
-    }
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(intent, context.getString(R.string.share)))
-}
 
 private const val DAYLIGHT_BAR_SAMPLES = 200
 private const val UV_SCALE_MAX = 12f

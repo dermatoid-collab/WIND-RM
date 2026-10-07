@@ -54,6 +54,10 @@
     <string name="forecast_error">Couldn\'t download the forecast. Check your connection and try again.</string>
     <string name="retry">Retry</string>
     <string name="share">Share</string>
+    <string name="share_forecast">Share forecast</string>
+    <string name="share_as_image">Image (JPG)</string>
+    <string name="share_as_pdf">PDF (single page)</string>
+    <string name="share_failed">Couldn\'t create the file to share.</string>
     <string name="fit_route">Fit route</string>
     <string name="elevation_gain_label">Elevation Gain</string>
     <string name="distance_label">Distance</string>
