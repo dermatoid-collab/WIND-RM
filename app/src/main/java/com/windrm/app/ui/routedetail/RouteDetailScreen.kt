@@ -141,6 +141,7 @@ fun RouteDetailScreen(
         var showTimeDialog by remember { mutableStateOf(false) }
         var placingStop by remember { mutableStateOf(false) }
         var editingStop by remember { mutableStateOf<StopEdit?>(null) }
+        var choosingPass by remember { mutableStateOf<List<RouteStop>?>(null) }
         val plannedLabelFormatter = remember { DateTimeFormatter.ofPattern("MMM d, yyyy 'at' HH:mm", Locale.getDefault()) }
         var speedText by remember { mutableStateOf(formatSpeedInput(viewModel.avgSpeedKmh)) }
         // The VM may adopt the recorded pace once the route loads; mirror it unless the user is typing.
@@ -223,7 +224,12 @@ fun RouteDetailScreen(
                     onMapTap = if (placingStop) {
                         { lat, lon ->
                             placingStop = false
-                            viewModel.stopAt(lat, lon)?.let { editingStop = StopEdit(null, it) }
+                            val candidates = viewModel.stopCandidates(lat, lon)
+                            when (candidates.size) {
+                                0 -> Unit
+                                1 -> editingStop = StopEdit(null, candidates.first())
+                                else -> choosingPass = candidates
+                            }
                         }
                     } else {
                         null
@@ -286,6 +292,39 @@ fun RouteDetailScreen(
                     viewModel.setPlannedTime(date, hour, minute)
                     showTimeDialog = false
                 },
+            )
+        }
+
+        choosingPass?.let { passes ->
+            val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
+            val start = viewModel.computeStartInstant()
+            AlertDialog(
+                onDismissRequest = { choosingPass = null },
+                title = { Text(stringResource(R.string.stop_which_pass)) },
+                text = {
+                    Column {
+                        passes.forEachIndexed { i, stop ->
+                            // Rough passing time at the chosen average speed, counting earlier stops.
+                            val earlierStopsMin = route.stops.filter { it.distanceM < stop.distanceM }.sumOf { it.durationMin }
+                            val ridingS = if (viewModel.avgSpeedKmh > 0) stop.distanceM / 1000 / viewModel.avgSpeedKmh * 3600 else 0.0
+                            val eta = start.plusSeconds(ridingS.toLong() + earlierStopsMin * 60L)
+                            TextButton(
+                                onClick = {
+                                    choosingPass = null
+                                    editingStop = StopEdit(null, stop)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    stringResource(R.string.stop_pass_option, i + 1, stop.distanceM / 1000, timeFormatter.format(eta)),
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { choosingPass = null }) { Text(stringResource(R.string.cancel)) } },
             )
         }
 

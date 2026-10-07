@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.model.Route
+import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteStop
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.settings.MapStyle
@@ -58,12 +59,33 @@ class RouteDetailViewModel(
     }
 
     /** Snaps a tap to the nearest track point; that point's distance is where the stop sits. */
-    fun stopAt(lat: Double, lon: Double, durationMin: Int = DEFAULT_STOP_MIN): RouteStop? {
+    /**
+     * Where a tap could place a stop: one candidate per time the ride passes there. Track points
+     * within 2.5x the distance to the nearest one (at least 60 m) count as "here" -- two recordings
+     * of the same road are rarely closer than 5-20 m, and a zoomed-out tap lands farther off -- and
+     * candidates more than 500 m apart along the route are separate passes (out and back).
+     */
+    fun stopCandidates(lat: Double, lon: Double, durationMin: Int = DEFAULT_STOP_MIN): List<RouteStop> {
         val range = cropRangeM()
         // Only the kept part of a cropped route: a stop in the cut-off part would never be reached.
-        val points = route?.points?.filter { it.distanceFromStartM in range } ?: return null
-        val nearest = points.minByOrNull { haversineMeters(lat, lon, it.lat, it.lon) } ?: return null
-        return RouteStop(nearest.distanceFromStartM, nearest.lat, nearest.lon, durationMin)
+        val points = route?.points?.filter { it.distanceFromStartM in range }.orEmpty()
+        if (points.isEmpty()) return emptyList()
+        val withDistance = points.map { it to haversineMeters(lat, lon, it.lat, it.lon) }
+        val nearestM = withDistance.minOf { it.second }
+        val radius = maxOf(MIN_SAME_PLACE_M, nearestM * SAME_PLACE_FACTOR)
+        val passes = mutableListOf<MutableList<Pair<RoutePoint, Double>>>()
+        for (candidate in withDistance.filter { it.second <= radius }) {
+            val current = passes.lastOrNull()
+            if (current == null || candidate.first.distanceFromStartM - current.last().first.distanceFromStartM > SEPARATE_PASS_M) {
+                passes += mutableListOf(candidate)
+            } else {
+                current += candidate
+            }
+        }
+        return passes.map { pass ->
+            val best = pass.minBy { it.second }.first
+            RouteStop(best.distanceFromStartM, best.lat, best.lon, durationMin)
+        }
     }
 
     fun addStop(stop: RouteStop) = saveStops((route?.stops.orEmpty() + stop).sortedBy { it.distanceM })
@@ -111,3 +133,6 @@ class RouteDetailViewModel(
 }
 
 const val DEFAULT_STOP_MIN = 30
+private const val MIN_SAME_PLACE_M = 60.0
+private const val SAME_PLACE_FACTOR = 2.5
+private const val SEPARATE_PASS_M = 500.0

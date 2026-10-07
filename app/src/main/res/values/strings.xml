@@ -106,6 +106,8 @@
     <string name="day_at_time">%1$s at %2$s</string>
     <string name="stop_place_hint">Tap the route where you\'ll stop</string>
     <string name="stop_duration">Stop duration</string>
+    <string name="stop_which_pass">You pass here more than once</string>
+    <string name="stop_pass_option">Pass %1$d · km %2$.1f · ≈ %3$s</string>
     <string name="stop_longer">5 minutes longer</string>
     <string name="stop_shorter">5 minutes shorter</string>
     <string name="remove_stop">Remove stop</string>
