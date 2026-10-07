@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -399,8 +398,9 @@ private fun StravaSegmentCard(segment: StravaSegmentSummary, importing: Boolean,
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StatsRow(content: @Composable FlowRowScope.() -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), content = content)
+private fun StatsRow(content: @Composable () -> Unit) {
+    // A plain content lambda keeps the experimental FlowRowScope out of every call site.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) { content() }
 }
 
 /** The whole card is the import tap target; a spinner replaces the trailing space while importing. */
