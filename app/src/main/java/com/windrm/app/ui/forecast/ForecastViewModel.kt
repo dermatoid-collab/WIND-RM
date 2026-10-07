@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.domain.cropped
@@ -90,7 +91,13 @@ class ForecastViewModel(
     }
 
     fun togglePacing() {
-        pacing = if (pacing == PacingMode.CONSTANT) PacingMode.REALISTIC else PacingMode.CONSTANT
+        val trek = (uiState as? ForecastUiState.Success)?.result?.activity == ActivityType.TREK
+        // Constant, Realistic, Realistic + wind (rides only), and round again.
+        pacing = when (pacing) {
+            PacingMode.CONSTANT -> PacingMode.REALISTIC
+            PacingMode.REALISTIC -> if (trek) PacingMode.CONSTANT else PacingMode.REALISTIC_WIND
+            PacingMode.REALISTIC_WIND -> PacingMode.CONSTANT
+        }
         load()
     }
 

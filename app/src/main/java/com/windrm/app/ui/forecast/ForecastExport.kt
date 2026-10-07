@@ -70,6 +70,7 @@ fun forecastSummaryText(result: RouteForecastResult): String {
         appendLine("Starting: ${formatter.format(result.startTime)}")
         appendLine("%.1f km · %.0f m↑".format(result.route.distanceKm, result.route.elevationGainM))
         appendLine("%s · %s km/h · %s pacing".format(activityLabel(result), formatKmh(result.avgSpeedKmh), pacingLabel(result)))
+        windEffectLabel(result)?.let { appendLine("Wind effect on the ride time: $it") }
         if (first != null) {
             appendLine("At the start: ${first.temperatureC.roundToInt()}°C, wind ${first.windSpeedKmh.roundToInt()} km/h")
         }
@@ -98,7 +99,7 @@ private fun stitch(context: Context, result: RouteForecastResult, parts: List<Bi
     val formatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
     val subtitle = "%s · %.1f km · %.0f m↑ · %s km/h · %s".format(
         formatter.format(result.startTime), result.route.distanceKm, result.route.elevationGainM,
-        formatKmh(result.avgSpeedKmh), pacingLabel(result),
+        formatKmh(result.avgSpeedKmh), pacingLabel(result) + (windEffectLabel(result)?.let { " ($it)" } ?: ""),
     )
     val headerHeight = (margin * 2 + titlePaint.textSize + subtitlePaint.textSize * 1.6f).toInt()
 
@@ -151,7 +152,14 @@ private fun writePdf(page: Bitmap, out: File) {
 fun pacingLabel(result: RouteForecastResult): String = when {
     result.pacing == PacingMode.CONSTANT -> "Constant"
     result.activity == ActivityType.TREK -> "CAI"
+    result.pacing == PacingMode.REALISTIC_WIND -> "Realistic + wind"
     else -> "Realistic"
+}
+
+/** "+14 min" or "-6 min": what the wind did to the ride time; null when the wind was not part of the estimate. */
+fun windEffectLabel(result: RouteForecastResult): String? = result.windEffectSeconds?.let { seconds ->
+    val minutes = Math.round(seconds / 60.0).toInt()
+    if (minutes == 0) "±0 min" else "%+d min".format(minutes)
 }
 
 fun activityLabel(result: RouteForecastResult): String = if (result.activity == ActivityType.TREK) "Trekking" else "Ride"

@@ -175,6 +175,21 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                     { viewModel.setMaxDescentSpeedKmh(it) },
                     10.0..120.0,
                 )
+                // Stored as a share (0.55), edited as a percentage (55 %).
+                NumberSetting(
+                    stringResource(R.string.settings_wind_height),
+                    // Rounded to a tenth of a percent: 0.55 * 100 is 55.00000000000001, which the field would show as "55.0".
+                    Math.round(settings.windHeightFactor * 1000) / 10.0,
+                    "%",
+                    { viewModel.setWindHeightFactor(it / 100) },
+                    20.0..100.0,
+                )
+                Text(
+                    stringResource(R.string.settings_wind_height_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
 
             SettingsSection(stringResource(R.string.settings_gpx_folder)) {

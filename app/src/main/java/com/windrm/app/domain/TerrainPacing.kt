@@ -7,14 +7,31 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.atan
 
-/** How arrival times along the route are estimated. */
-enum class PacingMode { CONSTANT, REALISTIC }
+/**
+ * How arrival times along the route are estimated: the same speed everywhere, terrain-aware, or
+ * terrain-aware with the forecast wind (rides only; the order is the order of the choice on screen).
+ */
+enum class PacingMode {
+    CONSTANT,
+    REALISTIC,
+    REALISTIC_WIND,
+    ;
+
+    val isRealistic: Boolean get() = this != CONSTANT
+}
 
 /** Rider-specific inputs of the realistic pacing model (Settings). */
 data class RiderProfile(
     val riderMassKg: Double = 62.0,
     val bikeMassKg: Double = 10.0,
     val maxDescentSpeedKmh: Double = 40.0,
+    /**
+     * Share of the 10 m forecast wind a rider feels. From the log wind profile u(z) = u10 * ln(z/z0) / ln(10/z0)
+     * at z = 1.2 m (centre of a rider's frontal area) and z0 = 0.10 m (open farmland with low crops and
+     * scattered obstacles; Davenport-Wieringa): 0.54, rounded to 0.55. Open plains are nearer 0.65-0.75,
+     * towns and wooded valleys 0.3-0.4.
+     */
+    val windHeightFactor: Double = 0.55,
 )
 
 /**
@@ -23,6 +40,10 @@ data class RiderProfile(
  * [RiderProfile.maxDescentSpeedKmh]. The power is calibrated so the whole route takes exactly as
  * long as it would at the requested average speed -- the total ride time is unchanged, only how
  * it is spread between climbs and descents.
+ *
+ * With [WindAlongTrack] the power is still calibrated in still air, then the wind (scaled by
+ * [RiderProfile.windHeightFactor]) is added to the air speed that drag acts on: a headwind slows the
+ * ride, a tailwind speeds it up, and the total time is no longer the one of the requested average.
  */
 object TerrainPacing {
     private const val STEP_M = 50.0
@@ -45,6 +66,7 @@ object TerrainPacing {
         distancesM: List<Double>,
         avgSpeedKmh: Double,
         profile: RiderProfile,
+        wind: WindAlongTrack? = null,
     ): List<Long> {
         val total = track.lastOrNull()?.distanceFromStartM ?: 0.0
         if (track.size < 2 || total <= 0.0 || avgSpeedKmh <= 0.0) {
@@ -73,11 +95,18 @@ object TerrainPacing {
             0.5 * SEA_LEVEL_AIR_DENSITY * exp(-altitude / 8500.0) * CDA
         }
 
-        fun stepSpeeds(powerW: Double) = DoubleArray(steps) {
-            speedFor(powerW * DRIVETRAIN_EFFICIENCY, resistN[it], dragFactor[it], maxSpeedMs)
+        // Wind against the rider on each step (m/s at rider height); still air when no wind is given.
+        val stillAir = DoubleArray(steps)
+        val headwindMs = if (wind == null) stillAir else DoubleArray(steps) {
+            val bearing = bearingDeg(track, gridDistances[it], gridDistances[it + 1])
+            wind.headwindMs((gridDistances[it] + gridDistances[it + 1]) / 2, bearing) * profile.windHeightFactor
+        }
+
+        fun stepSpeeds(powerW: Double, headwind: DoubleArray) = DoubleArray(steps) {
+            speedFor(powerW * DRIVETRAIN_EFFICIENCY, resistN[it], dragFactor[it], headwind[it], maxSpeedMs)
         }
         fun totalTime(powerW: Double): Double {
-            val speeds = stepSpeeds(powerW)
+            val speeds = stepSpeeds(powerW, stillAir)
             var t = 0.0
             for (i in 0 until steps) t += stepLength[i] / speeds[i]
             return t
@@ -91,7 +120,7 @@ object TerrainPacing {
             val mid = (low + high) / 2
             if (totalTime(mid) > targetTime) low = mid else high = mid
         }
-        val speeds = stepSpeeds((low + high) / 2)
+        val speeds = stepSpeeds((low + high) / 2, headwindMs)
 
         val cumulative = DoubleArray(steps + 1)
         for (i in 0 until steps) cumulative[i + 1] = cumulative[i] + stepLength[i] / speeds[i]
@@ -104,16 +133,32 @@ object TerrainPacing {
         }
     }
 
-    /** Steady speed (m/s) at which [wheelPower] balances gravity + rolling ([resist]) and air drag. */
-    private fun speedFor(wheelPower: Double, resist: Double, dragFactor: Double, maxSpeedMs: Double): Double {
-        // f(v) = drag*v^3 + resist*v - P: negative at 0, single positive root (convex beyond any dip).
+    /**
+     * Steady ground speed (m/s) at which [wheelPower] balances gravity + rolling ([resist]) and air
+     * drag, which acts on the speed relative to the air: ground speed plus [headwind] (negative = tailwind).
+     */
+    private fun speedFor(wheelPower: Double, resist: Double, dragFactor: Double, headwind: Double, maxSpeedMs: Double): Double {
+        // f(v) = v * (resist + drag * (v + headwind) * |v + headwind|) - P: negative at 0, one root above any dip.
         var low = 0.0
         var high = 40.0
         repeat(50) {
             val mid = (low + high) / 2
-            if (dragFactor * mid * mid * mid + resist * mid - wheelPower < 0) low = mid else high = mid
+            val air = mid + headwind
+            if (mid * (resist + dragFactor * air * kotlin.math.abs(air)) - wheelPower < 0) low = mid else high = mid
         }
         return ((low + high) / 2).coerceIn(MIN_SPEED_MS, maxSpeedMs)
+    }
+
+    /** Compass bearing (degrees) of the track between two distances from its start. */
+    private fun bearingDeg(track: List<RoutePoint>, fromM: Double, toM: Double): Double {
+        val a = pointAt(track, fromM)
+        val b = pointAt(track, toM)
+        val phi1 = Math.toRadians(a.lat)
+        val phi2 = Math.toRadians(b.lat)
+        val dLon = Math.toRadians(b.lon - a.lon)
+        val y = sin(dLon) * cos(phi2)
+        val x = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dLon)
+        return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
     }
 
     internal fun smooth(values: DoubleArray, halfWindow: Int): DoubleArray {

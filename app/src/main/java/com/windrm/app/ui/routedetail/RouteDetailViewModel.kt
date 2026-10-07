@@ -9,6 +9,7 @@ import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.CaiPacing
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.domain.RiderProfile
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
@@ -41,6 +42,8 @@ class RouteDetailViewModel(
     private var rideDefaultSpeedKmh = 25.0
     var maxDescentSpeedKmh by mutableStateOf(40.0)
         private set
+    var windHeightFactor by mutableStateOf(RiderProfile().windHeightFactor)
+        private set
 
     /** Kept part of the route, as fractions of its length (the two thumbs of the crop slider). */
     var cropRange by mutableStateOf(0f..1f)
@@ -64,6 +67,7 @@ class RouteDetailViewModel(
             rideDefaultSpeedKmh = settings.defaultAvgSpeedKmh
             caiProfile = settings.caiProfile
             maxDescentSpeedKmh = settings.maxDescentSpeedKmh
+            windHeightFactor = settings.windHeightFactor
             forecastHorizonDays = settings.forecastHorizonDays.toLong()
             mapStyle = settings.mapStyle
 
@@ -78,6 +82,8 @@ class RouteDetailViewModel(
         val current = route ?: return
         if (newActivity == activity) return
         activity = newActivity
+        // The wind pace is for rides only; a trek's realistic pace is the CAI one.
+        if (newActivity == ActivityType.TREK && pacingMode == PacingMode.REALISTIC_WIND) pacingMode = PacingMode.REALISTIC
         avgSpeedKmh = defaultSpeedFor(newActivity, current)
         route = current.copy(activity = newActivity)
         viewModelScope.launch { routeRepository.setActivity(current.id, newActivity) }
@@ -91,7 +97,7 @@ class RouteDetailViewModel(
 
     /** Moving time (no stops) of [part] at the current speed and pacing: CAI times for a realistic trek. */
     fun movingSeconds(part: Route): Long = when {
-        activity == ActivityType.TREK && pacingMode == PacingMode.REALISTIC ->
+        activity == ActivityType.TREK && pacingMode.isRealistic ->
             CaiPacing.totalSeconds(part.points, avgSpeedKmh, caiProfile)
         avgSpeedKmh > 0 -> (part.distanceKm / avgSpeedKmh * 3600).toLong()
         else -> 0L

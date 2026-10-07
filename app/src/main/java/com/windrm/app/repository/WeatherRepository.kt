@@ -5,6 +5,7 @@ import com.windrm.app.domain.ArrivalTimeCalculator
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.RiderProfile
+import com.windrm.app.domain.WindAlongTrack
 import com.windrm.app.domain.HourlySeries
 import com.windrm.app.domain.RouteSampler
 import com.windrm.app.domain.parseOpenMeteoInstant
@@ -22,6 +23,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import java.time.Instant
+import java.time.Duration
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -31,6 +33,10 @@ class WeatherRepository(
     private val airQualityApi: OpenMeteoApi,
 ) {
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+    private companion object {
+        const val WIND_ITERATIONS = 2
+    }
 
     suspend fun forecastRoute(
         route: Route,
@@ -42,10 +48,13 @@ class WeatherRepository(
         cai: CaiProfile = CaiProfile(),
     ): RouteForecastResult = coroutineScope {
         val samples = RouteSampler.sample(route)
+        val windMode = pacing == PacingMode.REALISTIC_WIND && activity == ActivityType.RIDE
+        fun arrivalsWith(wind: WindAlongTrack?) =
+            ArrivalTimeCalculator.arrivalTimes(route, samples, startTime, avgSpeedKmh, pacing, profile, activity, cai, wind)
         // The realistic model bisects over thousands of 50 m steps: keep it off the main thread.
-        val arrivalTimes = withContext(Dispatchers.Default) {
-            ArrivalTimeCalculator.arrivalTimes(route, samples, startTime, avgSpeedKmh, pacing, profile, activity, cai)
-        }
+        // First pass in still air; with wind mode the forecast then corrects it below.
+        var arrivalTimes = withContext(Dispatchers.Default) { arrivalsWith(null) }
+        val stillAirEnd = arrivalTimes.last()
 
         val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.first().minusSeconds(86_400))
         val endDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.last().plusSeconds(86_400))
@@ -62,6 +71,20 @@ class WeatherRepository(
 
         val weatherResponses = weatherDeferred.await()
         val airQualityResponses = airQualityDeferred.await()
+
+        if (windMode) {
+            // The wind depends on when each point is reached and that on the wind: two rounds settle it, with no new requests.
+            val distances = DoubleArray(samples.size) { samples[it].distanceFromStartM }
+            repeat(WIND_ITERATIONS) {
+                val winds = samples.indices.map { buildWeatherPoint(arrivalTimes[it], weatherResponses.getOrNull(it)) }
+                val wind = WindAlongTrack(
+                    distances,
+                    DoubleArray(samples.size) { winds[it].windSpeedKmh / 3.6 },
+                    DoubleArray(samples.size) { winds[it].windDirectionDeg },
+                )
+                arrivalTimes = withContext(Dispatchers.Default) { arrivalsWith(wind) }
+            }
+        }
 
         val forecastPoints = samples.mapIndexed { index, point ->
             val arrival = arrivalTimes[index]
@@ -81,6 +104,7 @@ class WeatherRepository(
             avgSpeedKmh = avgSpeedKmh,
             pacing = pacing,
             activity = activity,
+            windEffectSeconds = if (windMode) Duration.between(stillAirEnd, arrivalTimes.last()).seconds else null,
             points = forecastPoints,
             daylight = buildDaylightInfo(weatherResponses.firstOrNull(), startTime),
         )

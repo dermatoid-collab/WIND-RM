@@ -194,7 +194,7 @@ fun RouteDetailScreen(
             }
 
             val trek = viewModel.activity == ActivityType.TREK
-            val realistic = viewModel.pacingMode == PacingMode.REALISTIC
+            val realistic = viewModel.pacingMode.isRealistic
             FormRow(icon = if (trek) Icons.Filled.Hiking else Icons.Filled.Speed) {
                 TextField(
                     value = speedText,
@@ -217,26 +217,43 @@ fun RouteDetailScreen(
                 Spacer(Modifier.size(48.dp))
             }
 
-            // The speed model, both choices always visible: constant average vs. terrain-aware pacing
-            // (gradient physics on a ride, CAI signpost times on a trek).
-            SegmentedChoice(
-                options = listOf(
-                    stringResource(R.string.pacing_constant) to Icons.Filled.HorizontalRule,
-                    stringResource(if (trek) R.string.pacing_cai else R.string.pacing_realistic) to Icons.Filled.Terrain,
-                ),
-                selected = viewModel.pacingMode.ordinal,
-                onSelect = { viewModel.pacingMode = PacingMode.entries[it] },
-                modifier = Modifier.padding(start = 60.dp, end = 64.dp, top = 10.dp),
-            )
+            // The speed model, every choice always visible: constant average, terrain-aware pacing (gradient
+            // physics on a ride, CAI signpost times on a trek) and, on a ride, terrain-aware pacing with the forecast wind.
+            if (trek) {
+                SegmentedChoice(
+                    options = listOf(
+                        stringResource(R.string.pacing_constant) to Icons.Filled.HorizontalRule,
+                        stringResource(R.string.pacing_cai) to Icons.Filled.Terrain,
+                    ),
+                    selected = viewModel.pacingMode.ordinal.coerceAtMost(1),
+                    onSelect = { viewModel.pacingMode = PacingMode.entries[it] },
+                    modifier = Modifier.padding(start = 60.dp, end = 64.dp, top = 10.dp),
+                )
+            } else {
+                SegmentedChoice(
+                    options = listOf(
+                        stringResource(R.string.pacing_constant) to Icons.Filled.HorizontalRule,
+                        stringResource(R.string.pacing_realistic) to Icons.Filled.Terrain,
+                        stringResource(R.string.pacing_realistic_wind) to Icons.Filled.Terrain,
+                    ),
+                    selected = viewModel.pacingMode.ordinal,
+                    onSelect = { viewModel.pacingMode = PacingMode.entries[it] },
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+                    weights = listOf(1f, 1f, 1.6f),
+                    showIcons = false,
+                )
+            }
             Text(
                 when {
                     !realistic -> stringResource(R.string.pacing_hint_constant)
                     trek -> stringResource(R.string.pacing_hint_cai, formatSpeedInput(viewModel.caiProfile.flatKmh))
+                    viewModel.pacingMode == PacingMode.REALISTIC_WIND ->
+                        stringResource(R.string.pacing_hint_wind, "${(viewModel.windHeightFactor * 100).roundToInt()}%")
                     else -> stringResource(R.string.pacing_hint_realistic, formatSpeedInput(viewModel.maxDescentSpeedKmh))
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 60.dp, end = 16.dp, top = 4.dp),
+                modifier = Modifier.padding(start = if (trek) 60.dp else 16.dp, end = 16.dp, top = 4.dp),
             )
 
             Button(
@@ -508,6 +525,9 @@ internal fun SegmentedChoice(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** Relative width of each segment (equal when null): a long label gets more room. */
+    weights: List<Float>? = null,
+    showIcons: Boolean = true,
 ) {
     val outline = MaterialTheme.colorScheme.outline
     Row(
@@ -523,15 +543,21 @@ internal fun SegmentedChoice(
             val content = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
             Row(
                 Modifier
-                    .weight(1f)
+                    .weight(weights?.getOrNull(index) ?: 1f)
                     .fillMaxHeight()
                     .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
                     .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(index) }),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
-                Text(label, color = content, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
+                if (showIcons) Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+                Text(
+                    label,
+                    color = content,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = if (showIcons) 6.dp else 0.dp),
+                )
             }
         }
     }

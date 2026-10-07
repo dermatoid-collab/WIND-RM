@@ -156,6 +156,8 @@
     <string name="settings_gpx_folder_choose">Choose folder</string>
     <string name="settings_gpx_folder_change">Change folder</string>
     <string name="settings_gpx_folder_clear">Stop using it</string>
+    <string name="settings_wind_height">Wind felt at rider height</string>
+    <string name="settings_wind_height_hint">Forecast wind is measured 10 m above ground; a rider feels less. 55 % is the value of the standard logarithmic wind profile for open farmland (roughness 0.10 m) at 1.2 m. Use 65–75 % on open plains or ridges, 30–40 % in towns or wooded valleys. Used by the Realistic + wind pace.</string>
     <string name="settings_ride_light">Ride traffic light</string>
     <string name="settings_ride_light_hint">A value turns yellow at its yellow limit and red past its red limit (for cold: below them). Riding in civil twilight is yellow, in the dark red.</string>
     <string name="settings_ride_yellow">Yellow</string>
@@ -176,6 +178,9 @@
     <string name="pacing_constant">Constant</string>
     <string name="pacing_realistic">Realistic</string>
     <string name="pacing_cai">CAI</string>
+    <string name="pacing_realistic_wind">Realistic + wind</string>
+    <string name="pacing_hint_wind">Realistic pace plus the forecast wind on every stretch, felt at rider height (%1$s of the 10 m wind, set in Settings). The ride time then depends on the wind.</string>
+    <string name="forecast_wind_effect">Wind: %1$s on the ride time</string>
     <string name="pacing_hint_constant">The same speed on every metre of the route.</string>
     <string name="pacing_hint_realistic">Climbs slower, descents faster (max %1$s km/h). Same total time.</string>
     <string name="pacing_hint_cai">Times as on CAI trail signs, scaled by your flat speed (%1$s km/h = CAI standard).</string>

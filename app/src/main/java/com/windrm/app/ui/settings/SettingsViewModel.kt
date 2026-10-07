@@ -89,6 +89,10 @@ class SettingsViewModel(
 
     fun setBikeMassKg(kg: Double) = viewModelScope.launch { settingsRepository.setBikeMassKg(kg.coerceIn(3.0, 50.0)) }
 
+    fun setWindHeightFactor(factor: Double) = viewModelScope.launch {
+        settingsRepository.setWindHeightFactor(factor.coerceIn(0.2, 1.0))
+    }
+
     fun setMaxDescentSpeedKmh(speedKmh: Double) = viewModelScope.launch {
         settingsRepository.setMaxDescentSpeedKmh(speedKmh.coerceIn(10.0, 120.0))
     }

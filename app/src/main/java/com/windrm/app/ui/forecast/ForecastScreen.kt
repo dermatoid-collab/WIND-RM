@@ -712,7 +712,7 @@ private fun DaylightSummary(result: RouteForecastResult, formatter: DateTimeForm
  */
 @Composable
 private fun PacingPill(result: RouteForecastResult, onToggle: () -> Unit, modifier: Modifier = Modifier) {
-    val realistic = result.pacing == PacingMode.REALISTIC
+    val realistic = result.pacing.isRealistic
     val accent = MaterialTheme.colorScheme.primary
     Surface(
         onClick = onToggle,
@@ -722,19 +722,29 @@ private fun PacingPill(result: RouteForecastResult, onToggle: () -> Unit, modifi
         shadowElevation = 3.dp,
         modifier = modifier,
     ) {
-        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                if (realistic) Icons.Filled.Terrain else Icons.Filled.HorizontalRule,
-                contentDescription = null,
-                tint = accent,
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                "%s km/h · ".format(formatKmh(result.avgSpeedKmh)),
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(start = 6.dp),
-            )
-            Text(pacingLabel(result), style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (realistic) Icons.Filled.Terrain else Icons.Filled.HorizontalRule,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    "%s km/h · ".format(formatKmh(result.avgSpeedKmh)),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+                Text(pacingLabel(result), style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
+            }
+            // What the forecast wind did to the ride time, when it is part of the estimate.
+            windEffectLabel(result)?.let {
+                Text(
+                    stringResource(R.string.forecast_wind_effect, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF49454F),
+                )
+            }
         }
     }
 }

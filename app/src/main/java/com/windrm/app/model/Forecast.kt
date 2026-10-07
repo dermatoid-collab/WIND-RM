@@ -54,6 +54,8 @@ data class RouteForecastResult(
     val avgSpeedKmh: Double,
     val pacing: PacingMode = PacingMode.CONSTANT,
     val activity: ActivityType = ActivityType.RIDE,
+    /** What the forecast wind adds to (+) or takes off (-) the ride, in seconds, for [PacingMode.REALISTIC_WIND]; null otherwise. */
+    val windEffectSeconds: Long? = null,
     val points: List<RouteForecastPoint>,
     val daylight: DaylightInfo,
 ) {

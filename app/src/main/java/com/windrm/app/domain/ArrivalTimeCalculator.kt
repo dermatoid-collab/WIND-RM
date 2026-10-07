@@ -5,7 +5,7 @@ import com.windrm.app.model.RoutePoint
 import java.time.Instant
 
 /**
- * Estimates when the rider will reach each sampled point. [PacingMode.REALISTIC] spreads the ride
+ * Estimates when the rider will reach each sampled point. The realistic modes spread the ride
  * time by gradient ([TerrainPacing]) on a ride, or follows the CAI trail-time rule ([CaiPacing]) on a
  * trek; [PacingMode.CONSTANT] uses the GPX's own recorded pace when
  * available ([Route.hasTimestamps]), otherwise a constant average speed from the route start.
@@ -21,11 +21,16 @@ object ArrivalTimeCalculator {
         profile: RiderProfile = RiderProfile(),
         activity: ActivityType = ActivityType.RIDE,
         cai: CaiProfile = CaiProfile(),
+        /** Forecast wind along the route; used only by a ride in [PacingMode.REALISTIC_WIND]. */
+        wind: WindAlongTrack? = null,
     ): List<Instant> {
         val distances = samples.map { it.distanceFromStartM }
-        val ridingOffsets: List<Long> = if (pacing == PacingMode.REALISTIC) {
+        val ridingOffsets: List<Long> = if (pacing.isRealistic) {
             when (activity) {
-                ActivityType.RIDE -> TerrainPacing.offsetsSeconds(route.points, distances, avgSpeedKmh, profile)
+                ActivityType.RIDE -> TerrainPacing.offsetsSeconds(
+                    route.points, distances, avgSpeedKmh, profile,
+                    wind = if (pacing == PacingMode.REALISTIC_WIND) wind else null,
+                )
                 ActivityType.TREK -> CaiPacing.offsetsSeconds(route.points, distances, avgSpeedKmh, cai)
             }
         } else {

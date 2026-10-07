@@ -46,12 +46,14 @@ data class AppSettings(
     val riderMassKg: Double = 62.0,
     val bikeMassKg: Double = 10.0,
     val maxDescentSpeedKmh: Double = 40.0,
+    /** Share of the 10 m forecast wind a rider feels (see [RiderProfile.windHeightFactor]). */
+    val windHeightFactor: Double = RiderProfile().windHeightFactor,
     val rideThresholds: RideThresholds = RideThresholds(),
     val caiProfile: CaiProfile = CaiProfile(),
     /** Document-tree uri of the folder chosen for GPX files; null = none chosen. */
     val gpxFolderUri: String? = null,
 ) {
-    val riderProfile: RiderProfile get() = RiderProfile(riderMassKg, bikeMassKg, maxDescentSpeedKmh)
+    val riderProfile: RiderProfile get() = RiderProfile(riderMassKg, bikeMassKg, maxDescentSpeedKmh, windHeightFactor)
 
     val hasFixedHomeLocation: Boolean get() = homeLat != null && homeLon != null
 }
@@ -83,6 +85,7 @@ class SettingsRepository(private val context: Context) {
     private val keyRiderMassKg = doublePreferencesKey("rider_mass_kg")
     private val keyBikeMassKg = doublePreferencesKey("bike_mass_kg")
     private val keyMaxDescentSpeedKmh = doublePreferencesKey("max_descent_speed_kmh")
+    private val keyWindHeightFactor = doublePreferencesKey("wind_height_factor")
     private val keyGpxFolderUri = stringPreferencesKey("gpx_folder_uri")
     // "routeId|documentUri" entries: which saved route a file of the GPX folder already is, so opening it again doesn't import a copy.
     private val keyGpxLinks = stringSetPreferencesKey("gpx_links")
@@ -132,6 +135,7 @@ class SettingsRepository(private val context: Context) {
             riderMassKg = prefs[keyRiderMassKg] ?: 62.0,
             bikeMassKg = prefs[keyBikeMassKg] ?: 10.0,
             maxDescentSpeedKmh = prefs[keyMaxDescentSpeedKmh] ?: 40.0,
+            windHeightFactor = prefs[keyWindHeightFactor] ?: RiderProfile().windHeightFactor,
             rideThresholds = rideThresholdFields.fold(RideThresholds()) { t, field -> prefs[field.key]?.let { field.write(t, it) } ?: t },
             caiProfile = caiFields.fold(CaiProfile()) { c, field -> prefs[field.key]?.let { field.write(c, it) } ?: c },
             gpxFolderUri = prefs[keyGpxFolderUri],
@@ -162,6 +166,10 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setBikeMassKg(kg: Double) {
         context.settingsDataStore.edit { it[keyBikeMassKg] = kg }
+    }
+
+    suspend fun setWindHeightFactor(factor: Double) {
+        context.settingsDataStore.edit { it[keyWindHeightFactor] = factor }
     }
 
     suspend fun setMaxDescentSpeedKmh(speedKmh: Double) {
