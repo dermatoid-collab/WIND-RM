@@ -31,10 +31,11 @@ val cartoApiKey: String = localProperties.getProperty("CARTO_API_KEY", "")
 val thunderforestApiKey: String = localProperties.getProperty("THUNDERFOREST_API_KEY", "")
 val mapboxAccessToken: String = localProperties.getProperty("MAPBOX_ACCESS_TOKEN", "")
 
-// GitHub Actions sets these on every run, so each APK carries its own build number and commit;
-// a local build has neither and reports "dev".
+// GitHub Actions sets these on every run, so each APK carries its own build number, commit and
+// build time; a local build has none of them and reports "dev" with no date.
 val ciRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
 val ciCommit: String = System.getenv("GITHUB_SHA")?.take(7) ?: ""
+val ciBuildTimeMs: Long = if (ciRunNumber != null) System.currentTimeMillis() else 0L
 
 android {
     namespace = "com.windrm.app"
@@ -58,6 +59,7 @@ android {
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
         buildConfigField("String", "BUILD_NUMBER", "\"${ciRunNumber ?: "dev"}\"")
         buildConfigField("String", "BUILD_COMMIT", "\"$ciCommit\"")
+        buildConfigField("long", "BUILD_TIME_MS", "${ciBuildTimeMs}L")
 
         manifestPlaceholders["stravaRedirectScheme"] = stravaRedirectScheme
         manifestPlaceholders["stravaRedirectHost"] = stravaRedirectHost

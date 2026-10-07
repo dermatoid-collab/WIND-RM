@@ -53,6 +53,10 @@ import com.windrm.app.R
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.ThemeMode
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -207,16 +211,40 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             SettingsSection(stringResource(R.string.settings_about)) {
-                val commit = BuildConfig.BUILD_COMMIT.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: ""
-                Text("${stringResource(R.string.app_name)} · ${stringResource(R.string.settings_build)} ${BuildConfig.BUILD_NUMBER}$commit")
                 Text(
                     stringResource(R.string.settings_attribution),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
                 )
+                BuildInfo(Modifier.padding(top = 16.dp))
             }
         }
+    }
+}
+
+/** App name, CI build number and commit, build date and copyright, as the last lines of Settings. */
+@Composable
+private fun BuildInfo(modifier: Modifier = Modifier) {
+    val number = BuildConfig.BUILD_NUMBER.toIntOrNull()?.let { "#$it" } ?: BuildConfig.BUILD_NUMBER
+    val commit = BuildConfig.BUILD_COMMIT.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: ""
+    val date = BuildConfig.BUILD_TIME_MS.takeIf { it > 0 }?.let {
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+            .format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()))
+    }
+    Column(modifier.fillMaxWidth()) {
+        Text("${stringResource(R.string.app_name)} · ${stringResource(R.string.settings_build)} $number$commit")
+        if (date != null) {
+            Text(
+                stringResource(R.string.settings_built_on, date),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            stringResource(R.string.settings_copyright),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

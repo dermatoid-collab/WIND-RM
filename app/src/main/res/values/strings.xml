@@ -95,6 +95,8 @@
     <string name="settings_appearance">Appearance</string>
     <string name="settings_about">About</string>
     <string name="settings_build">build</string>
+    <string name="settings_built_on">Built %1$s</string>
+    <string name="settings_copyright">© RM</string>
     <string name="settings_pacing">Realistic pacing</string>
     <string name="settings_pacing_hint">Used when a forecast is set to realistic speed: the ride time stays the one from your average speed, but climbs take longer and descents less, based on these values.</string>
     <string name="settings_rider_mass">Rider weight</string>
