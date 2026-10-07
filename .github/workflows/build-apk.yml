@@ -1,8 +1,15 @@
 name: Build APK
 
 on:
+  # Documentation-only changes (CLAUDE.md, README.md, ...) don't affect the APK, so they don't start a build.
   push:
+    paths-ignore:
+      - "**.md"
+      - "local.properties.template"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "local.properties.template"
   workflow_dispatch:
 
 jobs:
