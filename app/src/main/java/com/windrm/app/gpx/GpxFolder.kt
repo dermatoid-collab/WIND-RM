@@ -3,6 +3,7 @@ package com.windrm.app.gpx
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.provider.DocumentsContract.Document
 
 /**
@@ -36,6 +37,42 @@ object GpxFolder {
             if (c.moveToFirst()) c.getString(0) else null
         }
     }.getOrNull()
+
+    /**
+     * Whether [file] (a document uri from the file picker) is one of the files already in the chosen
+     * folder: the provider's own answer first, then the document id lying under the folder's, then (for
+     * providers whose ids are opaque, like Drive's) a file of the same name and size in the folder.
+     */
+    fun contains(context: Context, tree: Uri, file: Uri): Boolean {
+        val rootId = DocumentsContract.getTreeDocumentId(tree)
+        val root = DocumentsContract.buildDocumentUriUsingTree(tree, rootId)
+        if (runCatching { DocumentsContract.isChildDocument(context.contentResolver, root, file) }.getOrDefault(false)) return true
+        val id = documentIdIn(context, tree, file)
+        if (id != null && (id == rootId || id.startsWith("$rootId/"))) return true
+        val (name, size) = nameAndSize(context, file)
+        if (name == null) return false
+        return runCatching { listTracks(context, tree).any { it.name == name && (size == null || it.sizeBytes == null || it.sizeBytes == size) } }
+            .getOrDefault(false)
+    }
+
+    /** [file] as the folder's own tree-based uri (the form the Files tab lists), or null when it comes from another provider. */
+    fun inTreeForm(context: Context, tree: Uri, file: Uri): Uri? =
+        documentIdIn(context, tree, file)?.let { DocumentsContract.buildDocumentUriUsingTree(tree, it) }
+
+    private fun documentIdIn(context: Context, tree: Uri, file: Uri): String? = runCatching {
+        if (file.authority == tree.authority && DocumentsContract.isDocumentUri(context, file)) DocumentsContract.getDocumentId(file) else null
+    }.getOrNull()
+
+    private fun nameAndSize(context: Context, file: Uri): Pair<String?, Long?> = runCatching {
+        context.contentResolver.query(file, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val size: Long? = if (c.isNull(1)) null else c.getLong(1)
+                c.getString(0) to size
+            } else {
+                null
+            }
+        }
+    }.getOrNull() ?: (null to null)
 
     /** GPX and TCX files in the folder and its subfolders (a few levels deep), newest first. */
     fun listTracks(context: Context, tree: Uri): List<Entry> {

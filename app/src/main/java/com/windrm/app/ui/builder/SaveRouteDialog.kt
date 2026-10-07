@@ -22,16 +22,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 
-/** Name for the route, plus what to do with its GPX: a copy in the chosen folder (on by default) and/or the share sheet. */
+/** Name for the route, plus what to do with its GPX: a copy in the chosen folder (on by default, unless the file is already there) and/or the share sheet. */
 @Composable
 internal fun SaveRouteDialog(
     initialName: String,
     folderName: String?,
+    /** Off for a file that already sits in the GPX folder, where a copy would only duplicate it. */
+    folderCopyByDefault: Boolean = true,
     onDismiss: () -> Unit,
     onConfirm: (name: String, toFolder: Boolean, share: Boolean) -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
-    var toFolder by remember { mutableStateOf(folderName != null) }
+    var toFolder by remember { mutableStateOf(folderName != null && folderCopyByDefault) }
     var share by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,

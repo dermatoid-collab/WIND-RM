@@ -105,6 +105,13 @@ class HomeViewModel(
     var gpxFolderName by mutableStateOf<String?>(null)
         private set
 
+    /** The picked file is already in the GPX folder: the dialog then doesn't offer a second copy by default. */
+    var pendingFromFolder by mutableStateOf(false)
+        private set
+
+    // The picked file in the folder's own uri form, so the Files tab recognises it once saved.
+    private var pendingLinkUri: Uri? = null
+
     fun prepareImport(context: Context, uri: Uri) {
         viewModelScope.launch {
             gpxError = null
@@ -112,11 +119,15 @@ class HomeViewModel(
                 withContext(Dispatchers.IO) {
                     val route = GpxUriImporter.read(context, uri)
                     val folder = settingsRepository.current().gpxFolderUri?.let(Uri::parse)
-                    route to folder?.let { GpxFolder.displayName(appContext, it) }
+                    val folderName = folder?.let { GpxFolder.displayName(appContext, it) }
+                    val inFolder = folder != null && folderName != null && GpxFolder.contains(appContext, folder, uri)
+                    Triple(route, folderName, if (inFolder && folder != null) (GpxFolder.inTreeForm(appContext, folder, uri) ?: uri) else null)
                 }
             }
-                .onSuccess { (route, folderName) ->
+                .onSuccess { (route, folderName, linkUri) ->
                     gpxFolderName = folderName
+                    pendingFromFolder = linkUri != null
+                    pendingLinkUri = linkUri
                     pendingImport = route
                 }
                 .onFailure { gpxError = it.message ?: "Couldn't import the GPX file" }
@@ -130,10 +141,13 @@ class HomeViewModel(
     /** Saves the picked file's route under [name]; with [toFolder] also keeps a GPX copy in the chosen folder. */
     fun confirmImport(name: String, toFolder: Boolean, onSaved: (Route) -> Unit) {
         val route = pendingImport ?: return
+        val link = pendingLinkUri
         pendingImport = null
         viewModelScope.launch {
             val named = route.copy(name = name.trim().ifEmpty { route.name })
             val saved = named.copy(id = routeRepository.saveRoute(named))
+            // A file already in the folder is that route's file: the Files tab opens it instead of importing it again.
+            if (link != null) settingsRepository.linkGpx(link.toString(), saved.id)
             if (toFolder) GpxFolderExport.save(appContext, settingsRepository, saved, gpxFolderName)
             onSaved(saved)
         }

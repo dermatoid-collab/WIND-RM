@@ -159,6 +159,7 @@ fun HomeScreen(
         SaveRouteDialog(
             initialName = route.name,
             folderName = viewModel.gpxFolderName,
+            folderCopyByDefault = !viewModel.pendingFromFolder,
             onDismiss = viewModel::cancelImport,
             onConfirm = { name, toFolder, share ->
                 viewModel.confirmImport(name, toFolder) { saved ->
