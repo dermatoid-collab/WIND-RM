@@ -6,7 +6,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -39,11 +43,28 @@ fun SemiCircularGauge(
     minColor: Color,
     maxColor: Color,
     modifier: Modifier = Modifier,
+    /** true while a finger is held on the gauge, false when it lifts. */
+    onPressChange: ((Boolean) -> Unit)? = null,
 ) {
+    // Keyed on Unit with the latest callback read through state: re-keying on the lambda would
+    // restart the detector mid-press (the press itself recomposes the screen) and lose the release.
+    val pressCallback by rememberUpdatedState(onPressChange)
     val scale = (scaleMax - scaleMin).coerceAtLeast(0.0001)
     val minFraction = ((rangeMin - scaleMin) / scale).coerceIn(0.0, 1.0)
     val maxFraction = ((rangeMax - scaleMin) / scale).coerceIn(0.0, 1.0)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.pointerInput(Unit) {
+            detectTapGestures(onPress = {
+                try {
+                    pressCallback?.invoke(true)
+                    tryAwaitRelease()
+                } finally {
+                    pressCallback?.invoke(false)
+                }
+            })
+        },
+    ) {
         Box(contentAlignment = Alignment.Center, modifier = modifier.size(96.dp)) {
             Canvas(modifier = Modifier.size(96.dp)) {
                 val ringStroke = 7.dp.toPx()

@@ -29,9 +29,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.Surface
@@ -48,6 +52,7 @@ import com.windrm.app.ui.components.AqiDial
 import com.windrm.app.ui.components.ChartBand
 import com.windrm.app.ui.components.ChartSeries
 import com.windrm.app.ui.components.MultiSeriesChart
+import com.windrm.app.ui.components.MapMarker
 import com.windrm.app.ui.components.RouteMapView
 import com.windrm.app.ui.components.SemiCircularGauge
 import com.windrm.app.ui.components.WindArrowPoint
@@ -185,6 +190,14 @@ private fun ForecastContent(
     // Interpolated on the full-resolution track, so the map dot glides smoothly instead of
     // jumping between the ~3 km-spaced weather samples.
     val highlightPoint = scrubFraction?.let { pointAtDistance(track, it * totalDistanceM) }
+    var heldGauge by remember { mutableStateOf<GaugeMetric?>(null) }
+    // Colours match the gauge rings: min = inner blue ring, max = outer orange ring.
+    val gaugeMarkers = heldGauge?.let { metric ->
+        listOf(
+            MapMarker(points.minBy(metric.value).point, TempColor.toArgb()),
+            MapMarker(points.maxBy(metric.value).point, FeelsLikeColor.toArgb()),
+        )
+    }.orEmpty()
     val timeLabels = remember(points) { timeAxisLabels(points) }
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     val scrubLabel = "%.1f km, %s".format(fraction * totalDistanceM / 1000.0, timeFmt.format(timeAtFraction(points, fraction)))
@@ -208,13 +221,14 @@ private fun ForecastContent(
                 mapStyle = mapStyle,
                 highlightPoint = highlightPoint,
                 scrubFraction = scrubFraction,
+                markers = gaugeMarkers,
                 height = 336.dp,
             )
             WindSpeedLegend()
         }
         HorizontalDivider()
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-            GaugesRow(points, current)
+            GaugesRow(points, current, onGaugeHeld = { heldGauge = it })
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
@@ -375,8 +389,20 @@ private fun ForecastContent(
     }
 }
 
+/** The three top gauges; holding one shows where its min and max occur on the map. */
+private enum class GaugeMetric(val value: (RouteForecastPoint) -> Double) {
+    TEMPERATURE({ it.weather.temperatureC }),
+    PRECIPITATION({ it.weather.precipitationProbabilityPct }),
+    WIND({ it.weather.windSpeedKmh }),
+}
+
 @Composable
-private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPoint) {
+private fun GaugesRow(
+    points: List<RouteForecastPoint>,
+    current: RouteForecastPoint,
+    onGaugeHeld: (GaugeMetric?) -> Unit,
+) {
+    fun pressHandler(metric: GaugeMetric): (Boolean) -> Unit = { pressed -> onGaugeHeld(if (pressed) metric else null) }
     val minTemp = points.minOf { it.weather.temperatureC }
     val maxTemp = points.maxOf { it.weather.temperatureC }
     val minPrecip = points.minOf { it.weather.precipitationProbabilityPct }
@@ -398,6 +424,7 @@ private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPo
             maxText = "${maxTemp.roundToInt()}°C",
             minColor = TempColor,
             maxColor = FeelsLikeColor,
+            onPressChange = pressHandler(GaugeMetric.TEMPERATURE),
         )
         SemiCircularGauge(
             rangeMin = minPrecip,
@@ -410,6 +437,7 @@ private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPo
             maxText = "${maxPrecip.roundToInt()}%",
             minColor = TempColor,
             maxColor = FeelsLikeColor,
+            onPressChange = pressHandler(GaugeMetric.PRECIPITATION),
         )
         SemiCircularGauge(
             rangeMin = minWind,
@@ -422,6 +450,7 @@ private fun GaugesRow(points: List<RouteForecastPoint>, current: RouteForecastPo
             maxText = "${maxWind.roundToInt()} km/h",
             minColor = TempColor,
             maxColor = FeelsLikeColor,
+            onPressChange = pressHandler(GaugeMetric.WIND),
         )
     }
 }

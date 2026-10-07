@@ -44,6 +44,9 @@ import org.osmdroid.views.overlay.Polyline
 /** A point along the route where a wind-direction arrow should be drawn, in meteorological "from" degrees. */
 data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double, val windSpeedKmh: Double)
 
+/** An extra dot on the route, e.g. where a gauge's min or max occurs. */
+data class MapMarker(val point: RoutePoint, val argb: Int)
+
 /** What was last applied to a MapView, stashed in its tag so update() can skip redundant work. */
 private data class MapViewFitState(val style: MapStyle, val points: List<RoutePoint>)
 
@@ -60,6 +63,7 @@ fun RouteMapView(
     highlightPoint: RoutePoint? = null,
     /** Scrub position (0..1 of the route); the arrow nearest to it gets a thicker white edge. */
     scrubFraction: Float? = null,
+    markers: List<MapMarker> = emptyList(),
     height: Dp = 280.dp,
 ) {
     val mapRef = remember { MapViewRef() }
@@ -124,7 +128,9 @@ fun RouteMapView(
                         mapView.overlays.add(WindArrowsOverlay(thinnedArrows, mapView.resources.displayMetrics.density, active))
                     }
 
-                    highlightPoint?.let { mapView.overlays.add(HighlightOverlay(it, mapView.resources.displayMetrics.density)) }
+                    val density = mapView.resources.displayMetrics.density
+                    highlightPoint?.let { mapView.overlays.add(PointMarkerOverlay(it, HIGHLIGHT_ARGB, density)) }
+                    markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
 
                     if (lastState?.points != points) {
                         val bbox = boundingBoxOf(geoPoints)
@@ -279,11 +285,11 @@ private class StartFinishOverlay(
     }
 }
 
-/** A marker at the route point currently under a finger on a chart, or where the slider was left. */
-private class HighlightOverlay(private val point: RoutePoint, density: Float) : Overlay() {
+/** A 12 dp dot with a white ring: the scrub position (blue) or a gauge's min/max location. */
+private class PointMarkerOverlay(private val point: RoutePoint, argb: Int, density: Float) : Overlay() {
     private val radius = MARKER_DIAMETER_DP / 2 * density
     private val ringPaint = markerRingPaint(density)
-    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E88E5"); style = Paint.Style.FILL }
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = argb; style = Paint.Style.FILL }
 
     override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
         if (shadow) return
@@ -296,6 +302,7 @@ private class HighlightOverlay(private val point: RoutePoint, density: Float) : 
 
 /** Start, finish and position markers all share one size: 12 dp across with a 2 dp white ring. */
 private const val MARKER_DIAMETER_DP = 12f
+private const val HIGHLIGHT_ARGB = 0xFF1E88E5.toInt()
 
 private fun markerRingPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     color = Color.WHITE
