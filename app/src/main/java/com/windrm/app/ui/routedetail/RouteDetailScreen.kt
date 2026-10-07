@@ -96,6 +96,7 @@ fun RouteDetailScreen(
     viewModel: RouteDetailViewModel,
     onBack: () -> Unit,
     onForecast: (startEpochS: Long, speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
+    onLive: (speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
 ) {
     val route = viewModel.route
     // The part actually ridden: header stats and the forecast follow the crop slider.
@@ -256,15 +257,25 @@ fun RouteDetailScreen(
                 modifier = Modifier.padding(start = if (trek) 60.dp else 16.dp, end = 16.dp, top = 4.dp),
             )
 
-            Button(
-                onClick = {
-                    onForecast(viewModel.computeStartInstant().epochSecond, viewModel.avgSpeedKmh, viewModel.pacingMode, viewModel.cropRangeM())
-                },
-                shape = RoundedCornerShape(4.dp),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp),
+            Row(
+                Modifier.align(Alignment.CenterHorizontally).padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.forecast_route).uppercase(), style = MaterialTheme.typography.titleMedium)
+                Button(
+                    onClick = {
+                        onForecast(viewModel.computeStartInstant().epochSecond, viewModel.avgSpeedKmh, viewModel.pacingMode, viewModel.cropRangeM())
+                    },
+                    shape = RoundedCornerShape(4.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                ) {
+                    Text(stringResource(R.string.forecast_route).uppercase(), style = MaterialTheme.typography.titleMedium)
+                }
+                OutlinedButton(
+                    onClick = { onLive(viewModel.avgSpeedKmh, viewModel.pacingMode, viewModel.cropRangeM()) },
+                    shape = RoundedCornerShape(4.dp),
+                ) {
+                    Text(stringResource(R.string.live_route), style = MaterialTheme.typography.titleMedium)
+                }
             }
 
             Box(

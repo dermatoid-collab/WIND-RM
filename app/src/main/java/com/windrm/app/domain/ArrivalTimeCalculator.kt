@@ -24,8 +24,26 @@ object ArrivalTimeCalculator {
         /** Forecast wind along the route; used only by a ride in [PacingMode.REALISTIC_WIND]. */
         wind: WindAlongTrack? = null,
     ): List<Instant> {
+        val ridingOffsets = ridingOffsets(route, samples, avgSpeedKmh, pacing, profile, activity, cai, wind)
+        return samples.mapIndexed { index, point ->
+            val stopSeconds = route.stops.filter { it.distanceM < point.distanceFromStartM }.sumOf { it.durationMin * 60L }
+            startTime.plusSeconds(ridingOffsets[index] + stopSeconds)
+        }
+    }
+
+    /** Seconds spent riding (planned stops not included) from the start to each of [samples]. */
+    fun ridingOffsets(
+        route: Route,
+        samples: List<RoutePoint>,
+        avgSpeedKmh: Double,
+        pacing: PacingMode = PacingMode.CONSTANT,
+        profile: RiderProfile = RiderProfile(),
+        activity: ActivityType = ActivityType.RIDE,
+        cai: CaiProfile = CaiProfile(),
+        wind: WindAlongTrack? = null,
+    ): List<Long> {
         val distances = samples.map { it.distanceFromStartM }
-        val ridingOffsets: List<Long> = if (pacing.isRealistic) {
+        return if (pacing.isRealistic) {
             when (activity) {
                 ActivityType.RIDE -> TerrainPacing.offsetsSeconds(
                     route.points, distances, avgSpeedKmh, profile,
@@ -37,10 +55,6 @@ object ArrivalTimeCalculator {
             samples.map { point ->
                 if (route.hasTimestamps && point.timeOffsetS != null) point.timeOffsetS else estimateOffsetSeconds(point, avgSpeedKmh)
             }
-        }
-        return samples.mapIndexed { index, point ->
-            val stopSeconds = route.stops.filter { it.distanceM < point.distanceFromStartM }.sumOf { it.durationMin * 60L }
-            startTime.plusSeconds(ridingOffsets[index] + stopSeconds)
         }
     }
 

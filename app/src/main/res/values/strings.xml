@@ -223,4 +223,27 @@ Thunderforest Outdoors: maps © Thunderforest.</string>
     <string name="source_places_text">The Home location name comes from your device\'s Android geocoder. Elevation profiles come from the imported GPX file or Strava data.</string>
     <string name="source_software_title">Open-source software</string>
     <string name="source_software_text">osmdroid, Retrofit and OkHttp (Square), Kotlin and kotlinx (JetBrains), AndroidX and Jetpack Compose (Google): all under the Apache License 2.0.</string>
+
+    <!-- Live -->
+    <string name="live_route">LIVE</string>
+    <string name="live_title">Live</string>
+    <string name="live_remaining">Remaining</string>
+    <string name="live_arrived">Arrived</string>
+    <string name="live_time_left">Time left</string>
+    <string name="live_planned">planned</string>
+    <string name="live_arrival_at">arrive %1$s</string>
+    <string name="live_at_your_pace">At your pace</string>
+    <string name="live_pace_pending">measuring…</string>
+    <string name="live_to_go">Climb to go</string>
+    <string name="live_profile_ahead">Profile ahead</string>
+    <string name="live_you">You</string>
+    <string name="live_wind_ignored">The live time ignores the forecast wind (realistic pace in still air).</string>
+    <string name="live_permission_needed">Live needs your precise location to find you on the route. It is used only while this page is open.</string>
+    <string name="live_gps_off">GPS is off. Turn on location in the phone settings.</string>
+    <string name="live_waiting_fix">Waiting for a GPS fix…</string>
+    <string name="live_off_route">%1$d m off the route</string>
+    <string name="live_choose_pass_hint">The route passes here more than once: choose where you are.</string>
+    <string name="live_choose_pass_title">Which pass?</string>
+    <string name="live_choose_pass_body">The route goes through this place more than once. Where are you now?</string>
+    <string name="live_pass_option">At km %1$.1f of %2$.1f</string>
 </resources>

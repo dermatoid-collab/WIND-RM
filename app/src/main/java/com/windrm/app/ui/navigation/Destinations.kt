@@ -29,4 +29,14 @@ sealed class Destination(val route: String) {
         fun path(routeId: Long, startEpochS: Long, speedKmh: Double, pacing: PacingMode, cropStartM: Double, cropEndM: Double) =
             "forecast/$routeId/$startEpochS/$speedKmh/${pacing.name}/${cropStartM.toFloat()}/${cropEndM.toFloat()}"
     }
+
+    data object Live : Destination("live/{routeId}/{speed}/{pacing}/{cropStart}/{cropEnd}") {
+        const val ARG_ROUTE_ID = "routeId"
+        const val ARG_SPEED = "speed"
+        const val ARG_PACING = "pacing"
+        const val ARG_CROP_START = "cropStart"
+        const val ARG_CROP_END = "cropEnd"
+        fun path(routeId: Long, speedKmh: Double, pacing: PacingMode, cropStartM: Double, cropEndM: Double) =
+            "live/$routeId/$speedKmh/${pacing.name}/${cropStartM.toFloat()}/${cropEndM.toFloat()}"
+    }
 }

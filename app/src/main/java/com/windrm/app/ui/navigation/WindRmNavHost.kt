@@ -18,6 +18,8 @@ import com.windrm.app.ui.forecast.ForecastScreen
 import com.windrm.app.ui.forecast.ForecastViewModel
 import com.windrm.app.ui.home.HomeScreen
 import com.windrm.app.ui.home.HomeViewModel
+import com.windrm.app.ui.live.LiveScreen
+import com.windrm.app.ui.live.LiveViewModel
 import com.windrm.app.ui.routedetail.RouteDetailScreen
 import com.windrm.app.ui.routedetail.RouteDetailViewModel
 import com.windrm.app.ui.routes.RoutesListScreen
@@ -118,6 +120,9 @@ fun WindRmNavHost(container: AppContainer) {
                 onForecast = { startEpochS, speedKmh, pacing, crop ->
                     navController.navigate(Destination.Forecast.path(routeId, startEpochS, speedKmh, pacing, crop.start, crop.endInclusive))
                 },
+                onLive = { speedKmh, pacing, crop ->
+                    navController.navigate(Destination.Live.path(routeId, speedKmh, pacing, crop.start, crop.endInclusive))
+                },
             )
         }
 
@@ -147,6 +152,31 @@ fun WindRmNavHost(container: AppContainer) {
                 },
             )
             ForecastScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+        }
+
+        composable(
+            route = Destination.Live.route,
+            arguments = listOf(
+                navArgument(Destination.Live.ARG_ROUTE_ID) { type = NavType.LongType },
+                navArgument(Destination.Live.ARG_SPEED) { type = NavType.FloatType },
+                navArgument(Destination.Live.ARG_PACING) { type = NavType.StringType },
+                navArgument(Destination.Live.ARG_CROP_START) { type = NavType.FloatType },
+                navArgument(Destination.Live.ARG_CROP_END) { type = NavType.FloatType },
+            ),
+        ) { backStackEntry ->
+            val args = backStackEntry.arguments ?: return@composable
+            val appContext = LocalContext.current.applicationContext
+            val routeId = args.getLong(Destination.Live.ARG_ROUTE_ID)
+            val speed = args.getFloat(Destination.Live.ARG_SPEED).toDouble()
+            val pacing = args.getString(Destination.Live.ARG_PACING)
+                ?.let { runCatching { PacingMode.valueOf(it) }.getOrNull() } ?: PacingMode.CONSTANT
+            val crop = args.getFloat(Destination.Live.ARG_CROP_START).toDouble()..args.getFloat(Destination.Live.ARG_CROP_END).toDouble()
+            val viewModel = viewModel<LiveViewModel>(
+                factory = viewModelFactory {
+                    initializer { LiveViewModel(appContext, container.routeRepository, container.settingsRepository, routeId, speed, pacing, crop) }
+                },
+            )
+            LiveScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
         }
     }
 }
