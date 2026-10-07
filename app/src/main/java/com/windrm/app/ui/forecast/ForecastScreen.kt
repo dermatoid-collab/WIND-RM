@@ -506,14 +506,15 @@ private fun ForecastContent(
 
 /**
  * The four air-quality views. Band tops follow the European AQI breakpoints (Good, Fair, Moderate,
- * Poor, Very poor) for the overall index and for each pollutant's concentration in µg/m³; the last
- * band ("Extremely poor") is open-ended and only drawn up to a cap so the chart keeps a scale.
+ * Poor, Very poor) for the overall index and for each pollutant's concentration in µg/m³, as listed
+ * in Open-Meteo's air-quality docs; the last band ("Extremely poor") is open-ended and only drawn up
+ * to a cap (+20 %) so the chart keeps a scale.
  */
 private enum class AqiView(val title: String, val unit: String, val bandTops: List<Float>, val value: (AirQualityPoint) -> Double) {
     OVERALL("AQI Overall", "", listOf(20f, 40f, 60f, 80f, 100f, 120f), { it.europeanAqi }),
-    PM25("PM2.5", "µg/m³", listOf(10f, 20f, 25f, 50f, 75f, 90f), { it.pm2_5 }),
-    PM10("PM10", "µg/m³", listOf(20f, 40f, 50f, 100f, 150f, 180f), { it.pm10 }),
-    OZONE("Ozone", "µg/m³", listOf(50f, 100f, 130f, 240f, 380f, 450f), { it.ozone }),
+    PM25("PM2.5", "µg/m³", listOf(5f, 15f, 50f, 90f, 140f, 168f), { it.pm2_5 }),
+    PM10("PM10", "µg/m³", listOf(15f, 45f, 120f, 195f, 270f, 324f), { it.pm10 }),
+    OZONE("Ozone", "µg/m³", listOf(60f, 100f, 120f, 160f, 180f, 216f), { it.ozone }),
 }
 
 private val AQI_BAND_LABELS = listOf("Good", "Fair", "Moderate", "Poor", "Very poor", "Extremely poor")
