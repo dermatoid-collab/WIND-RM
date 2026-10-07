@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -441,7 +443,8 @@ private fun StartTimeDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.starting)) },
         text = {
-            Column {
+            // Scrolls: the dial is tall and would otherwise be cut off on a small screen or in landscape.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Filled.CalendarMonth, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                     Text(date.format(dateFieldFormatter))

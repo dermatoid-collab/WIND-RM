@@ -16,6 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -68,8 +73,10 @@ private const val STEP_MIN = 15
 /**
  * Pick a new start from inside the forecast, like the original app: page through the days (or tap
  * the date for a calendar), then tap or drag sideways on any chart of the weather at the route start
- * to choose the time. The charts scroll vertically.
+ * to choose the time -- or tap the time to type it, which works even when no weather could be loaded.
+ * The charts scroll vertically.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StartTimePickerDialog(
     initialStart: Instant,
@@ -83,9 +90,9 @@ fun StartTimePickerDialog(
     val initial = remember(initialStart) { initialStart.atZone(zone) }
     var date by remember { mutableStateOf(initial.toLocalDate().coerceIn(today, today.plusDays(horizonDays.toLong()))) }
     var showCalendar by remember { mutableStateOf(false) }
-    var minuteOfDay by remember {
-        mutableIntStateOf((initial.hour * 60 + initial.minute).coerceIn(WINDOW_START_MIN, WINDOW_END_MIN))
-    }
+    // Any minute of the day: typing a time outside the charts' window (4:00-22:00) is allowed.
+    var minuteOfDay by remember { mutableIntStateOf(initial.hour * 60 + initial.minute) }
+    var showTimeInput by remember { mutableStateOf(false) }
     val dayFormatter = remember { DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()) }
     val windowMin = (WINDOW_END_MIN - WINDOW_START_MIN).toFloat()
     val timeText = "%02d:%02d".format(minuteOfDay / 60, minuteOfDay % 60)
@@ -124,23 +131,39 @@ fun StartTimePickerDialog(
                         today.plusDays(1) -> stringResource(R.string.tomorrow)
                         else -> date.format(dayFormatter)
                     }
-                    // Tapping the date opens the calendar, to jump straight to any day in the horizon.
-                    Row(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { showCalendar = true }
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.CalendarMonth,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 8.dp).size(20.dp),
-                        )
-                        Text(stringResource(R.string.day_at_time, dayLabel, timeText), style = MaterialTheme.typography.titleMedium)
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        // Tapping the date opens the calendar, to jump straight to any day in the horizon.
+                        Row(
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showCalendar = true }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(end = 6.dp).size(20.dp),
+                            )
+                            Text(dayLabel, style = MaterialTheme.typography.titleMedium)
+                        }
+                        // Tapping the time opens a box to type it.
+                        Row(
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showTimeInput = true }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.Schedule,
+                                contentDescription = stringResource(R.string.start_time),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(end = 6.dp).size(20.dp),
+                            )
+                            Text(timeText, style = MaterialTheme.typography.titleMedium)
+                        }
                     }
                     IconButton(onClick = { date = date.plusDays(1) }, enabled = date < today.plusDays(horizonDays.toLong())) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
@@ -173,7 +196,7 @@ fun StartTimePickerDialog(
                         )
                         else -> {
                             val xLabels = (0..6).map { "%02d:00".format((WINDOW_START_MIN / 60) + it * 3) }
-                            val selection = (minuteOfDay - WINDOW_START_MIN) / windowMin
+                            val selection = ((minuteOfDay - WINDOW_START_MIN) / windowMin).coerceIn(0f, 1f)
                             val onScrub: (Float) -> Unit = { f ->
                                 val raw = WINDOW_START_MIN + f * windowMin
                                 minuteOfDay = ((raw / STEP_MIN).roundToInt() * STEP_MIN).coerceIn(WINDOW_START_MIN, WINDOW_END_MIN)
@@ -226,6 +249,22 @@ fun StartTimePickerDialog(
                 }
             }
         }
+    }
+
+    if (showTimeInput) {
+        val timeState = rememberTimePickerState(initialHour = minuteOfDay / 60, initialMinute = minuteOfDay % 60, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTimeInput = false },
+            title = { Text(stringResource(R.string.start_time)) },
+            text = { TimeInput(state = timeState) },
+            confirmButton = {
+                TextButton(onClick = {
+                    minuteOfDay = timeState.hour * 60 + timeState.minute
+                    showTimeInput = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showTimeInput = false }) { Text(stringResource(R.string.cancel)) } },
+        )
     }
 
     if (showCalendar) {

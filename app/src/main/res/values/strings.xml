@@ -192,7 +192,7 @@
     <string name="activity_trek">Trekking</string>
     <string name="add_stop">Add a stop</string>
     <string name="start_time">Start time</string>
-    <string name="start_time_hint">Tap or drag sideways on any chart to pick the start time. Tap the date to open the calendar.</string>
+    <string name="start_time_hint">Tap the time to type it, or tap or drag sideways on any chart. Tap the date to open the calendar.</string>
     <string name="start_time_no_data">No forecast available for this day.</string>
     <string name="today">Today</string>
     <string name="tomorrow">Tomorrow</string>
