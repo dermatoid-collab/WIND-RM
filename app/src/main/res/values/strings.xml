@@ -28,6 +28,8 @@
     <string name="builder_back_to_start">Back to start</string>
     <string name="builder_clear">Clear</string>
     <string name="builder_points">points</string>
+    <string name="builder_time_speed">Estimated moving time at %1$s km/h (your average speed in Settings)</string>
+    <string name="builder_time_cai">Estimated walking time by the CAI trail rule (%1$s km/h on the flat)</string>
     <string name="builder_paved">Paved</string>
     <string name="builder_unpaved">Unpaved</string>
     <string name="builder_trail">Trail</string>

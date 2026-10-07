@@ -8,6 +8,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.domain.ActivityType
+import com.windrm.app.domain.CaiPacing
+import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.assembleRoute
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.gpx.GpxFolder
@@ -78,6 +80,12 @@ class RouteBuilderViewModel(
     var gpxFolderName by mutableStateOf<String?>(null)
         private set
 
+    /** Speed behind the time estimate: the Settings average for a ride, the CAI flat speed for a trek. */
+    var rideSpeedKmh by mutableStateOf(25.0)
+        private set
+    private var caiProfile = CaiProfile()
+    val estimateSpeedKmh: Double get() = if (activity == ActivityType.TREK) caiProfile.flatKmh else rideSpeedKmh
+
     private var job: Job? = null
 
     /** What accepting the stretch in [pendingUnpaved] does: add it to the end, or put it in place of an edited one. */
@@ -97,6 +105,16 @@ class RouteBuilderViewModel(
     /** Unpaved or trail metres inside a route that is meant to be paved only. */
     val leftoverRoughM: Double get() = if (strictPaved) unpavedM + trailM else 0.0
 
+    /**
+     * Moving time of [route]: a ride at the Settings average speed (the realistic pace keeps the same
+     * total), a trek by the CAI trail times, which add time for the climbing.
+     */
+    fun estimateSeconds(route: Route): Long = when {
+        activity == ActivityType.TREK -> CaiPacing.totalSeconds(route.points, caiProfile.flatKmh, caiProfile)
+        rideSpeedKmh > 0 -> (route.distanceKm / rideSpeedKmh * 3600).toLong()
+        else -> 0L
+    }
+
     /** The finished route, or null until there are two points; the name is only a placeholder here. */
     val draft: Route? get() = assembleRoute("", activity, segments, 0L)
 
@@ -104,6 +122,8 @@ class RouteBuilderViewModel(
         viewModelScope.launch {
             val settings = settingsRepository.current()
             mapStyle = settings.mapStyle
+            rideSpeedKmh = settings.defaultAvgSpeedKmh
+            caiProfile = settings.caiProfile
             gpxFolderName = settings.gpxFolderUri?.let(Uri::parse)?.let { tree ->
                 withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, tree) }
             }

@@ -259,10 +259,23 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
 @Composable
 private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileValues: List<Float>) {
     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val duration = remember(draft, viewModel.activity, viewModel.rideSpeedKmh) { draft?.let(viewModel::estimateSeconds) }
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Bottom) {
             Stat("%.1f".format(draft?.distanceKm ?: 0.0), "km")
             Stat("${(draft?.elevationGainM ?: 0.0).roundToInt()}", "m↑")
+            Stat(duration?.let(::formatDuration) ?: "–", "")
             Stat("${viewModel.waypoints.size}", stringResource(R.string.builder_points))
+        }
+
+        if (duration != null) {
+            Text(
+                stringResource(
+                    if (viewModel.activity == ActivityType.TREK) R.string.builder_time_cai else R.string.builder_time_speed,
+                    "%.0f".format(viewModel.estimateSpeedKmh),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         val total = viewModel.pavedM + viewModel.unpavedM + viewModel.trailM
@@ -307,6 +320,12 @@ private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileV
 
         ElevationSparkline(profileValues, Modifier.fillMaxWidth().height(56.dp))
     }
+}
+
+/** "1h 05m" / "42 min". */
+private fun formatDuration(seconds: Long): String {
+    val minutes = (seconds / 60.0).roundToInt()
+    return if (minutes >= 60) "%dh %02dm".format(minutes / 60, minutes % 60) else "$minutes min"
 }
 
 @Composable
