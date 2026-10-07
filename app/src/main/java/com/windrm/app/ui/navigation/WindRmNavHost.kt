@@ -89,7 +89,7 @@ fun WindRmNavHost(container: AppContainer) {
             val initialTab = backStackEntry.arguments?.getInt(Destination.RoutesList.ARG_INITIAL_TAB) ?: 0
             val viewModel = viewModel<RoutesListViewModel>(
                 factory = viewModelFactory {
-                    initializer { RoutesListViewModel(container.routeRepository, container.stravaRepository, container.stravaAuthManager) }
+                    initializer { RoutesListViewModel(container.routeRepository, container.stravaRepository, container.stravaAuthManager, container.settingsRepository) }
                 },
             )
             RoutesListScreen(

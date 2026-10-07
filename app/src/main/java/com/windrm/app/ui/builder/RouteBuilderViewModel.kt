@@ -1,14 +1,19 @@
 package com.windrm.app.ui.builder
 
 import android.content.Context
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.R
 import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.assembleRoute
 import com.windrm.app.domain.haversineMeters
+import com.windrm.app.gpx.GpxFolder
+import com.windrm.app.gpx.GpxWriter
 import com.windrm.app.location.DeviceLocation
 import com.windrm.app.model.LatLon
 import com.windrm.app.model.Route
@@ -71,6 +76,11 @@ class RouteBuilderViewModel(
     var mapZoom by mutableStateOf(DEFAULT_ZOOM)
         private set
 
+    /** Name of the GPX folder chosen in Settings, shown in the save dialog; null = none (or it can't be read). */
+    var gpxFolderName by mutableStateOf<String?>(null)
+        private set
+    private var gpxFolder: Uri? = null
+
     private var job: Job? = null
 
     val profile: BuilderProfile get() = BuilderProfile.of(activity, allowUnpaved)
@@ -94,6 +104,9 @@ class RouteBuilderViewModel(
         viewModelScope.launch {
             val settings = settingsRepository.current()
             mapStyle = settings.mapStyle
+            gpxFolder = settings.gpxFolderUri?.let(Uri::parse)
+            gpxFolderName = gpxFolder?.let { tree -> withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, tree) } }
+            if (gpxFolderName == null) gpxFolder = null
             val home = settings.homeLat?.let { lat -> settings.homeLon?.let { lon -> lat to lon } }
             val here = home ?: withContext(Dispatchers.IO) {
                 runCatching { DeviceLocation.lastKnown(appContext) }.getOrNull()?.let { it.latitude to it.longitude }
@@ -225,12 +238,31 @@ class RouteBuilderViewModel(
     fun defaultName(): String =
         "Route ${LocalDate.now().format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))}"
 
-    /** Saves the route under [name] and hands it back (with its new id) for the caller to open or export. */
-    fun save(name: String, onSaved: (Route) -> Unit) {
+    /**
+     * Saves the route under [name]; with [toFolder] also writes its GPX into the folder chosen in
+     * Settings. The saved route (with its new id) is handed back for the caller to open or share.
+     */
+    fun save(name: String, toFolder: Boolean, onSaved: (Route) -> Unit) {
         val route = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, System.currentTimeMillis()) ?: return
         viewModelScope.launch {
             val id = routeRepository.saveRoute(route)
-            onSaved(route.copy(id = id))
+            val saved = route.copy(id = id)
+            if (toFolder) writeToFolder(saved)
+            onSaved(saved)
+        }
+    }
+
+    private suspend fun writeToFolder(route: Route) {
+        val tree = gpxFolder ?: return
+        val written = withContext(Dispatchers.IO) {
+            runCatching { GpxFolder.write(appContext, tree, GpxWriter.fileName(route.name), GpxWriter.write(route)) }.getOrNull()
+        }
+        if (written != null) {
+            // So the Files tab opens this route instead of importing the file again.
+            settingsRepository.linkGpx(written.toString(), route.id)
+            Toast.makeText(appContext, appContext.getString(R.string.builder_gpx_saved, gpxFolderName ?: ""), Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(appContext, appContext.getString(R.string.builder_gpx_failed), Toast.LENGTH_LONG).show()
         }
     }
 

@@ -1,6 +1,7 @@
 package com.windrm.app.ui.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -8,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
+import com.windrm.app.gpx.GpxFolder
 import com.windrm.app.location.DeviceLocation
 import com.windrm.app.remote.strava.StravaAuthEvent
 import com.windrm.app.remote.strava.StravaAuthManager
@@ -16,6 +18,8 @@ import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.SettingsRepository
 import com.windrm.app.settings.ThemeMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -36,11 +40,20 @@ class SettingsViewModel(
     var homeLocationLoading by mutableStateOf(false)
         private set
 
+    /** Name of the chosen GPX folder as its provider reports it; null when none is chosen or it can't be read. */
+    var gpxFolderName by mutableStateOf<String?>(null)
+        private set
+
     val stravaConfigured: Boolean get() = stravaAuthManager.isConfigured
 
     init {
         viewModelScope.launch {
             settingsRepository.settings.collect { settings = it }
+        }
+        viewModelScope.launch {
+            settingsRepository.settings.map { it.gpxFolderUri }.distinctUntilChanged().collect { uri ->
+                gpxFolderName = uri?.let { withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, Uri.parse(it)) } }
+            }
         }
         viewModelScope.launch {
             stravaAuthorized = stravaAuthManager.isAuthorized()
@@ -87,6 +100,8 @@ class SettingsViewModel(
     fun setCaiProfile(profile: CaiProfile) = viewModelScope.launch { settingsRepository.setCaiProfile(profile) }
 
     fun resetCaiProfile() = viewModelScope.launch { settingsRepository.resetCaiProfile() }
+
+    fun setGpxFolder(uri: Uri?) = viewModelScope.launch { settingsRepository.setGpxFolder(uri) }
 
     fun setForecastHorizonDays(days: Int) = viewModelScope.launch {
         settingsRepository.setForecastHorizonDays(days.coerceIn(1, 16))

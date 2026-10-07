@@ -5,6 +5,9 @@
     <string name="routes_title">WIND-RM</string>
     <string name="tab_recent">Recent</string>
     <string name="tab_strava">Strava</string>
+    <string name="tab_files">Files</string>
+    <string name="files_no_folder">No GPX folder chosen yet. Pick a folder (on this phone or in Google Drive) to see its GPX files here and to keep a copy of every route you create.</string>
+    <string name="files_empty">No GPX files in this folder yet.</string>
     <string name="tab_favorites">Favorites</string>
     <string name="no_favorites_yet">No favorites yet. Tap the star on a route to add it here.</string>
     <string name="add_favorite">Add to favorites</string>
@@ -34,6 +37,10 @@
     <string name="builder_name_title">Save route</string>
     <string name="builder_name_label">Route name</string>
     <string name="builder_export_gpx">Also share as a GPX file</string>
+    <string name="builder_gpx_to_folder">Save a GPX copy to “%1$s”</string>
+    <string name="builder_no_folder_hint">Choose a GPX folder in Settings to keep a copy of every route there.</string>
+    <string name="builder_gpx_saved">GPX saved to “%1$s”</string>
+    <string name="builder_gpx_failed">Route saved, but the GPX file couldn\'t be written to the folder</string>
     <string name="builder_error_no_route">No route found. Tap closer to a road (or a trail on a trek).</string>
     <string name="builder_error_connection">Can’t reach the routing service. Check your connection.</string>
     <string name="builder_error_failed">Routing failed. Try again in a moment.</string>
@@ -140,6 +147,14 @@
     <string name="settings_cai_high_altitude">High altitude from</string>
     <string name="settings_cai_high_up">Climbing rate at high altitude</string>
     <string name="settings_cai_high_down">Descending rate at high altitude</string>
+    <string name="settings_gpx_folder">GPX folder</string>
+    <string name="settings_gpx_folder_hint">A folder for your GPX files, on this phone or in Google Drive (its app must be installed). New routes save a GPX copy there, and the Files tab lists the GPX files it holds.</string>
+    <string name="settings_gpx_folder_none">No folder chosen</string>
+    <string name="settings_gpx_folder_current">Folder: %1$s</string>
+    <string name="settings_gpx_folder_unreadable">Folder chosen, but it can\'t be read now. Choose it again.</string>
+    <string name="settings_gpx_folder_choose">Choose folder</string>
+    <string name="settings_gpx_folder_change">Change folder</string>
+    <string name="settings_gpx_folder_clear">Stop using it</string>
     <string name="settings_ride_light">Ride traffic light</string>
     <string name="settings_ride_light_hint">A value turns yellow at its yellow limit and red past its red limit (for cold: below them). Riding in civil twilight is yellow, in the dark red.</string>
     <string name="settings_ride_yellow">Yellow</string>

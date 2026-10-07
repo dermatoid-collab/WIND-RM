@@ -65,6 +65,9 @@ import java.time.format.FormatStyle
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val settings = viewModel.settings
+    val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) viewModel.setGpxFolder(uri)
+    }
     val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.useCurrentLocationAsHome()
     }
@@ -172,6 +175,31 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                     { viewModel.setMaxDescentSpeedKmh(it) },
                     10.0..120.0,
                 )
+            }
+
+            SettingsSection(stringResource(R.string.settings_gpx_folder)) {
+                Text(
+                    stringResource(R.string.settings_gpx_folder_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    when {
+                        settings.gpxFolderUri == null -> stringResource(R.string.settings_gpx_folder_none)
+                        viewModel.gpxFolderName != null -> stringResource(R.string.settings_gpx_folder_current, viewModel.gpxFolderName ?: "")
+                        else -> stringResource(R.string.settings_gpx_folder_unreadable)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { folderLauncher.launch(null) }) {
+                        Text(stringResource(if (settings.gpxFolderUri == null) R.string.settings_gpx_folder_choose else R.string.settings_gpx_folder_change))
+                    }
+                    if (settings.gpxFolderUri != null) {
+                        TextButton(onClick = { viewModel.setGpxFolder(null) }) { Text(stringResource(R.string.settings_gpx_folder_clear)) }
+                    }
+                }
             }
 
             SettingsSection(stringResource(R.string.settings_cai)) {

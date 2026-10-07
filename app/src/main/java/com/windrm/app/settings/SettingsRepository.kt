@@ -1,10 +1,13 @@
 package com.windrm.app.settings
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -45,6 +48,8 @@ data class AppSettings(
     val maxDescentSpeedKmh: Double = 40.0,
     val rideThresholds: RideThresholds = RideThresholds(),
     val caiProfile: CaiProfile = CaiProfile(),
+    /** Document-tree uri of the folder chosen for GPX files; null = none chosen. */
+    val gpxFolderUri: String? = null,
 ) {
     val riderProfile: RiderProfile get() = RiderProfile(riderMassKg, bikeMassKg, maxDescentSpeedKmh)
 
@@ -78,6 +83,9 @@ class SettingsRepository(private val context: Context) {
     private val keyRiderMassKg = doublePreferencesKey("rider_mass_kg")
     private val keyBikeMassKg = doublePreferencesKey("bike_mass_kg")
     private val keyMaxDescentSpeedKmh = doublePreferencesKey("max_descent_speed_kmh")
+    private val keyGpxFolderUri = stringPreferencesKey("gpx_folder_uri")
+    // "routeId|documentUri" entries: which saved route a file of the GPX folder already is, so opening it again doesn't import a copy.
+    private val keyGpxLinks = stringSetPreferencesKey("gpx_links")
 
     /** One key per traffic-light limit; a missing key falls back to the default in [RideThresholds]. */
     /** Trekking (CAI) pacing values, stored the same way; a missing key falls back to [CaiProfile]'s default. */
@@ -126,6 +134,7 @@ class SettingsRepository(private val context: Context) {
             maxDescentSpeedKmh = prefs[keyMaxDescentSpeedKmh] ?: 40.0,
             rideThresholds = rideThresholdFields.fold(RideThresholds()) { t, field -> prefs[field.key]?.let { field.write(t, it) } ?: t },
             caiProfile = caiFields.fold(CaiProfile()) { c, field -> prefs[field.key]?.let { field.write(c, it) } ?: c },
+            gpxFolderUri = prefs[keyGpxFolderUri],
         )
     }
 
@@ -161,6 +170,35 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRideThresholds(thresholds: RideThresholds) {
         context.settingsDataStore.edit { prefs -> rideThresholdFields.forEach { prefs[it.key] = it.read(thresholds) } }
+    }
+
+    /**
+     * Remembers the chosen GPX folder and keeps read/write access to it across restarts; passing
+     * null forgets it. The grant on a previously chosen folder is released.
+     */
+    suspend fun setGpxFolder(uri: Uri?) {
+        val previous = current().gpxFolderUri
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        if (uri != null) runCatching { context.contentResolver.takePersistableUriPermission(uri, flags) }
+        context.settingsDataStore.edit { prefs ->
+            if (uri == null) prefs.remove(keyGpxFolderUri) else prefs[keyGpxFolderUri] = uri.toString()
+        }
+        if (previous != null && previous != uri?.toString()) {
+            runCatching { context.contentResolver.releasePersistableUriPermission(Uri.parse(previous), flags) }
+        }
+    }
+
+    /** The saved route a GPX file (by document uri) was already imported as or written from, if any. */
+    suspend fun linkedRouteId(documentUri: String): Long? =
+        context.settingsDataStore.data.first()[keyGpxLinks].orEmpty()
+            .firstOrNull { it.substringAfter('|') == documentUri }
+            ?.substringBefore('|')?.toLongOrNull()
+
+    suspend fun linkGpx(documentUri: String, routeId: Long) {
+        context.settingsDataStore.edit { prefs ->
+            val links = prefs[keyGpxLinks].orEmpty().filterNot { it.substringAfter('|') == documentUri }.toSet()
+            prefs[keyGpxLinks] = links + "$routeId|$documentUri"
+        }
     }
 
     suspend fun setCaiProfile(profile: CaiProfile) {

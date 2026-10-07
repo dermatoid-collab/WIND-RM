@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +60,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.windrm.app.R
 import com.windrm.app.domain.PolylineDecoder
+import com.windrm.app.gpx.GpxFolder
 import com.windrm.app.model.Route
 import com.windrm.app.remote.strava.StravaActivitySummary
 import com.windrm.app.remote.strava.StravaMapSummary
@@ -74,6 +76,7 @@ import kotlin.math.roundToInt
 const val TAB_RECENT = 0
 const val TAB_FAVORITES = 1
 const val TAB_STRAVA = 2
+const val TAB_FILES = 3
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
 
@@ -94,6 +97,14 @@ fun RoutesListScreen(
     LifecycleResumeEffect(Unit) {
         viewModel.onStravaAuthorized()
         onPauseOrDispose { }
+    }
+
+    val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) viewModel.setGpxFolder(context, uri)
+    }
+    // The folder is read again every time the Files tab comes up.
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == TAB_FILES) viewModel.loadFiles(context)
     }
 
     val gpxLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -138,6 +149,7 @@ fun RoutesListScreen(
                 Tab(selected = selectedTab == TAB_RECENT, onClick = { selectedTab = TAB_RECENT }, text = { Text(stringResource(R.string.tab_recent)) })
                 Tab(selected = selectedTab == TAB_FAVORITES, onClick = { selectedTab = TAB_FAVORITES }, text = { Text(stringResource(R.string.tab_favorites)) })
                 Tab(selected = selectedTab == TAB_STRAVA, onClick = { selectedTab = TAB_STRAVA }, text = { Text(stringResource(R.string.tab_strava)) })
+                Tab(selected = selectedTab == TAB_FILES, onClick = { selectedTab = TAB_FILES }, text = { Text(stringResource(R.string.tab_files)) })
             }
 
             when (selectedTab) {
@@ -162,6 +174,11 @@ fun RoutesListScreen(
                     },
                     onImported = onRouteSelected,
                 )
+                TAB_FILES -> FilesTab(
+                    viewModel = viewModel,
+                    onChooseFolder = { folderLauncher.launch(null) },
+                    onOpen = { entry -> viewModel.openGpxFile(context, entry, onRouteSelected) },
+                )
             }
         }
     }
@@ -173,6 +190,57 @@ fun RoutesListScreen(
             text = { Text(stringResource(R.string.strava_not_configured_message)) },
             confirmButton = { TextButton(onClick = { showStravaInfo = false }) { Text("OK") } },
         )
+    }
+}
+
+/** The GPX files of the folder chosen in Settings; tapping one opens it as a route. */
+@Composable
+private fun FilesTab(viewModel: RoutesListViewModel, onChooseFolder: () -> Unit, onOpen: (GpxFolder.Entry) -> Unit) {
+    if (viewModel.gpxFolderUri == null) {
+        Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(stringResource(R.string.files_no_folder), style = MaterialTheme.typography.bodyLarge)
+            Button(onClick = onChooseFolder, modifier = Modifier.padding(top = 16.dp)) { Text(stringResource(R.string.settings_gpx_folder_choose)) }
+        }
+        return
+    }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                viewModel.gpxFolderName ?: stringResource(R.string.settings_gpx_folder_unreadable),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onChooseFolder) { Text(stringResource(R.string.settings_gpx_folder_change)) }
+        }
+        viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
+        viewModel.filesError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp)) }
+        when {
+            viewModel.filesLoading && viewModel.gpxFiles.isEmpty() ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            viewModel.gpxFiles.isEmpty() -> EmptyState(stringResource(R.string.files_empty))
+            else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(viewModel.gpxFiles, key = { it.documentUri.toString() }) { entry -> GpxFileCard(entry, onClick = { onOpen(entry) }) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GpxFileCard(entry: GpxFolder.Entry, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                Text(entry.name.removeSuffix(".gpx").removeSuffix(".GPX"), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                val details = listOfNotNull(
+                    entry.folder,
+                    entry.lastModifiedMs?.let { dateFormatter.format(Instant.ofEpochMilli(it)) },
+                    entry.sizeBytes?.let { "%.0f kB".format(it / 1024.0) },
+                ).joinToString(" · ")
+                if (details.isNotEmpty()) Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

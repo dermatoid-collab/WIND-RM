@@ -238,11 +238,12 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
     if (showSave) {
         SaveRouteDialog(
             initialName = remember { viewModel.defaultName() },
+            folderName = viewModel.gpxFolderName,
             onDismiss = { showSave = false },
-            onConfirm = { name, exportGpx ->
+            onConfirm = { name, toFolder, share ->
                 showSave = false
-                viewModel.save(name) { saved ->
-                    if (exportGpx) shareGpx(context, saved)
+                viewModel.save(name, toFolder) { saved ->
+                    if (share) shareGpx(context, saved)
                     onSaved(saved)
                 }
             },
@@ -352,11 +353,17 @@ private fun sparklineValues(points: List<RoutePoint>): List<Float> {
     return List(SPARKLINE_MAX_POINTS) { elevations[(it * step).toInt()] } + elevations.last()
 }
 
-/** Name for the route and, optionally, a GPX file to share along with saving it. */
+/** Name for the route, plus what to do with its GPX: a copy in the chosen folder (on by default) and/or the share sheet. */
 @Composable
-private fun SaveRouteDialog(initialName: String, onDismiss: () -> Unit, onConfirm: (name: String, exportGpx: Boolean) -> Unit) {
+private fun SaveRouteDialog(
+    initialName: String,
+    folderName: String?,
+    onDismiss: () -> Unit,
+    onConfirm: (name: String, toFolder: Boolean, share: Boolean) -> Unit,
+) {
     var name by remember { mutableStateOf(initialName) }
-    var exportGpx by remember { mutableStateOf(false) }
+    var toFolder by remember { mutableStateOf(folderName != null) }
+    var share by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.builder_name_title)) },
@@ -369,18 +376,35 @@ private fun SaveRouteDialog(initialName: String, onDismiss: () -> Unit, onConfir
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 8.dp).clickable { exportGpx = !exportGpx },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = exportGpx, onCheckedChange = { exportGpx = it })
-                    Text(stringResource(R.string.builder_export_gpx), style = MaterialTheme.typography.bodyMedium)
+                if (folderName != null) {
+                    CheckRow(toFolder, { toFolder = it }, stringResource(R.string.builder_gpx_to_folder, folderName))
+                } else {
+                    Text(
+                        stringResource(R.string.builder_no_folder_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                 }
+                CheckRow(share, { share = it }, stringResource(R.string.builder_export_gpx))
             }
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(name, exportGpx) }, enabled = name.isNotBlank()) { Text(stringResource(R.string.builder_save)) }
+            TextButton(onClick = { onConfirm(name, toFolder && folderName != null, share) }, enabled = name.isNotBlank()) {
+                Text(stringResource(R.string.builder_save))
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
+}
+
+@Composable
+private fun CheckRow(checked: Boolean, onChange: (Boolean) -> Unit, label: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(top = 4.dp).clickable { onChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = onChange)
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
 }

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.gpx.GpxFolder
 import com.windrm.app.gpx.GpxUriImporter
 import com.windrm.app.model.Route
 import com.windrm.app.remote.strava.StravaActivitySummary
@@ -16,10 +17,13 @@ import com.windrm.app.remote.strava.StravaRouteSummary
 import com.windrm.app.remote.strava.StravaSegmentSummary
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.StravaRepository
+import com.windrm.app.settings.SettingsRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Mirrors the Activities / Routes / Segments selector in Epic Ride Weather's Strava tab. */
 enum class StravaSection { ACTIVITIES, ROUTES, SEGMENTS }
@@ -28,6 +32,7 @@ class RoutesListViewModel(
     private val routeRepository: RouteRepository,
     private val stravaRepository: StravaRepository,
     private val stravaAuthManager: StravaAuthManager,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     val routes: StateFlow<List<Route>> = routeRepository.observeRoutes()
@@ -55,6 +60,73 @@ class RoutesListViewModel(
         private set
 
     val stravaConfigured: Boolean get() = stravaAuthManager.isConfigured
+
+    /** The GPX folder chosen in Settings (null = none), its name, and the GPX files found in it. */
+    var gpxFolderUri by mutableStateOf<Uri?>(null)
+        private set
+    var gpxFolderName by mutableStateOf<String?>(null)
+        private set
+    var gpxFiles by mutableStateOf<List<GpxFolder.Entry>>(emptyList())
+        private set
+    var filesLoading by mutableStateOf(false)
+        private set
+    var filesError by mutableStateOf<String?>(null)
+        private set
+
+    /** Reads the folder again; called each time the Files tab is shown, so files added elsewhere (Drive, a PC) appear. */
+    fun loadFiles(context: Context) {
+        val appContext = context.applicationContext
+        viewModelScope.launch {
+            filesLoading = true
+            filesError = null
+            val tree = settingsRepository.current().gpxFolderUri?.let(Uri::parse)
+            gpxFolderUri = tree
+            if (tree == null) {
+                gpxFolderName = null
+                gpxFiles = emptyList()
+            } else {
+                runCatching {
+                    withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, tree) to GpxFolder.listGpx(appContext, tree) }
+                }
+                    .onSuccess { (name, files) ->
+                        gpxFolderName = name
+                        gpxFiles = files
+                    }
+                    .onFailure {
+                        gpxFiles = emptyList()
+                        filesError = it.message ?: "Couldn't read the folder"
+                    }
+            }
+            filesLoading = false
+        }
+    }
+
+    /** Picked from the Files tab itself: remembered like a choice made in Settings. */
+    fun setGpxFolder(context: Context, uri: Uri) {
+        viewModelScope.launch {
+            settingsRepository.setGpxFolder(uri)
+            loadFiles(context)
+        }
+    }
+
+    /** Opens the saved route a file already is; imports it (once) when it is new to the app. */
+    fun openGpxFile(context: Context, entry: GpxFolder.Entry, onOpened: (Route) -> Unit) {
+        viewModelScope.launch {
+            gpxError = null
+            val key = entry.documentUri.toString()
+            val known = settingsRepository.linkedRouteId(key)?.let { routeRepository.getRoute(it) }
+            if (known != null) {
+                onOpened(known)
+                return@launch
+            }
+            runCatching { GpxUriImporter.import(context, entry.documentUri, routeRepository) }
+                .onSuccess {
+                    settingsRepository.linkGpx(key, it.id)
+                    onOpened(it)
+                }
+                .onFailure { gpxError = it.message ?: "Couldn't import the GPX file" }
+        }
+    }
 
     fun toggleFavorite(route: Route) {
         viewModelScope.launch { routeRepository.setFavorite(route.id, !route.isFavorite) }
