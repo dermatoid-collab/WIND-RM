@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.windrm.app.domain.RiderProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -36,7 +37,12 @@ data class AppSettings(
     val homeLat: Double? = null,
     val homeLon: Double? = null,
     val homeLabel: String? = null,
+    val riderMassKg: Double = 62.0,
+    val bikeMassKg: Double = 10.0,
+    val maxDescentSpeedKmh: Double = 40.0,
 ) {
+    val riderProfile: RiderProfile get() = RiderProfile(riderMassKg, bikeMassKg, maxDescentSpeedKmh)
+
     val hasFixedHomeLocation: Boolean get() = homeLat != null && homeLon != null
 }
 
@@ -50,6 +56,9 @@ class SettingsRepository(private val context: Context) {
     private val keyHomeLon = doublePreferencesKey("home_lon")
     private val keyHomeLabel = stringPreferencesKey("home_label")
     private val keyHasHomeLocation = booleanPreferencesKey("has_home_location")
+    private val keyRiderMassKg = doublePreferencesKey("rider_mass_kg")
+    private val keyBikeMassKg = doublePreferencesKey("bike_mass_kg")
+    private val keyMaxDescentSpeedKmh = doublePreferencesKey("max_descent_speed_kmh")
 
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
@@ -60,6 +69,9 @@ class SettingsRepository(private val context: Context) {
             homeLat = if (prefs[keyHasHomeLocation] == true) prefs[keyHomeLat] else null,
             homeLon = if (prefs[keyHasHomeLocation] == true) prefs[keyHomeLon] else null,
             homeLabel = prefs[keyHomeLabel],
+            riderMassKg = prefs[keyRiderMassKg] ?: 62.0,
+            bikeMassKg = prefs[keyBikeMassKg] ?: 10.0,
+            maxDescentSpeedKmh = prefs[keyMaxDescentSpeedKmh] ?: 40.0,
         )
     }
 
@@ -79,6 +91,18 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setForecastHorizonDays(days: Int) {
         context.settingsDataStore.edit { it[keyForecastHorizonDays] = days }
+    }
+
+    suspend fun setRiderMassKg(kg: Double) {
+        context.settingsDataStore.edit { it[keyRiderMassKg] = kg }
+    }
+
+    suspend fun setBikeMassKg(kg: Double) {
+        context.settingsDataStore.edit { it[keyBikeMassKg] = kg }
+    }
+
+    suspend fun setMaxDescentSpeedKmh(speedKmh: Double) {
+        context.settingsDataStore.edit { it[keyMaxDescentSpeedKmh] = speedKmh }
     }
 
     suspend fun setHomeLocation(lat: Double, lon: Double, label: String) {

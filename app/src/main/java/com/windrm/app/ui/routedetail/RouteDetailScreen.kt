@@ -19,6 +19,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DatePickerState
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
+import com.windrm.app.domain.PacingMode
 import com.windrm.app.ui.routes.FavoriteButton
 import com.windrm.app.ui.components.RouteMapView
 import java.time.DayOfWeek
@@ -61,7 +65,7 @@ import java.util.Locale
 fun RouteDetailScreen(
     viewModel: RouteDetailViewModel,
     onBack: () -> Unit,
-    onForecast: (startEpochS: Long, speedKmh: Double) -> Unit,
+    onForecast: (startEpochS: Long, speedKmh: Double, pacing: PacingMode) -> Unit,
 ) {
     val route = viewModel.route
 
@@ -150,8 +154,27 @@ fun RouteDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
 
+                Text(
+                    stringResource(R.string.pacing_mode),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+                )
+                val pacingOptions = listOf(
+                    PacingMode.CONSTANT to stringResource(R.string.pacing_constant),
+                    PacingMode.REALISTIC to stringResource(R.string.pacing_realistic),
+                )
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    pacingOptions.forEachIndexed { index, (mode, label) ->
+                        SegmentedButton(
+                            selected = viewModel.pacingMode == mode,
+                            onClick = { viewModel.pacingMode = mode },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = pacingOptions.size),
+                        ) { Text(label) }
+                    }
+                }
+
                 Button(
-                    onClick = { onForecast(viewModel.computeStartInstant().epochSecond, viewModel.avgSpeedKmh) },
+                    onClick = { onForecast(viewModel.computeStartInstant().epochSecond, viewModel.avgSpeedKmh, viewModel.pacingMode) },
                     modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
                 ) {
                     Text(stringResource(R.string.forecast_route))

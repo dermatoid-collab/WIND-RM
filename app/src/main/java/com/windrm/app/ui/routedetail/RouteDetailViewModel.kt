@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.PacingMode
 import com.windrm.app.model.Route
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.settings.MapStyle
@@ -24,6 +25,7 @@ class RouteDetailViewModel(
         private set
     var avgSpeedKmh by mutableStateOf(25.0)
     var startsNow by mutableStateOf(true)
+    var pacingMode by mutableStateOf(PacingMode.CONSTANT)
     var plannedDate by mutableStateOf(LocalDate.now())
     var plannedHour by mutableStateOf(8)
     var plannedMinute by mutableStateOf(0)

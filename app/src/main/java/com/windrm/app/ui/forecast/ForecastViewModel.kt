@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.PacingMode
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.WeatherRepository
@@ -26,6 +27,7 @@ class ForecastViewModel(
     private val routeId: Long,
     private val startEpochS: Long,
     private val speedKmh: Double,
+    private val pacing: PacingMode,
 ) : ViewModel() {
 
     var uiState by mutableStateOf<ForecastUiState>(ForecastUiState.Loading)
@@ -47,7 +49,8 @@ class ForecastViewModel(
             uiState = ForecastUiState.Loading
             runCatching {
                 val route = routeRepository.getRoute(routeId) ?: error("Route not found")
-                weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh)
+                val profile = settingsRepository.current().riderProfile
+                weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh, pacing, profile)
             }
                 .onSuccess {
                     scrubFraction = null

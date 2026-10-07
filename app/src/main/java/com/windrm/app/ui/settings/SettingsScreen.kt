@@ -140,6 +140,22 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 )
             }
 
+            SettingsSection(stringResource(R.string.settings_pacing)) {
+                Text(
+                    stringResource(R.string.settings_pacing_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                NumberSetting(stringResource(R.string.settings_rider_mass), settings.riderMassKg, "kg", viewModel::setRiderMassKg)
+                NumberSetting(stringResource(R.string.settings_bike_mass), settings.bikeMassKg, "kg", viewModel::setBikeMassKg)
+                NumberSetting(
+                    stringResource(R.string.settings_max_descent_speed),
+                    settings.maxDescentSpeedKmh,
+                    stringResource(R.string.km_h),
+                    viewModel::setMaxDescentSpeedKmh,
+                )
+            }
+
             SettingsSection(stringResource(R.string.settings_home_location)) {
                 if (settings.hasFixedHomeLocation) {
                     Text(
@@ -227,6 +243,24 @@ private fun apiKeyFor(style: MapStyle): String = when (style) {
     MapStyle.CARTO_POSITRON -> BuildConfig.CARTO_API_KEY
     MapStyle.THUNDERFOREST_OUTDOORS -> BuildConfig.THUNDERFOREST_API_KEY
     else -> ""
+}
+
+/** Labelled decimal field; accepts "," as the decimal separator too (Italian keyboards). */
+@Composable
+private fun NumberSetting(label: String, value: Double, unit: String, onChange: (Double) -> Unit) {
+    Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 16.dp))
+    var text by remember(value) { mutableStateOf(formatSpeed(value)) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            text = input
+            input.replace(',', '.').toDoubleOrNull()?.let(onChange)
+        },
+        suffix = { Text(unit) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    )
 }
 
 private fun formatSpeed(speedKmh: Double): String =

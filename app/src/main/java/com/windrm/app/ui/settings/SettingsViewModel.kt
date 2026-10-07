@@ -70,6 +70,14 @@ class SettingsViewModel(
         settingsRepository.setDefaultAvgSpeedKmh(speedKmh.coerceIn(1.0, 80.0))
     }
 
+    fun setRiderMassKg(kg: Double) = viewModelScope.launch { settingsRepository.setRiderMassKg(kg.coerceIn(20.0, 200.0)) }
+
+    fun setBikeMassKg(kg: Double) = viewModelScope.launch { settingsRepository.setBikeMassKg(kg.coerceIn(3.0, 50.0)) }
+
+    fun setMaxDescentSpeedKmh(speedKmh: Double) = viewModelScope.launch {
+        settingsRepository.setMaxDescentSpeedKmh(speedKmh.coerceIn(10.0, 120.0))
+    }
+
     fun setForecastHorizonDays(days: Int) = viewModelScope.launch {
         settingsRepository.setForecastHorizonDays(days.coerceIn(1, 16))
     }

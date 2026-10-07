@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.windrm.app.di.AppContainer
+import com.windrm.app.domain.PacingMode
 import com.windrm.app.ui.forecast.ForecastScreen
 import com.windrm.app.ui.forecast.ForecastViewModel
 import com.windrm.app.ui.home.HomeScreen
@@ -88,8 +89,8 @@ fun WindRmNavHost(container: AppContainer) {
             RouteDetailScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
-                onForecast = { startEpochS, speedKmh ->
-                    navController.navigate(Destination.Forecast.path(routeId, startEpochS, speedKmh))
+                onForecast = { startEpochS, speedKmh, pacing ->
+                    navController.navigate(Destination.Forecast.path(routeId, startEpochS, speedKmh, pacing))
                 },
             )
         }
@@ -100,16 +101,19 @@ fun WindRmNavHost(container: AppContainer) {
                 navArgument(Destination.Forecast.ARG_ROUTE_ID) { type = NavType.LongType },
                 navArgument(Destination.Forecast.ARG_START_EPOCH) { type = NavType.LongType },
                 navArgument(Destination.Forecast.ARG_SPEED) { type = NavType.FloatType },
+                navArgument(Destination.Forecast.ARG_PACING) { type = NavType.StringType },
             ),
         ) { backStackEntry ->
             val args = backStackEntry.arguments ?: return@composable
             val routeId = args.getLong(Destination.Forecast.ARG_ROUTE_ID)
             val startEpoch = args.getLong(Destination.Forecast.ARG_START_EPOCH)
             val speed = args.getFloat(Destination.Forecast.ARG_SPEED).toDouble()
+            val pacing = args.getString(Destination.Forecast.ARG_PACING)
+                ?.let { runCatching { PacingMode.valueOf(it) }.getOrNull() } ?: PacingMode.CONSTANT
             val viewModel = viewModel<ForecastViewModel>(
                 factory = viewModelFactory {
                     initializer {
-                        ForecastViewModel(container.routeRepository, container.weatherRepository, container.settingsRepository, routeId, startEpoch, speed)
+                        ForecastViewModel(container.routeRepository, container.weatherRepository, container.settingsRepository, routeId, startEpoch, speed, pacing)
                     }
                 },
             )

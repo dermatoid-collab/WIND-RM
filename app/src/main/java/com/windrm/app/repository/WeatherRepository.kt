@@ -1,6 +1,8 @@
 package com.windrm.app.repository
 
 import com.windrm.app.domain.ArrivalTimeCalculator
+import com.windrm.app.domain.PacingMode
+import com.windrm.app.domain.RiderProfile
 import com.windrm.app.domain.HourlySeries
 import com.windrm.app.domain.RouteSampler
 import com.windrm.app.domain.parseOpenMeteoInstant
@@ -15,6 +17,8 @@ import com.windrm.app.remote.openmeteo.OpenMeteoApi
 import com.windrm.app.remote.openmeteo.OpenMeteoResponse
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -26,9 +30,18 @@ class WeatherRepository(
 ) {
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
-    suspend fun forecastRoute(route: Route, startTime: Instant, avgSpeedKmh: Double): RouteForecastResult = coroutineScope {
+    suspend fun forecastRoute(
+        route: Route,
+        startTime: Instant,
+        avgSpeedKmh: Double,
+        pacing: PacingMode = PacingMode.CONSTANT,
+        profile: RiderProfile = RiderProfile(),
+    ): RouteForecastResult = coroutineScope {
         val samples = RouteSampler.sample(route)
-        val arrivalTimes = ArrivalTimeCalculator.arrivalTimes(route, samples, startTime, avgSpeedKmh)
+        // The realistic model bisects over thousands of 50 m steps: keep it off the main thread.
+        val arrivalTimes = withContext(Dispatchers.Default) {
+            ArrivalTimeCalculator.arrivalTimes(route, samples, startTime, avgSpeedKmh, pacing, profile)
+        }
 
         val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.first().minusSeconds(86_400))
         val endDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.last().plusSeconds(86_400))
