@@ -6,6 +6,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -232,7 +235,7 @@ private fun RouteCard(route: Route, onClick: () -> Unit, onToggleFavorite: () ->
                 // The route's own creation date (as Strava lists it); the import date only when unknown.
                 Text(dateFormatter.format(Instant.ofEpochMilli(route.originalDateEpochMs ?: route.createdAtEpochMs)), style = MaterialTheme.typography.bodySmall)
                 val durationS = route.points.lastOrNull()?.timeOffsetS?.takeIf { it > 0 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatsRow {
                     durationS?.let { Text(formatDuration(it), style = MaterialTheme.typography.bodyMedium) }
                     Text("%.1f km".format(route.distanceKm), style = MaterialTheme.typography.bodyMedium)
                     Text("${route.elevationGainM.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
@@ -349,7 +352,7 @@ private fun StravaActivityCard(activity: StravaActivitySummary, importing: Boole
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(activity.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             activity.start_date?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatsRow {
                 if (activity.moving_time > 0) Text(formatDuration(activity.moving_time), style = MaterialTheme.typography.bodyMedium)
                 Text("%.1f km".format(activity.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
                 Text("${activity.total_elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
@@ -366,7 +369,7 @@ private fun StravaRouteCard(route: StravaRouteSummary, importing: Boolean, onImp
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             route.created_at?.let { Text(formatIsoDate(it), style = MaterialTheme.typography.bodySmall) }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatsRow {
                 Text("%.1f km".format(route.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
                 Text("${route.elevation_gain.roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
             }
@@ -380,13 +383,24 @@ private fun StravaSegmentCard(segment: StravaSegmentSummary, importing: Boolean,
         RoutePolylinePreview(points = mapPoints(segment.map))
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Text(segment.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatsRow {
                 Text("%.1f km".format(segment.distance / 1000.0), style = MaterialTheme.typography.bodyMedium)
                 Text("${(segment.elevation_high - segment.elevation_low).roundToInt()} m↑", style = MaterialTheme.typography.bodyMedium)
                 Text("%.1f%%".format(segment.average_grade), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
+}
+
+/**
+ * The stats line of a card (time, km, m↑, km/h, ...). Values that don't fit move whole to a second
+ * line: in a plain Row the last one was squeezed to zero width and wrapped a letter per line,
+ * stretching the card to several times its height.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatsRow(content: @Composable FlowRowScope.() -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), content = content)
 }
 
 /** The whole card is the import tap target; a spinner replaces the trailing space while importing. */
