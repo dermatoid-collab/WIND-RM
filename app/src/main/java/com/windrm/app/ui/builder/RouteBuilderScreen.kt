@@ -143,7 +143,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                         stringResource(R.string.activity_trek) to Icons.Filled.Hiking,
                     ),
                     selected = viewModel.activity.ordinal,
-                    onSelect = { viewModel.setActivity(ActivityType.entries[it]) },
+                    onSelect = { viewModel.changeActivity(ActivityType.entries[it]) },
                 )
                 if (viewModel.activity == ActivityType.RIDE) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -155,7 +155,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = !viewModel.allowUnpaved, onCheckedChange = { viewModel.setAllowUnpaved(!it) })
+                        Switch(checked = !viewModel.allowUnpaved, onCheckedChange = { viewModel.changeAllowUnpaved(!it) })
                     }
                 }
                 Text(

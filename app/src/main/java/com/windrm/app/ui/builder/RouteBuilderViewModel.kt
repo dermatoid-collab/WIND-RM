@@ -160,14 +160,14 @@ class RouteBuilderViewModel(
         pendingUnpaved = null
     }
 
-    fun setActivity(newActivity: ActivityType) {
+    fun changeActivity(newActivity: ActivityType) {
         if (newActivity == activity) return
         val previous = activity to allowUnpaved
         activity = newActivity
         rerouteAll(previous)
     }
 
-    fun setAllowUnpaved(allow: Boolean) {
+    fun changeAllowUnpaved(allow: Boolean) {
         if (allow == allowUnpaved) return
         val previous = activity to allowUnpaved
         allowUnpaved = allow
