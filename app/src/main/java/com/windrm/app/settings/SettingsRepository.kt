@@ -33,6 +33,7 @@ enum class ThemeMode(val label: String) {
     SYSTEM("System default"),
     LIGHT("Light"),
     DARK("Dark"),
+    TOKYO_NIGHT("Tokyo Night"),
 }
 
 data class AppSettings(

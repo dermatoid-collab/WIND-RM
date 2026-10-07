@@ -29,9 +29,9 @@ class MainActivity : ComponentActivity() {
             val darkTheme = when (settings.themeMode) {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false
-                ThemeMode.DARK -> true
+                ThemeMode.DARK, ThemeMode.TOKYO_NIGHT -> true
             }
-            WindRmTheme(darkTheme = darkTheme) {
+            WindRmTheme(darkTheme = darkTheme, tokyoNight = settings.themeMode == ThemeMode.TOKYO_NIGHT) {
                 WindRmNavHost(container)
             }
         }
