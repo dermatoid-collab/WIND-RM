@@ -84,6 +84,6 @@
     <string name="settings_use_live_gps">Use live GPS instead</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_about">About</string>
-    <string name="settings_version">version</string>
+    <string name="settings_build">build</string>
     <string name="settings_attribution">Map data © OpenStreetMap contributors. Weather data by Open-Meteo.com. Activity, route and segment import by Strava.</string>
 </resources>

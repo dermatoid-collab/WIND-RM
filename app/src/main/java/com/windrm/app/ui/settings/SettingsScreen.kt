@@ -177,7 +177,8 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             SettingsSection(stringResource(R.string.settings_about)) {
-                Text("${stringResource(R.string.app_name)} ${stringResource(R.string.settings_version)} ${BuildConfig.VERSION_NAME}")
+                val commit = BuildConfig.BUILD_COMMIT.takeIf { it.isNotEmpty() }?.let { " ($it)" } ?: ""
+                Text("${stringResource(R.string.app_name)} · ${stringResource(R.string.settings_build)} ${BuildConfig.BUILD_NUMBER}$commit")
                 Text(
                     stringResource(R.string.settings_attribution),
                     style = MaterialTheme.typography.bodySmall,

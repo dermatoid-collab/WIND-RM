@@ -31,6 +31,11 @@ val cartoApiKey: String = localProperties.getProperty("CARTO_API_KEY", "")
 val thunderforestApiKey: String = localProperties.getProperty("THUNDERFOREST_API_KEY", "")
 val mapboxAccessToken: String = localProperties.getProperty("MAPBOX_ACCESS_TOKEN", "")
 
+// GitHub Actions sets these on every run, so each APK carries its own build number and commit;
+// a local build has neither and reports "dev".
+val ciRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val ciCommit: String = System.getenv("GITHUB_SHA")?.take(7) ?: ""
+
 android {
     namespace = "com.windrm.app"
     compileSdk = 34
@@ -39,8 +44,8 @@ android {
         applicationId = "com.windrm.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = ciRunNumber ?: 1
+        versionName = "0.1.${ciRunNumber ?: 0}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -51,6 +56,8 @@ android {
         buildConfigField("String", "CARTO_API_KEY", "\"$cartoApiKey\"")
         buildConfigField("String", "THUNDERFOREST_API_KEY", "\"$thunderforestApiKey\"")
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
+        buildConfigField("String", "BUILD_NUMBER", "\"${ciRunNumber ?: "dev"}\"")
+        buildConfigField("String", "BUILD_COMMIT", "\"$ciCommit\"")
 
         manifestPlaceholders["stravaRedirectScheme"] = stravaRedirectScheme
         manifestPlaceholders["stravaRedirectHost"] = stravaRedirectHost
