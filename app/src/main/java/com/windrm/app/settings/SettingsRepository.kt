@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.domain.RiderProfile
 import kotlinx.coroutines.flow.Flow
@@ -43,6 +44,7 @@ data class AppSettings(
     val bikeMassKg: Double = 10.0,
     val maxDescentSpeedKmh: Double = 40.0,
     val rideThresholds: RideThresholds = RideThresholds(),
+    val caiProfile: CaiProfile = CaiProfile(),
 ) {
     val riderProfile: RiderProfile get() = RiderProfile(riderMassKg, bikeMassKg, maxDescentSpeedKmh)
 
@@ -54,6 +56,13 @@ private class ThresholdField(
     val key: Preferences.Key<Double>,
     val read: (RideThresholds) -> Double,
     val write: (RideThresholds, Double) -> RideThresholds,
+)
+
+/** Same as [ThresholdField], for one [CaiProfile] value. */
+private class CaiField(
+    val key: Preferences.Key<Double>,
+    val read: (CaiProfile) -> Double,
+    val write: (CaiProfile, Double) -> CaiProfile,
 )
 
 /** User-configurable app preferences, persisted locally (never synced, no account needed). */
@@ -71,6 +80,16 @@ class SettingsRepository(private val context: Context) {
     private val keyMaxDescentSpeedKmh = doublePreferencesKey("max_descent_speed_kmh")
 
     /** One key per traffic-light limit; a missing key falls back to the default in [RideThresholds]. */
+    /** Trekking (CAI) pacing values, stored the same way; a missing key falls back to [CaiProfile]'s default. */
+    private val caiFields = listOf(
+        CaiField(doublePreferencesKey("cai_flat_kmh"), { it.flatKmh }, { c, v -> c.copy(flatKmh = v) }),
+        CaiField(doublePreferencesKey("cai_up_mh"), { it.upMetresPerHour }, { c, v -> c.copy(upMetresPerHour = v) }),
+        CaiField(doublePreferencesKey("cai_down_mh"), { it.downMetresPerHour }, { c, v -> c.copy(downMetresPerHour = v) }),
+        CaiField(doublePreferencesKey("cai_high_altitude_m"), { it.highAltitudeM }, { c, v -> c.copy(highAltitudeM = v) }),
+        CaiField(doublePreferencesKey("cai_high_up_mh"), { it.highUpMetresPerHour }, { c, v -> c.copy(highUpMetresPerHour = v) }),
+        CaiField(doublePreferencesKey("cai_high_down_mh"), { it.highDownMetresPerHour }, { c, v -> c.copy(highDownMetresPerHour = v) }),
+    )
+
     private val rideThresholdFields = listOf(
         ThresholdField(doublePreferencesKey("ride_feels_cold_yellow"), { it.feelsColdYellowC }, { t, v -> t.copy(feelsColdYellowC = v) }),
         ThresholdField(doublePreferencesKey("ride_feels_cold_red"), { it.feelsColdRedC }, { t, v -> t.copy(feelsColdRedC = v) }),
@@ -106,6 +125,7 @@ class SettingsRepository(private val context: Context) {
             bikeMassKg = prefs[keyBikeMassKg] ?: 10.0,
             maxDescentSpeedKmh = prefs[keyMaxDescentSpeedKmh] ?: 40.0,
             rideThresholds = rideThresholdFields.fold(RideThresholds()) { t, field -> prefs[field.key]?.let { field.write(t, it) } ?: t },
+            caiProfile = caiFields.fold(CaiProfile()) { c, field -> prefs[field.key]?.let { field.write(c, it) } ?: c },
         )
     }
 
@@ -141,6 +161,15 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setRideThresholds(thresholds: RideThresholds) {
         context.settingsDataStore.edit { prefs -> rideThresholdFields.forEach { prefs[it.key] = it.read(thresholds) } }
+    }
+
+    suspend fun setCaiProfile(profile: CaiProfile) {
+        context.settingsDataStore.edit { prefs -> caiFields.forEach { prefs[it.key] = it.read(profile) } }
+    }
+
+    /** Drops the stored trekking values so the CAI defaults apply again. */
+    suspend fun resetCaiProfile() {
+        context.settingsDataStore.edit { prefs -> caiFields.forEach { prefs.remove(it.key) } }
     }
 
     /** Drops the stored limits so the defaults in [RideThresholds] apply again. */

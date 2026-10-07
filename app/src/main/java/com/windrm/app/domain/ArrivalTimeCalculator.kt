@@ -6,7 +6,8 @@ import java.time.Instant
 
 /**
  * Estimates when the rider will reach each sampled point. [PacingMode.REALISTIC] spreads the ride
- * time by gradient ([TerrainPacing]); [PacingMode.CONSTANT] uses the GPX's own recorded pace when
+ * time by gradient ([TerrainPacing]) on a ride, or follows the CAI trail-time rule ([CaiPacing]) on a
+ * trek; [PacingMode.CONSTANT] uses the GPX's own recorded pace when
  * available ([Route.hasTimestamps]), otherwise a constant average speed from the route start.
  * Either way, every point past a planned stop ([Route.stops]) is pushed back by its duration.
  */
@@ -18,9 +19,15 @@ object ArrivalTimeCalculator {
         avgSpeedKmh: Double,
         pacing: PacingMode = PacingMode.CONSTANT,
         profile: RiderProfile = RiderProfile(),
+        activity: ActivityType = ActivityType.RIDE,
+        cai: CaiProfile = CaiProfile(),
     ): List<Instant> {
+        val distances = samples.map { it.distanceFromStartM }
         val ridingOffsets: List<Long> = if (pacing == PacingMode.REALISTIC) {
-            TerrainPacing.offsetsSeconds(route.points, samples.map { it.distanceFromStartM }, avgSpeedKmh, profile)
+            when (activity) {
+                ActivityType.RIDE -> TerrainPacing.offsetsSeconds(route.points, distances, avgSpeedKmh, profile)
+                ActivityType.TREK -> CaiPacing.offsetsSeconds(route.points, distances, avgSpeedKmh, cai)
+            }
         } else {
             samples.map { point ->
                 if (route.hasTimestamps && point.timeOffsetS != null) point.timeOffsetS else estimateOffsetSeconds(point, avgSpeedKmh)

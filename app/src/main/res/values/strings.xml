@@ -103,6 +103,14 @@
     <string name="settings_rider_mass">Rider weight</string>
     <string name="settings_bike_mass">Bike + clothing weight</string>
     <string name="settings_max_descent_speed">Max descending speed</string>
+    <string name="settings_cai">Trekking (CAI times)</string>
+    <string name="settings_cai_hint">Used when a trek is set to the CAI pace: like the times on CAI trail signs, the time for the distance and the time for the climb or descent are worked out per stretch, then the larger counts in full and the smaller by half. Times are net, without breaks. Your flat speed on the route screen scales the result (the CAI flat speed below = standard signpost times).</string>
+    <string name="settings_cai_flat">Flat walking speed</string>
+    <string name="settings_cai_up">Climbing rate</string>
+    <string name="settings_cai_down">Descending rate</string>
+    <string name="settings_cai_high_altitude">High altitude from</string>
+    <string name="settings_cai_high_up">Climbing rate at high altitude</string>
+    <string name="settings_cai_high_down">Descending rate at high altitude</string>
     <string name="settings_ride_light">Ride traffic light</string>
     <string name="settings_ride_light_hint">A value turns yellow at its yellow limit and red past its red limit (for cold: below them). Riding in civil twilight is yellow, in the dark red.</string>
     <string name="settings_ride_yellow">Yellow</string>
@@ -122,6 +130,13 @@
     <string name="pacing_mode">Speed model</string>
     <string name="pacing_constant">Constant</string>
     <string name="pacing_realistic">Realistic</string>
+    <string name="pacing_cai">CAI</string>
+    <string name="pacing_hint_constant">The same speed on every metre of the route.</string>
+    <string name="pacing_hint_realistic">Climbs slower, descents faster (max %1$s km/h). Same total time.</string>
+    <string name="pacing_hint_cai">Times as on CAI trail signs, scaled by your flat speed (%1$s km/h = CAI standard).</string>
+    <string name="flat_speed">Flat speed</string>
+    <string name="activity_ride">Ride</string>
+    <string name="activity_trek">Trekking</string>
     <string name="add_stop">Add a stop</string>
     <string name="start_time">Start time</string>
     <string name="start_time_hint">Tap or drag sideways on any chart to pick the start time. Tap the date to open the calendar.</string>

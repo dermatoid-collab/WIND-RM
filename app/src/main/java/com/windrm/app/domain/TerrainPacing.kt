@@ -116,7 +116,7 @@ object TerrainPacing {
         return ((low + high) / 2).coerceIn(MIN_SPEED_MS, maxSpeedMs)
     }
 
-    private fun smooth(values: DoubleArray, halfWindow: Int): DoubleArray {
+    internal fun smooth(values: DoubleArray, halfWindow: Int): DoubleArray {
         val n = values.size
         val prefix = DoubleArray(n + 1)
         for (i in 0 until n) prefix[i + 1] = prefix[i] + values[i]
@@ -127,7 +127,7 @@ object TerrainPacing {
         }
     }
 
-    private fun elevationAt(track: List<RoutePoint>, distanceM: Double): Double? {
+    internal fun elevationAt(track: List<RoutePoint>, distanceM: Double): Double? {
         var lo = 0
         var hi = track.lastIndex
         while (hi - lo > 1) {
@@ -144,6 +144,6 @@ object TerrainPacing {
         return ea + (eb - ea) * t
     }
 
-    private fun constantOffset(distanceM: Double, avgSpeedKmh: Double): Long =
+    internal fun constantOffset(distanceM: Double, avgSpeedKmh: Double): Long =
         if (avgSpeedKmh <= 0.0) 0L else ((distanceM / 1000.0) / avgSpeedKmh * 3600.0).toLong()
 }

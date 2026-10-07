@@ -11,14 +11,16 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
 import com.windrm.app.R
+import com.windrm.app.domain.ActivityType
+import com.windrm.app.domain.PacingMode
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.model.aqiLabel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 enum class ShareFormat { JPG, PDF }
 
@@ -67,6 +69,7 @@ fun forecastSummaryText(result: RouteForecastResult): String {
         appendLine("WIND-RM · ${result.route.name}")
         appendLine("Starting: ${formatter.format(result.startTime)}")
         appendLine("%.1f km · %.0f m↑".format(result.route.distanceKm, result.route.elevationGainM))
+        appendLine("%s · %s km/h · %s pacing".format(activityLabel(result), formatKmh(result.avgSpeedKmh), pacingLabel(result)))
         if (first != null) {
             appendLine("At the start: ${first.temperatureC.roundToInt()}°C, wind ${first.windSpeedKmh.roundToInt()} km/h")
         }
@@ -93,8 +96,9 @@ private fun stitch(context: Context, result: RouteForecastResult, parts: List<Bi
         textSize = 14 * density
     }
     val formatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
-    val subtitle = "%s · %.1f km · %.0f m↑ · %.1f km/h".format(
-        formatter.format(result.startTime), result.route.distanceKm, result.route.elevationGainM, result.avgSpeedKmh,
+    val subtitle = "%s · %.1f km · %.0f m↑ · %s km/h · %s".format(
+        formatter.format(result.startTime), result.route.distanceKm, result.route.elevationGainM,
+        formatKmh(result.avgSpeedKmh), pacingLabel(result),
     )
     val headerHeight = (margin * 2 + titlePaint.textSize + subtitlePaint.textSize * 1.6f).toInt()
 
@@ -142,3 +146,15 @@ private fun writePdf(page: Bitmap, out: File) {
         document.close()
     }
 }
+
+/** How the arrival times were estimated, as shown on the map pill and in shared files: Constant, Realistic or CAI (trekking). */
+fun pacingLabel(result: RouteForecastResult): String = when {
+    result.pacing == PacingMode.CONSTANT -> "Constant"
+    result.activity == ActivityType.TREK -> "CAI"
+    else -> "Realistic"
+}
+
+fun activityLabel(result: RouteForecastResult): String = if (result.activity == ActivityType.TREK) "Trekking" else "Ride"
+
+/** "29.5", or "4" for a whole number. */
+fun formatKmh(kmh: Double): String = if (kmh == kmh.toInt().toDouble()) kmh.toInt().toString() else "%.1f".format(kmh)

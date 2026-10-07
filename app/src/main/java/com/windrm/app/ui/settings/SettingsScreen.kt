@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.windrm.app.BuildConfig
 import com.windrm.app.R
+import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.ThemeMode
@@ -162,14 +163,19 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                NumberSetting(stringResource(R.string.settings_rider_mass), settings.riderMassKg, "kg", viewModel::setRiderMassKg)
-                NumberSetting(stringResource(R.string.settings_bike_mass), settings.bikeMassKg, "kg", viewModel::setBikeMassKg)
+                NumberSetting(stringResource(R.string.settings_rider_mass), settings.riderMassKg, "kg", { viewModel.setRiderMassKg(it) }, 20.0..200.0)
+                NumberSetting(stringResource(R.string.settings_bike_mass), settings.bikeMassKg, "kg", { viewModel.setBikeMassKg(it) }, 3.0..50.0)
                 NumberSetting(
                     stringResource(R.string.settings_max_descent_speed),
                     settings.maxDescentSpeedKmh,
                     stringResource(R.string.km_h),
-                    viewModel::setMaxDescentSpeedKmh,
+                    { viewModel.setMaxDescentSpeedKmh(it) },
+                    10.0..120.0,
                 )
+            }
+
+            SettingsSection(stringResource(R.string.settings_cai)) {
+                CaiProfileEditor(settings.caiProfile, { viewModel.setCaiProfile(it) }, { viewModel.resetCaiProfile() })
             }
 
             SettingsSection(stringResource(R.string.settings_ride_light)) {
@@ -323,22 +329,55 @@ private fun apiKeyFor(style: MapStyle): String = when (style) {
     else -> ""
 }
 
-/** Labelled decimal field; accepts "," as the decimal separator too (Italian keyboards). */
+/**
+ * Labelled decimal field; accepts "," as the decimal separator too (Italian keyboards). A value is
+ * saved only once it is inside [range], so partial input ("6" on the way to "62") never gets
+ * clamped and rewritten under the user's fingers; the text follows outside changes (Restore defaults).
+ */
 @Composable
-private fun NumberSetting(label: String, value: Double, unit: String, onChange: (Double) -> Unit) {
+private fun NumberSetting(
+    label: String,
+    value: Double,
+    unit: String,
+    onChange: (Double) -> Unit,
+    range: ClosedFloatingPointRange<Double> = 0.0..Double.MAX_VALUE,
+) {
     Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 16.dp))
-    var text by remember(value) { mutableStateOf(formatSpeed(value)) }
+    var text by remember { mutableStateOf(formatSpeed(value)) }
+    LaunchedEffect(value) {
+        if (parseNumber(text) != value) text = formatSpeed(value)
+    }
     OutlinedTextField(
         value = text,
         onValueChange = { input ->
             text = input
-            input.replace(',', '.').toDoubleOrNull()?.let(onChange)
+            parseNumber(input)?.takeIf { it in range }?.let(onChange)
         },
         suffix = { Text(unit) },
+        isError = parseNumber(text)?.let { it !in range } ?: text.isNotBlank(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
     )
+}
+
+/** Trekking times by the CAI signpost rule; every value is editable, with one tap back to the CAI defaults. */
+@Composable
+private fun CaiProfileEditor(profile: CaiProfile, onChange: (CaiProfile) -> Unit, onReset: () -> Unit) {
+    Text(
+        stringResource(R.string.settings_cai_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    NumberSetting(stringResource(R.string.settings_cai_flat), profile.flatKmh, stringResource(R.string.km_h), { onChange(profile.copy(flatKmh = it)) }, 1.0..10.0)
+    NumberSetting(stringResource(R.string.settings_cai_up), profile.upMetresPerHour, "m/h", { onChange(profile.copy(upMetresPerHour = it)) }, 50.0..2000.0)
+    NumberSetting(stringResource(R.string.settings_cai_down), profile.downMetresPerHour, "m/h", { onChange(profile.copy(downMetresPerHour = it)) }, 50.0..3000.0)
+    NumberSetting(stringResource(R.string.settings_cai_high_altitude), profile.highAltitudeM, "m", { onChange(profile.copy(highAltitudeM = it)) }, 500.0..9000.0)
+    NumberSetting(stringResource(R.string.settings_cai_high_up), profile.highUpMetresPerHour, "m/h", { onChange(profile.copy(highUpMetresPerHour = it)) }, 50.0..2000.0)
+    NumberSetting(stringResource(R.string.settings_cai_high_down), profile.highDownMetresPerHour, "m/h", { onChange(profile.copy(highDownMetresPerHour = it)) }, 50.0..3000.0)
+    TextButton(onClick = onReset, modifier = Modifier.padding(top = 8.dp)) {
+        Text(stringResource(R.string.settings_ride_reset))
+    }
 }
 
 /**

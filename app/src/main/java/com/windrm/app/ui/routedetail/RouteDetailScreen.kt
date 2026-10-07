@@ -1,35 +1,25 @@
 package com.windrm.app.ui.routedetail
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.RangeSlider
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import com.windrm.app.domain.cropped
-import com.windrm.app.model.Route
-import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,44 +30,65 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Hiking
+import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
+import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.domain.cropped
+import com.windrm.app.model.Route
 import com.windrm.app.model.RouteStop
-import com.windrm.app.ui.routes.FavoriteButton
 import com.windrm.app.ui.components.HorizonDatePickerDialog
 import com.windrm.app.ui.components.RouteMapView
+import com.windrm.app.ui.routes.FavoriteButton
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,7 +118,10 @@ fun RouteDetailScreen(
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(route?.name ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleLarge)
                         ridden?.let { r ->
-                            Text(rideSummary(r, viewModel.avgSpeedKmh), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                            val movingS = remember(r, viewModel.avgSpeedKmh, viewModel.pacingMode, viewModel.activity, viewModel.caiProfile) {
+                                viewModel.movingSeconds(r)
+                            }
+                            Text(rideSummary(r, movingS), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                         }
                         route?.let { r ->
                             // The route's own creation date (the import date when unknown).
@@ -144,6 +158,16 @@ fun RouteDetailScreen(
         }
 
         Column(Modifier.fillMaxSize().padding(padding)) {
+            SegmentedChoice(
+                options = listOf(
+                    stringResource(R.string.activity_ride) to Icons.Filled.DirectionsBike,
+                    stringResource(R.string.activity_trek) to Icons.Filled.Hiking,
+                ),
+                selected = viewModel.activity.ordinal,
+                onSelect = { viewModel.changeActivity(ActivityType.entries[it]) },
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+            )
+
             FormRow(icon = Icons.Filled.Event, onClick = { showTimeDialog = true }) {
                 // Same label/value sizes and start inset as the Average Speed field below, so the two rows line up.
                 Column(Modifier.weight(1f)) {
@@ -169,18 +193,17 @@ fun RouteDetailScreen(
                 }
             }
 
-            FormRow(icon = Icons.Filled.Speed) {
+            val trek = viewModel.activity == ActivityType.TREK
+            val realistic = viewModel.pacingMode == PacingMode.REALISTIC
+            FormRow(icon = if (trek) Icons.Filled.Hiking else Icons.Filled.Speed) {
                 TextField(
                     value = speedText,
                     onValueChange = { text ->
                         speedText = text
                         text.replace(',', '.').toDoubleOrNull()?.let { viewModel.avgSpeedKmh = it.coerceIn(1.0, 80.0) }
                     },
-                    label = { Text(stringResource(R.string.average_speed)) },
-                    suffix = {
-                        val mode = stringResource(if (viewModel.pacingMode == PacingMode.REALISTIC) R.string.pacing_realistic else R.string.pacing_constant)
-                        Text("${stringResource(R.string.km_h)} · $mode")
-                    },
+                    label = { Text(stringResource(if (trek && realistic) R.string.flat_speed else R.string.average_speed)) },
+                    suffix = { Text(stringResource(R.string.km_h)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     textStyle = MaterialTheme.typography.titleMedium,
@@ -190,13 +213,31 @@ fun RouteDetailScreen(
                     ),
                     modifier = Modifier.weight(1f),
                 )
-                // Swaps the speed model: constant average vs. realistic (gradient-aware) pacing.
-                IconButton(onClick = {
-                    viewModel.pacingMode = if (viewModel.pacingMode == PacingMode.CONSTANT) PacingMode.REALISTIC else PacingMode.CONSTANT
-                }) {
-                    Icon(Icons.Filled.SwapHoriz, contentDescription = stringResource(R.string.pacing_mode))
-                }
+                // Keeps the field as wide as the Starting row above, which ends with its clock button.
+                Spacer(Modifier.size(48.dp))
             }
+
+            // The speed model, both choices always visible: constant average vs. terrain-aware pacing
+            // (gradient physics on a ride, CAI signpost times on a trek).
+            SegmentedChoice(
+                options = listOf(
+                    stringResource(R.string.pacing_constant) to Icons.Filled.HorizontalRule,
+                    stringResource(if (trek) R.string.pacing_cai else R.string.pacing_realistic) to Icons.Filled.Terrain,
+                ),
+                selected = viewModel.pacingMode.ordinal,
+                onSelect = { viewModel.pacingMode = PacingMode.entries[it] },
+                modifier = Modifier.padding(start = 60.dp, end = 64.dp, top = 10.dp),
+            )
+            Text(
+                when {
+                    !realistic -> stringResource(R.string.pacing_hint_constant)
+                    trek -> stringResource(R.string.pacing_hint_cai, formatSpeedInput(viewModel.caiProfile.flatKmh))
+                    else -> stringResource(R.string.pacing_hint_realistic, formatSpeedInput(viewModel.maxDescentSpeedKmh))
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 60.dp, end = 16.dp, top = 4.dp),
+            )
 
             Button(
                 onClick = {
@@ -460,12 +501,48 @@ private fun FormRow(icon: ImageVector, onClick: (() -> Unit)? = null, content: @
     }
 }
 
-/** "133 km  3,371 m↑  25 km/h  5h 19m": the ridden part, its time including planned stops. */
-private fun rideSummary(route: Route, avgSpeedKmh: Double): String {
-    val ridingMin = if (avgSpeedKmh > 0) route.distanceKm / avgSpeedKmh * 60 else 0.0
-    val totalMin = (ridingMin + route.stops.sumOf { it.durationMin }).roundToInt()
+/** Two or more mutually exclusive choices in one pill, the selected one filled with the accent colour. */
+@Composable
+private fun SegmentedChoice(
+    options: List<Pair<String, ImageVector>>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val outline = MaterialTheme.colorScheme.outline
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(36.dp)
+            .clip(RoundedCornerShape(50))
+            .border(1.dp, outline, RoundedCornerShape(50)),
+    ) {
+        options.forEachIndexed { index, (label, icon) ->
+            if (index > 0) Box(Modifier.fillMaxHeight().width(1.dp).background(outline))
+            val isSelected = index == selected
+            val content = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            Row(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(index) }),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+                Text(label, color = content, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
+            }
+        }
+    }
+}
+
+/** "133 km  3,371 m↑  25 km/h  5h 19m": the ridden part, its average moving speed and its time including planned stops. */
+private fun rideSummary(route: Route, movingSeconds: Long): String {
+    val avgKmh = if (movingSeconds > 0) route.distanceKm / (movingSeconds / 3600.0) else 0.0
+    val totalMin = (movingSeconds / 60.0 + route.stops.sumOf { it.durationMin }).roundToInt()
     return "%.0f km  %,d m↑  %s km/h  %dh %02dm".format(
-        route.distanceKm, route.elevationGainM.roundToInt(), formatSpeedInput(avgSpeedKmh), totalMin / 60, totalMin % 60,
+        route.distanceKm, route.elevationGainM.roundToInt(), formatSpeedInput(avgKmh), totalMin / 60, totalMin % 60,
     )
 }
 

@@ -5,6 +5,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import com.windrm.app.domain.ActivityType
 import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteSource
@@ -30,6 +31,8 @@ data class RouteEntity(
     @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
     val originalDateEpochMs: Long? = null,
     @ColumnInfo(defaultValue = "'[]'") val stopsJson: String = "[]",
+    // ActivityType name; the default matches the 2 -> 3 migration.
+    @ColumnInfo(defaultValue = "'RIDE'") val activity: String = "RIDE",
 ) {
     fun toRoute(): Route = Route(
         id = id,
@@ -44,6 +47,7 @@ data class RouteEntity(
         isFavorite = isFavorite,
         originalDateEpochMs = originalDateEpochMs,
         stops = json.decodeFromString(stopsJson),
+        activity = runCatching { ActivityType.valueOf(activity) }.getOrDefault(ActivityType.RIDE),
     )
 
     companion object {
@@ -60,6 +64,7 @@ data class RouteEntity(
             isFavorite = route.isFavorite,
             originalDateEpochMs = route.originalDateEpochMs,
             stopsJson = encodeStops(route.stops),
+            activity = route.activity.name,
         )
 
         fun encodeStops(stops: List<RouteStop>): String = json.encodeToString(stops)

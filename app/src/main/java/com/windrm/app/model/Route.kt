@@ -1,5 +1,6 @@
 package com.windrm.app.model
 
+import com.windrm.app.domain.ActivityType
 import kotlinx.serialization.Serializable
 
 /** Where a [Route] was imported from. */
@@ -48,6 +49,8 @@ data class Route(
     val originalDateEpochMs: Long? = null,
     /** Planned breaks, in route order; they push back every arrival time after them. */
     val stops: List<RouteStop> = emptyList(),
+    /** Ride or trek: picks the realistic pacing model. */
+    val activity: ActivityType = ActivityType.RIDE,
 ) {
     val startPoint: RoutePoint? get() = points.firstOrNull()
 

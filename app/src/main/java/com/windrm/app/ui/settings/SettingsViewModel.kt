@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.location.DeviceLocation
 import com.windrm.app.remote.strava.StravaAuthEvent
@@ -82,6 +83,10 @@ class SettingsViewModel(
     fun setRideThresholds(thresholds: RideThresholds) = viewModelScope.launch { settingsRepository.setRideThresholds(thresholds) }
 
     fun resetRideThresholds() = viewModelScope.launch { settingsRepository.resetRideThresholds() }
+
+    fun setCaiProfile(profile: CaiProfile) = viewModelScope.launch { settingsRepository.setCaiProfile(profile) }
+
+    fun resetCaiProfile() = viewModelScope.launch { settingsRepository.resetCaiProfile() }
 
     fun setForecastHorizonDays(days: Int) = viewModelScope.launch {
         settingsRepository.setForecastHorizonDays(days.coerceIn(1, 16))

@@ -1,5 +1,7 @@
 package com.windrm.app.model
 
+import com.windrm.app.domain.ActivityType
+import com.windrm.app.domain.PacingMode
 import java.time.Instant
 
 /** Hourly weather values interpolated to a specific point in time. */
@@ -50,6 +52,8 @@ data class RouteForecastResult(
     val route: Route,
     val startTime: Instant,
     val avgSpeedKmh: Double,
+    val pacing: PacingMode = PacingMode.CONSTANT,
+    val activity: ActivityType = ActivityType.RIDE,
     val points: List<RouteForecastPoint>,
     val daylight: DaylightInfo,
 ) {

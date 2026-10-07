@@ -30,6 +30,9 @@ interface RouteDao {
     @Query("UPDATE routes SET stopsJson = :stopsJson WHERE id = :id")
     suspend fun setStops(id: Long, stopsJson: String)
 
+    @Query("UPDATE routes SET activity = :activity WHERE id = :id")
+    suspend fun setActivity(id: Long, activity: String)
+
     @Query("DELETE FROM routes WHERE id = :id")
     suspend fun deleteById(id: Long)
 }

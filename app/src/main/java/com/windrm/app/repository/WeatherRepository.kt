@@ -1,6 +1,8 @@
 package com.windrm.app.repository
 
+import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.ArrivalTimeCalculator
+import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.RiderProfile
 import com.windrm.app.domain.HourlySeries
@@ -36,11 +38,13 @@ class WeatherRepository(
         avgSpeedKmh: Double,
         pacing: PacingMode = PacingMode.CONSTANT,
         profile: RiderProfile = RiderProfile(),
+        activity: ActivityType = ActivityType.RIDE,
+        cai: CaiProfile = CaiProfile(),
     ): RouteForecastResult = coroutineScope {
         val samples = RouteSampler.sample(route)
         // The realistic model bisects over thousands of 50 m steps: keep it off the main thread.
         val arrivalTimes = withContext(Dispatchers.Default) {
-            ArrivalTimeCalculator.arrivalTimes(route, samples, startTime, avgSpeedKmh, pacing, profile)
+            ArrivalTimeCalculator.arrivalTimes(route, samples, startTime, avgSpeedKmh, pacing, profile, activity, cai)
         }
 
         val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.first().minusSeconds(86_400))
@@ -75,6 +79,8 @@ class WeatherRepository(
             route = route,
             startTime = startTime,
             avgSpeedKmh = avgSpeedKmh,
+            pacing = pacing,
+            activity = activity,
             points = forecastPoints,
             daylight = buildDaylightInfo(weatherResponses.firstOrNull(), startTime),
         )

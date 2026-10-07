@@ -23,8 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,10 +57,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
+import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.RideLevel
 import com.windrm.app.domain.RideQuality
 import com.windrm.app.domain.RideQualityEvaluator
@@ -147,6 +151,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                     mapStyle = viewModel.mapStyle,
                     mapLayer = mapLayer,
                     chartsLayer = chartsLayer,
+                    onTogglePacing = viewModel::togglePacing,
                 )
             }
         }
@@ -342,6 +347,7 @@ private fun ForecastContent(
     mapStyle: MapStyle,
     mapLayer: GraphicsLayer,
     chartsLayer: GraphicsLayer,
+    onTogglePacing: () -> Unit,
 ) {
     val points = result.points
     if (points.isEmpty()) {
@@ -387,18 +393,21 @@ private fun ForecastContent(
                 }
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
         ) {
-            RouteMapView(
-                // The full-resolution track, not the sparse weather-sampling points -- otherwise
-                // the drawn line cuts corners on every curve between samples.
-                points = result.route.points,
-                windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
-                mapStyle = mapStyle,
-                highlightPoint = highlightPoint,
-                scrubFraction = scrubFraction,
-                markers = gaugeMarkers,
-                stops = result.route.stops,
-                height = 336.dp,
-            )
+            Box {
+                RouteMapView(
+                    // The full-resolution track, not the sparse weather-sampling points -- otherwise
+                    // the drawn line cuts corners on every curve between samples.
+                    points = result.route.points,
+                    windArrows = points.map { WindArrowPoint(it.point, it.weather.windDirectionDeg, it.weather.windSpeedKmh) },
+                    mapStyle = mapStyle,
+                    highlightPoint = highlightPoint,
+                    scrubFraction = scrubFraction,
+                    markers = gaugeMarkers,
+                    stops = result.route.stops,
+                    height = 336.dp,
+                )
+                PacingPill(result, onTogglePacing, Modifier.align(Alignment.TopStart).padding(10.dp))
+            }
             WindSpeedLegend()
         }
         HorizontalDivider()
@@ -694,6 +703,39 @@ private fun DaylightSummary(result: RouteForecastResult, formatter: DateTimeForm
         d.sunset?.let { Text("${stringResource(R.string.sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.titleMedium) }
         d.civilSunrise?.let { Text("${stringResource(R.string.civil_sunrise)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyLarge) }
         d.civilSunset?.let { Text("${stringResource(R.string.civil_sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyLarge) }
+    }
+}
+
+/**
+ * Speed and pacing the forecast was computed with, over the map's free top-left corner. Tapping it
+ * switches between constant and realistic pacing and recalculates times and weather.
+ */
+@Composable
+private fun PacingPill(result: RouteForecastResult, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    val realistic = result.pacing == PacingMode.REALISTIC
+    val accent = MaterialTheme.colorScheme.primary
+    Surface(
+        onClick = onToggle,
+        shape = RoundedCornerShape(50),
+        color = Color.White,
+        contentColor = Color(0xFF1C1B1F),
+        shadowElevation = 3.dp,
+        modifier = modifier,
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (realistic) Icons.Filled.Terrain else Icons.Filled.HorizontalRule,
+                contentDescription = null,
+                tint = accent,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                "%s km/h · ".format(formatKmh(result.avgSpeedKmh)),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+            Text(pacingLabel(result), style = MaterialTheme.typography.labelLarge, color = accent, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

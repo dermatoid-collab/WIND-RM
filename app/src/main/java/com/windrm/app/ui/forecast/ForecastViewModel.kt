@@ -32,7 +32,7 @@ class ForecastViewModel(
     private val routeId: Long,
     initialStartEpochS: Long,
     private val speedKmh: Double,
-    private val pacing: PacingMode,
+    initialPacing: PacingMode,
     /** Kept part of the route, metres from its start (the route screen's crop slider). */
     private val cropRangeM: ClosedFloatingPointRange<Double>,
 ) : ViewModel() {
@@ -48,6 +48,10 @@ class ForecastViewModel(
 
     /** Start of the ride; changed from inside the forecast with the start-time picker. */
     var startEpochS by mutableStateOf(initialStartEpochS)
+        private set
+
+    /** Constant or realistic pacing; switched from the pill on the map, which recalculates the forecast. */
+    var pacing by mutableStateOf(initialPacing)
         private set
 
     /** Hourly weather at the route start over the whole forecast horizon, for the start-time picker. */
@@ -85,14 +89,22 @@ class ForecastViewModel(
         load()
     }
 
+    fun togglePacing() {
+        pacing = if (pacing == PacingMode.CONSTANT) PacingMode.REALISTIC else PacingMode.CONSTANT
+        load()
+    }
+
     fun load() {
         viewModelScope.launch {
             uiState = ForecastUiState.Loading
             runCatching {
                 val route = (routeRepository.getRoute(routeId) ?: error("Route not found"))
                     .cropped(cropRangeM.start, cropRangeM.endInclusive)
-                val profile = settingsRepository.current().riderProfile
-                weatherRepository.forecastRoute(route, Instant.ofEpochSecond(startEpochS), speedKmh, pacing, profile)
+                val settings = settingsRepository.current()
+                weatherRepository.forecastRoute(
+                    route, Instant.ofEpochSecond(startEpochS), speedKmh, pacing, settings.riderProfile,
+                    route.activity, settings.caiProfile,
+                )
             }
                 .onSuccess {
                     scrubFraction = null

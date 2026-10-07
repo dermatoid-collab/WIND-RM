@@ -5,6 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.ActivityType
+import com.windrm.app.domain.CaiPacing
+import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.model.Route
@@ -30,6 +33,15 @@ class RouteDetailViewModel(
     var startsNow by mutableStateOf(true)
     var pacingMode by mutableStateOf(PacingMode.CONSTANT)
 
+    /** Ride or trek, saved with the route; switching also swaps the speed for that activity's default. */
+    var activity by mutableStateOf(ActivityType.RIDE)
+        private set
+    var caiProfile by mutableStateOf(CaiProfile())
+        private set
+    private var rideDefaultSpeedKmh = 25.0
+    var maxDescentSpeedKmh by mutableStateOf(40.0)
+        private set
+
     /** Kept part of the route, as fractions of its length (the two thumbs of the crop slider). */
     var cropRange by mutableStateOf(0f..1f)
 
@@ -49,13 +61,40 @@ class RouteDetailViewModel(
         viewModelScope.launch {
             val settings = settingsRepository.current()
             avgSpeedKmh = settings.defaultAvgSpeedKmh
+            rideDefaultSpeedKmh = settings.defaultAvgSpeedKmh
+            caiProfile = settings.caiProfile
+            maxDescentSpeedKmh = settings.maxDescentSpeedKmh
             forecastHorizonDays = settings.forecastHorizonDays.toLong()
             mapStyle = settings.mapStyle
 
             val loaded = routeRepository.getRoute(routeId)
             route = loaded
-            loaded?.recordedAvgSpeedKmh?.let { avgSpeedKmh = it.coerceIn(5.0, 60.0) }
+            activity = loaded?.activity ?: ActivityType.RIDE
+            avgSpeedKmh = defaultSpeedFor(activity, loaded)
         }
+    }
+
+    fun changeActivity(newActivity: ActivityType) {
+        val current = route ?: return
+        if (newActivity == activity) return
+        activity = newActivity
+        avgSpeedKmh = defaultSpeedFor(newActivity, current)
+        route = current.copy(activity = newActivity)
+        viewModelScope.launch { routeRepository.setActivity(current.id, newActivity) }
+    }
+
+    /** A ride starts from the recorded pace (else the Settings default); a trek from the CAI flat speed. */
+    private fun defaultSpeedFor(activity: ActivityType, route: Route?): Double = when (activity) {
+        ActivityType.RIDE -> route?.recordedAvgSpeedKmh?.coerceIn(5.0, 60.0) ?: rideDefaultSpeedKmh
+        ActivityType.TREK -> caiProfile.flatKmh
+    }
+
+    /** Moving time (no stops) of [part] at the current speed and pacing: CAI times for a realistic trek. */
+    fun movingSeconds(part: Route): Long = when {
+        activity == ActivityType.TREK && pacingMode == PacingMode.REALISTIC ->
+            CaiPacing.totalSeconds(part.points, avgSpeedKmh, caiProfile)
+        avgSpeedKmh > 0 -> (part.distanceKm / avgSpeedKmh * 3600).toLong()
+        else -> 0L
     }
 
     /** Snaps a tap to the nearest track point; that point's distance is where the stop sits. */
