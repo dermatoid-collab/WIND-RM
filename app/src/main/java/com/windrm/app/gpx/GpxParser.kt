@@ -1,6 +1,7 @@
 package com.windrm.app.gpx
 
 import android.util.Xml
+import com.windrm.app.domain.elevationGainM
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
@@ -84,17 +85,11 @@ object GpxParser {
         val startTime = if (hasTimestamps) rawPoints.first().time else null
 
         var cumulativeDistance = 0.0
-        var elevationGain = 0.0
         val points = ArrayList<RoutePoint>(rawPoints.size)
         for ((index, raw) in rawPoints.withIndex()) {
             if (index > 0) {
                 val prev = rawPoints[index - 1]
                 cumulativeDistance += haversineMeters(prev.lat, prev.lon, raw.lat, raw.lon)
-                val prevEle = prev.ele
-                if (prevEle != null && raw.ele != null) {
-                    val delta = raw.ele - prevEle
-                    if (delta > 1.0) elevationGain += delta
-                }
             }
             val timeOffsetS = if (hasTimestamps && startTime != null && raw.time != null) {
                 raw.time.epochSecond - startTime.epochSecond
@@ -114,7 +109,7 @@ object GpxParser {
             createdAtEpochMs = System.currentTimeMillis(),
             points = points,
             distanceKm = cumulativeDistance / 1000.0,
-            elevationGainM = elevationGain,
+            elevationGainM = elevationGainM(rawPoints.map { it.ele }),
             hasTimestamps = hasTimestamps,
             originalDateEpochMs = (fileTime ?: rawPoints.firstNotNullOfOrNull { it.time })?.toEpochMilli(),
         )

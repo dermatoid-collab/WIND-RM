@@ -1,5 +1,6 @@
 package com.windrm.app.repository
 
+import com.windrm.app.domain.elevationGainM
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.gpx.GpxParser
 import com.windrm.app.model.Route
@@ -41,7 +42,8 @@ class StravaRepository(
         return parsed.copy(
             source = RouteSource.STRAVA,
             distanceKm = if (parsed.distanceKm > 0) parsed.distanceKm else route.distance / 1000.0,
-            elevationGainM = if (parsed.elevationGainM > 0) parsed.elevationGainM else route.elevation_gain,
+            // Strava's own figure, as shown in its app; the computed one only when it's missing.
+            elevationGainM = if (route.elevation_gain > 0) route.elevation_gain else parsed.elevationGainM,
             stravaRouteId = route.id,
             originalDateEpochMs = parseStravaDate(route.created_at) ?: parsed.originalDateEpochMs,
         )
@@ -54,7 +56,7 @@ class StravaRepository(
             name = activity.name,
             streams = streams,
             fallbackDistanceKm = activity.distance / 1000.0,
-            fallbackElevationGainM = activity.total_elevation_gain,
+            stravaElevationGainM = activity.total_elevation_gain,
         ).copy(originalDateEpochMs = parseStravaDate(activity.start_date))
     }
 
@@ -65,7 +67,8 @@ class StravaRepository(
             name = segment.name,
             streams = streams,
             fallbackDistanceKm = segment.distance / 1000.0,
-            fallbackElevationGainM = (segment.elevation_high - segment.elevation_low).coerceAtLeast(0.0),
+            // Segments only expose high/low points, not a total climb, so compute it from the stream.
+            stravaElevationGainM = null,
         )
     }
 
@@ -74,7 +77,7 @@ class StravaRepository(
         name: String,
         streams: StravaStreamSet,
         fallbackDistanceKm: Double,
-        fallbackElevationGainM: Double,
+        stravaElevationGainM: Double?,
     ): Route {
         val latlng = streams.latlng?.data.orEmpty()
         val altitude = streams.altitude?.data
@@ -83,7 +86,6 @@ class StravaRepository(
         require(latlng.size >= 2) { "Not enough GPS points for this item." }
 
         var cumulativeDistance = 0.0
-        var elevationGain = 0.0
         val points = ArrayList<RoutePoint>(latlng.size)
         for ((index, coord) in latlng.withIndex()) {
             val lat = coord.getOrNull(0) ?: continue
@@ -92,11 +94,6 @@ class StravaRepository(
             if (index > 0) {
                 val prev = latlng[index - 1]
                 cumulativeDistance += haversineMeters(prev[0], prev[1], lat, lon)
-                val prevEle = altitude?.getOrNull(index - 1)
-                if (prevEle != null && ele != null) {
-                    val delta = ele - prevEle
-                    if (delta > 1.0) elevationGain += delta
-                }
             }
             points += RoutePoint(
                 lat = lat,
@@ -113,7 +110,7 @@ class StravaRepository(
             createdAtEpochMs = System.currentTimeMillis(),
             points = points,
             distanceKm = if (cumulativeDistance > 0) cumulativeDistance / 1000.0 else fallbackDistanceKm,
-            elevationGainM = if (elevationGain > 0) elevationGain else fallbackElevationGainM,
+            elevationGainM = stravaElevationGainM?.takeIf { it > 0 } ?: elevationGainM(points.map { it.eleM }),
             hasTimestamps = time != null,
         )
     }

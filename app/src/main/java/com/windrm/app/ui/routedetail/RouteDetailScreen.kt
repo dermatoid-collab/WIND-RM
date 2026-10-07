@@ -50,6 +50,7 @@ import com.windrm.app.ui.components.RouteMapView
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
@@ -90,6 +91,8 @@ fun RouteDetailScreen(
 
         var showTimeDialog by remember { mutableStateOf(false) }
         val plannedLabelFormatter = remember { DateTimeFormatter.ofPattern("EEE d MMM, HH:mm", Locale.getDefault()) }
+        // Same format as the route lists; the route's own creation date, the import date if unknown.
+        val routeDateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault()) }
 
         Column(
             Modifier
@@ -101,6 +104,11 @@ fun RouteDetailScreen(
 
             Column(Modifier.padding(16.dp)) {
                 Text("%.1f km · %.0f m↑".format(route.distanceKm, route.elevationGainM), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    routeDateFormatter.format(Instant.ofEpochMilli(route.originalDateEpochMs ?: route.createdAtEpochMs)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
                 Text(
                     stringResource(R.string.starting),
