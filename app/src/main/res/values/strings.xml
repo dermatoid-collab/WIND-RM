@@ -23,6 +23,7 @@
     <string name="builder_routing_note">Routing: most direct (shortest distance)</string>
     <string name="builder_tap_start">Tap the map to set the start</string>
     <string name="builder_tap_next">Tap again to route to the next point</string>
+    <string name="builder_drag_hint">Drag any point to move it</string>
     <string name="builder_undo">Undo</string>
     <string name="builder_back_to_start">Back to start</string>
     <string name="builder_clear">Clear</string>

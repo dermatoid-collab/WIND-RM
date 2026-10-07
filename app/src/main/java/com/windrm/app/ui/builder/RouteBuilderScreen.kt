@@ -106,6 +106,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
         val shown = if (started) viewModel.waypoints.drop(1).dropLast(1) else viewModel.waypoints
         shown.map { MapMarker(RoutePoint(lat = it.lat, lon = it.lon), if (started) MidMarkerArgb else StartMarkerArgb) }
     }
+    val dragHandles = remember(viewModel.waypoints) { viewModel.waypoints.map { RoutePoint(lat = it.lat, lon = it.lon) } }
     val profileValues = remember(viewModel.segments) { sparklineValues(mapPoints) }
 
     Scaffold(
@@ -181,6 +182,8 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                         mapStyle = viewModel.mapStyle,
                         markers = markers,
                         onMapTap = { lat, lon -> viewModel.onMapTap(lat, lon) },
+                        draggablePoints = dragHandles,
+                        onPointDragged = { index, lat, lon -> viewModel.moveWaypoint(index, lat, lon) },
                         height = Dp.Unspecified,
                         autoFit = false,
                         initialCenter = center,
@@ -195,6 +198,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                 val hint = when (viewModel.waypoints.size) {
                     0 -> R.string.builder_tap_start
                     1 -> R.string.builder_tap_next
+                    2 -> R.string.builder_drag_hint
                     else -> null
                 }
                 if (hint != null && center != null) {

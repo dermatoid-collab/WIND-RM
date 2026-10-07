@@ -84,8 +84,13 @@ fun RouteMapView(
     /** (latitude, longitude) the map opens on while there is no route to fit; null = osmdroid's default. */
     initialCenter: Pair<Double, Double>? = null,
     initialZoom: Double = 14.0,
+    /** Points the user can pick up and move with a finger (the route builder's waypoints); needs [onPointDragged]. */
+    draggablePoints: List<RoutePoint> = emptyList(),
+    /** A dragged point was dropped: its index in [draggablePoints] and the new place. */
+    onPointDragged: ((index: Int, lat: Double, lon: Double) -> Unit)? = null,
 ) {
     val mapRef = remember { MapViewRef() }
+    val drag = remember { DragState() }
     // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
     // while the surrounding Column is scrolling, bleeding over the next section's title.
     val sized = if (height == Dp.Unspecified) modifier.fillMaxWidth().fillMaxHeight() else modifier.fillMaxWidth().height(height)
@@ -187,6 +192,10 @@ fun RouteMapView(
                     val density = mapView.resources.displayMetrics.density
                     markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
                 }
+                // On top of everything else so it gets first pick of a touch.
+                if (onPointDragged != null && draggablePoints.isNotEmpty()) {
+                    mapView.overlays.add(DragHandlesOverlay(draggablePoints, drag, mapView.resources.displayMetrics.density, onPointDragged))
+                }
                 mapView.tag = MapViewFitState(mapStyle, points)
                 mapView.invalidate()
             },
@@ -211,6 +220,94 @@ fun RouteMapView(
         }
     }
 }
+
+/** The point being dragged, kept outside the overlay because the overlays are rebuilt on every recomposition. */
+private class DragState {
+    var index: Int = -1
+    var lat: Double = 0.0
+    var lon: Double = 0.0
+}
+
+/**
+ * Lets a finger pick up any of [points] (within ~28 dp) and move it; the map does not pan during the
+ * drag. While it lasts a larger blue dot follows the finger, and on release [onDropped] gets the new place.
+ */
+private class DragHandlesOverlay(
+    private val points: List<RoutePoint>,
+    private val drag: DragState,
+    private val density: Float,
+    private val onDropped: (Int, Double, Double) -> Unit,
+) : Overlay() {
+    private val ringPaint = markerRingPaint(density)
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = HIGHLIGHT_ARGB; style = Paint.Style.FILL }
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = HIGHLIGHT_ARGB; alpha = 70; style = Paint.Style.FILL }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow || drag.index < 0) return
+        val out = android.graphics.Point()
+        mapView.projection.toPixels(GeoPoint(drag.lat, drag.lon), out)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 18f * density, haloPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), MARKER_DIAMETER_DP / 2 * density, dotPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), MARKER_DIAMETER_DP / 2 * density, ringPaint)
+    }
+
+    override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                val out = android.graphics.Point()
+                val hitRadius = 28f * density
+                var best = -1
+                var bestDistance = hitRadius
+                points.forEachIndexed { i, p ->
+                    mapView.projection.toPixels(GeoPoint(p.lat, p.lon), out)
+                    val d = kotlin.math.hypot(out.x - event.x, out.y - event.y)
+                    if (d <= bestDistance) {
+                        best = i
+                        bestDistance = d
+                    }
+                }
+                if (best < 0) return false
+                drag.index = best
+                drag.lat = points[best].lat
+                drag.lon = points[best].lon
+                mapView.parent?.requestDisallowInterceptTouchEvent(true)
+                mapView.invalidate()
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (drag.index < 0) return false
+                val p = mapView.projection.fromPixels(event.x.toInt(), event.y.toInt())
+                drag.lat = p.latitude
+                drag.lon = p.longitude
+                mapView.invalidate()
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                if (drag.index < 0) return false
+                val index = drag.index
+                val p = mapView.projection.fromPixels(event.x.toInt(), event.y.toInt())
+                val moved = kotlin.math.hypot(
+                    (p.latitude - points[index].lat) * 111_320.0,
+                    (p.longitude - points[index].lon) * 111_320.0 * kotlin.math.cos(Math.toRadians(p.latitude)),
+                )
+                drag.index = -1
+                mapView.invalidate()
+                // A touch that never left the point is a tap on it, not a move.
+                if (moved > MIN_DRAG_M) onDropped(index, p.latitude, p.longitude)
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                if (drag.index < 0) return false
+                drag.index = -1
+                mapView.invalidate()
+                return true
+            }
+        }
+        return false
+    }
+}
+
+private const val MIN_DRAG_M = 5.0
 
 private class MapViewRef {
     var view: MapView? = null
