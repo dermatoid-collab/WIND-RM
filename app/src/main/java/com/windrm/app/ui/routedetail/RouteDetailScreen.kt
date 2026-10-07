@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -122,7 +123,12 @@ fun RouteDetailScreen(
                             val movingS = remember(r, viewModel.avgSpeedKmh, viewModel.pacingMode, viewModel.activity, viewModel.caiProfile) {
                                 viewModel.movingSeconds(r)
                             }
-                            Text(rideSummary(r, movingS), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                            Text(
+                                rideSummary(r, movingS),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                                textAlign = TextAlign.Center,
+                            )
                         }
                         route?.let { r ->
                             // The route's own creation date (the import date when unknown).
@@ -574,13 +580,18 @@ internal fun SegmentedChoice(
     }
 }
 
-/** "133 km  3,371 m↑  25 km/h  5h 19m": the ridden part, its average moving speed and its time including planned stops. */
+/**
+ * "133 km  3,371 m↑  25 km/h  5h 19m (incl. 40m stops)": the ridden part, its average moving speed and its
+ * time including the planned stops, which are named when there are any.
+ */
 private fun rideSummary(route: Route, movingSeconds: Long): String {
     val avgKmh = if (movingSeconds > 0) route.distanceKm / (movingSeconds / 3600.0) else 0.0
-    val totalMin = (movingSeconds / 60.0 + route.stops.sumOf { it.durationMin }).roundToInt()
-    return "%.0f km  %,d m↑  %s km/h  %dh %02dm".format(
+    val stopsMin = route.stops.sumOf { it.durationMin }
+    val totalMin = (movingSeconds / 60.0 + stopsMin).roundToInt()
+    val base = "%.0f km  %,d m↑  %s km/h  %dh %02dm".format(
         route.distanceKm, route.elevationGainM.roundToInt(), formatSpeedInput(avgKmh), totalMin / 60, totalMin % 60,
     )
+    return if (stopsMin > 0) "$base (incl. ${formatStopDuration(stopsMin)} stops)" else base
 }
 
 private fun formatSpeedInput(speedKmh: Double): String =
