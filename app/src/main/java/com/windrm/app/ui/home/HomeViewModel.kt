@@ -10,6 +10,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.gpx.GpxFolder
+import com.windrm.app.gpx.GpxFolderExport
 import com.windrm.app.gpx.GpxUriImporter
 import com.windrm.app.location.DeviceLocation
 import com.windrm.app.model.CurrentWeatherSnapshot
@@ -95,12 +97,45 @@ class HomeViewModel(
         }
     }
 
-    fun importGpx(context: Context, uri: Uri, onImported: (Route) -> Unit) {
+    /** A file picked with the "+" menu, read but not saved yet: it waits for the user to name it in the import dialog. */
+    var pendingImport by mutableStateOf<Route?>(null)
+        private set
+
+    /** Name of the GPX folder chosen in Settings, offered by the import dialog; null = none. */
+    var gpxFolderName by mutableStateOf<String?>(null)
+        private set
+
+    fun prepareImport(context: Context, uri: Uri) {
         viewModelScope.launch {
             gpxError = null
-            runCatching { GpxUriImporter.import(context, uri, routeRepository) }
-                .onSuccess { onImported(it) }
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val route = GpxUriImporter.read(context, uri)
+                    val folder = settingsRepository.current().gpxFolderUri?.let(Uri::parse)
+                    route to folder?.let { GpxFolder.displayName(appContext, it) }
+                }
+            }
+                .onSuccess { (route, folderName) ->
+                    gpxFolderName = folderName
+                    pendingImport = route
+                }
                 .onFailure { gpxError = it.message ?: "Couldn't import the GPX file" }
+        }
+    }
+
+    fun cancelImport() {
+        pendingImport = null
+    }
+
+    /** Saves the picked file's route under [name]; with [toFolder] also keeps a GPX copy in the chosen folder. */
+    fun confirmImport(name: String, toFolder: Boolean, onSaved: (Route) -> Unit) {
+        val route = pendingImport ?: return
+        pendingImport = null
+        viewModelScope.launch {
+            val named = route.copy(name = name.trim().ifEmpty { route.name })
+            val saved = named.copy(id = routeRepository.saveRoute(named))
+            if (toFolder) GpxFolderExport.save(appContext, settingsRepository, saved, gpxFolderName)
+            onSaved(saved)
         }
     }
 }

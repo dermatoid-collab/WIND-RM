@@ -1,8 +1,14 @@
 package com.windrm.app.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,30 +18,39 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Umbrella
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,10 +58,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.windrm.app.R
 import com.windrm.app.model.CurrentWeatherSnapshot
 import com.windrm.app.model.Route
 import com.windrm.app.model.WeatherPoint
+import com.windrm.app.ui.builder.SaveRouteDialog
+import com.windrm.app.ui.builder.shareGpx
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
@@ -58,6 +76,7 @@ fun HomeScreen(
     onOpenRecent: () -> Unit,
     onOpenFavorites: () -> Unit,
     onOpenStrava: () -> Unit,
+    onOpenFiles: () -> Unit,
     onOpenSettings: () -> Unit,
     onCreateRoute: () -> Unit,
     onRouteImported: (Route) -> Unit,
@@ -66,9 +85,12 @@ fun HomeScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         viewModel.onPermissionResult(granted)
     }
+    // The "+" menu's Files: the picked file is read, then named in the same dialog the route builder uses.
     val gpxLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) viewModel.importGpx(context, uri, onImported = onRouteImported)
+        if (uri != null) viewModel.prepareImport(context, uri)
     }
+    var fabExpanded by remember { mutableStateOf(false) }
+    BackHandler(enabled = fabExpanded) { fabExpanded = false }
 
     // Refreshes the weather snapshot every time the home screen comes back to the foreground,
     // instead of only once when the ViewModel is first created.
@@ -87,28 +109,93 @@ fun HomeScreen(
                 ),
             )
         },
-    ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            WeatherSnapshotSection(
-                viewModel = viewModel,
-                onRequestPermission = { permissionLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-            )
-
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                MenuRow(Icons.Filled.History, stringResource(R.string.tab_recent), onOpenRecent)
-                MenuRow(Icons.Filled.Star, stringResource(R.string.tab_favorites), onOpenFavorites)
-                MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
-                MenuRow(Icons.Filled.Add, stringResource(R.string.menu_create_route), onCreateRoute)
-                MenuRow(Icons.Filled.UploadFile, stringResource(R.string.menu_files)) {
+        floatingActionButton = {
+            NewFab(
+                expanded = fabExpanded,
+                onToggle = { fabExpanded = !fabExpanded },
+                onCreateRoute = {
+                    fabExpanded = false
+                    onCreateRoute()
+                },
+                onPickFile = {
+                    fabExpanded = false
                     gpxLauncher.launch(arrayOf("application/gpx+xml", "application/vnd.garmin.tcx+xml", "application/octet-stream", "*/*"))
+                },
+            )
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                WeatherSnapshotSection(
+                    viewModel = viewModel,
+                    onRequestPermission = { permissionLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
+                )
+
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    MenuRow(Icons.Filled.History, stringResource(R.string.tab_recent), onOpenRecent)
+                    MenuRow(Icons.Filled.Star, stringResource(R.string.tab_favorites), onOpenFavorites)
+                    MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
+                    MenuRow(Icons.Filled.Folder, stringResource(R.string.tab_files), onOpenFiles)
+                    viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                    MenuRow(Icons.Filled.Settings, stringResource(R.string.menu_settings), onOpenSettings)
                 }
-                viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                MenuRow(Icons.Filled.Settings, stringResource(R.string.menu_settings), onOpenSettings)
+            }
+            // Dims the page while the "+" menu is open; a tap on it closes the menu.
+            if (fabExpanded) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { fabExpanded = false },
+                )
             }
         }
+    }
+
+    viewModel.pendingImport?.let { route ->
+        SaveRouteDialog(
+            initialName = route.name,
+            folderName = viewModel.gpxFolderName,
+            onDismiss = viewModel::cancelImport,
+            onConfirm = { name, toFolder, share ->
+                viewModel.confirmImport(name, toFolder) { saved ->
+                    if (share) shareGpx(context, saved)
+                    onRouteImported(saved)
+                }
+            },
+        )
+    }
+}
+
+/** Google-style "+" button: opens a small menu with the two ways to add a route, Create route and Files. */
+@Composable
+private fun NewFab(expanded: Boolean, onToggle: () -> Unit, onCreateRoute: () -> Unit, onPickFile: () -> Unit) {
+    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        AnimatedVisibility(visible = expanded) {
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                FabAction(stringResource(R.string.menu_create_route), Icons.Filled.Map, onCreateRoute)
+                FabAction(stringResource(R.string.menu_files), Icons.Filled.UploadFile, onPickFile)
+            }
+        }
+        FloatingActionButton(onClick = onToggle) {
+            Icon(
+                if (expanded) Icons.Filled.Close else Icons.Filled.Add,
+                contentDescription = stringResource(R.string.menu_new),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FabAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 3.dp) {
+            Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+        }
+        SmallFloatingActionButton(onClick = onClick) { Icon(icon, contentDescription = null) }
     }
 }
 
