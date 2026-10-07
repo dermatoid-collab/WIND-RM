@@ -136,6 +136,11 @@ fun RouteMapView(
                         outlinePaint.isAntiAlias = true
                         outlinePaint.strokeCap = Paint.Cap.ROUND
                         outlinePaint.strokeJoin = Paint.Join.ROUND
+                        // A tap on the line must reach the map-tap overlay below (placing a stop is
+                        // exactly a tap on the route): by default osmdroid swallows it and pops up an
+                        // empty info bubble instead.
+                        infoWindow = null
+                        setOnClickListener { _, _, _ -> false }
                     }
                     mapView.overlays.add(polyline)
 
