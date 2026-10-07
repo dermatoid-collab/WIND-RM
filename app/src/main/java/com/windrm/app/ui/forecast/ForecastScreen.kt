@@ -1,6 +1,7 @@
 package com.windrm.app.ui.forecast
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -43,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.windrm.app.R
 import com.windrm.app.model.RouteForecastPoint
 import com.windrm.app.model.DaylightInfo
+import com.windrm.app.model.AirQualityPoint
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.aqiLabel
@@ -178,6 +182,7 @@ private fun ForecastContent(
     // jumping between the ~3 km-spaced weather samples.
     val highlightPoint = scrubFraction?.let { pointAtDistance(track, it * totalDistanceM) }
     var heldGauge by remember { mutableStateOf<GaugeMetric?>(null) }
+    var aqiView by remember { mutableStateOf(AqiView.OVERALL) }
     // Colours match the gauge rings: min = inner blue ring, max = outer orange ring.
     val gaugeMarkers = heldGauge?.let { metric ->
         listOf(
@@ -337,23 +342,50 @@ private fun ForecastContent(
                             }
                         }
                     }
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AqiView.entries.forEach { view ->
+                            val selected = view == aqiView
+                            Surface(
+                                onClick = { aqiView = view },
+                                shape = RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(
+                                    if (selected) 2.dp else 1.dp,
+                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                ),
+                            ) {
+                                Text(
+                                    view.title,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
                     MultiSeriesChart(
-                        title = "AQI",
+                        title = aqiView.title,
                         xLabels = timeLabels,
-                        yRangeOverride = 0f..100f,
+                        yUnit = aqiView.unit,
+                        yRangeOverride = 0f..aqiView.bandTops.last(),
                         scrubFraction = scrubFraction,
                         onScrub = onScrub,
                         onScrubEnd = onScrubEnd,
                         scrubLabel = scrubLabel,
-                        bands = listOf(
-                            ChartBand(0f..20f, AqiGood),
-                            ChartBand(20f..40f, AqiFair),
-                            ChartBand(40f..60f, AqiModerate),
-                            ChartBand(60f..80f, AqiPoor),
-                            ChartBand(80f..100f, AqiVeryPoor),
-                        ),
+                        bands = aqiView.bandTops.mapIndexed { i, top ->
+                            val bottom = if (i == 0) 0f else aqiView.bandTops[i - 1]
+                            ChartBand(bottom..top, AQI_BAND_COLORS[i], AQI_BAND_LABELS[i])
+                        },
                         series = listOf(
-                            ChartSeries("European AQI", AqiSevere, points.map { (it.airQuality?.europeanAqi ?: 0.0).toFloat() }, tooltipLabel = "AQI", decimals = 0),
+                            ChartSeries(
+                                aqiView.title, AQI_LINE_COLOR,
+                                points.map { p -> (p.airQuality?.let(aqiView.value) ?: 0.0).toFloat() },
+                                filled = false, tooltipLabel = aqiView.title,
+                                unit = if (aqiView.unit.isEmpty()) "" else " ${aqiView.unit}", decimals = 0,
+                            ),
                         ),
                     )
                 }
@@ -376,6 +408,22 @@ private fun ForecastContent(
         }
     }
 }
+
+/**
+ * The four air-quality views. Band tops follow the European AQI breakpoints (Good, Fair, Moderate,
+ * Poor, Very poor) for the overall index and for each pollutant's concentration in µg/m³; the last
+ * band ("Extremely poor") is open-ended and only drawn up to a cap so the chart keeps a scale.
+ */
+private enum class AqiView(val title: String, val unit: String, val bandTops: List<Float>, val value: (AirQualityPoint) -> Double) {
+    OVERALL("AQI Overall", "", listOf(20f, 40f, 60f, 80f, 100f, 120f), { it.europeanAqi }),
+    PM25("PM2.5", "µg/m³", listOf(10f, 20f, 25f, 50f, 75f, 90f), { it.pm2_5 }),
+    PM10("PM10", "µg/m³", listOf(20f, 40f, 50f, 100f, 150f, 180f), { it.pm10 }),
+    OZONE("Ozone", "µg/m³", listOf(50f, 100f, 130f, 240f, 380f, 450f), { it.ozone }),
+}
+
+private val AQI_BAND_LABELS = listOf("Good", "Fair", "Moderate", "Poor", "Very poor", "Extremely poor")
+private val AQI_BAND_COLORS = listOf(AqiGood, AqiFair, AqiModerate, AqiPoor, AqiVeryPoor, AqiSevere)
+private val AQI_LINE_COLOR = Color(0xFF37474F)
 
 /** The three top gauges; holding one shows where its min and max occur on the map. */
 private enum class GaugeMetric(val value: (RouteForecastPoint) -> Double) {

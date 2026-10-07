@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -62,6 +65,8 @@ data class ChartSeries(
 data class ChartBand(
     val range: ClosedFloatingPointRange<Float>,
     val color: Color,
+    /** Written inside the band, right-aligned (e.g. "Good"), when the band is tall enough to hold it. */
+    val label: String? = null,
 )
 
 private val Y_AXIS_WIDTH = 40.dp
@@ -106,6 +111,8 @@ fun MultiSeriesChart(
         val min = if (rawMin == rawMax) rawMin - 1f else rawMin
         val max = if (rawMin == rawMax) rawMax + 1f else rawMax
 
+        val textMeasurer = rememberTextMeasurer()
+        val bandLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         Row(Modifier.fillMaxWidth().height(chartHeight)) {
             YAxisLabels(min, max, Modifier.width(Y_AXIS_WIDTH), alignEnd = false, height = chartHeight)
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().height(chartHeight)) {
@@ -144,6 +151,16 @@ fun MultiSeriesChart(
                             topLeft = Offset(0f, top),
                             size = Size(size.width, bottom - top),
                         )
+                        band.label?.let { label ->
+                            val layout = textMeasurer.measure(label, TextStyle(fontSize = 12.sp, color = bandLabelColor))
+                            val bandHeight = bottom - top
+                            if (bandHeight >= layout.size.height) {
+                                drawText(
+                                    layout,
+                                    topLeft = Offset(size.width - layout.size.width - 6.dp.toPx(), top + (bandHeight - layout.size.height) / 2),
+                                )
+                            }
+                        }
                     }
                     val gridColor = Color.LightGray.copy(alpha = 0.4f)
                     val stepCount = 4
