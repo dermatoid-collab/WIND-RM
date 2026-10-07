@@ -229,7 +229,8 @@ private fun RouteCard(route: Route, onClick: () -> Unit, onToggleFavorite: () ->
             RoutePolylinePreview(points = route.points.map { it.lat to it.lon })
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(route.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
-                Text(dateFormatter.format(Instant.ofEpochMilli(route.createdAtEpochMs)), style = MaterialTheme.typography.bodySmall)
+                // The route's own creation date (as Strava lists it); the import date only when unknown.
+                Text(dateFormatter.format(Instant.ofEpochMilli(route.originalDateEpochMs ?: route.createdAtEpochMs)), style = MaterialTheme.typography.bodySmall)
                 val durationS = route.points.lastOrNull()?.timeOffsetS?.takeIf { it > 0 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     durationS?.let { Text(formatDuration(it), style = MaterialTheme.typography.bodyMedium) }

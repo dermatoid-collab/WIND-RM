@@ -27,6 +27,7 @@ data class RouteEntity(
     val stravaRouteId: Long?,
     // Default matches the 1 -> 2 migration's DEFAULT 0, so Room's schema check agrees.
     @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
+    val originalDateEpochMs: Long? = null,
 ) {
     fun toRoute(): Route = Route(
         id = id,
@@ -39,6 +40,7 @@ data class RouteEntity(
         hasTimestamps = hasTimestamps,
         stravaRouteId = stravaRouteId,
         isFavorite = isFavorite,
+        originalDateEpochMs = originalDateEpochMs,
     )
 
     companion object {
@@ -53,6 +55,7 @@ data class RouteEntity(
             hasTimestamps = route.hasTimestamps,
             stravaRouteId = route.stravaRouteId,
             isFavorite = route.isFavorite,
+            originalDateEpochMs = route.originalDateEpochMs,
         )
     }
 }

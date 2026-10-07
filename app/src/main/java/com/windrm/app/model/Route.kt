@@ -32,6 +32,11 @@ data class Route(
     val stravaRouteId: Long? = null,
     /** Starred by the user; listed under Favorites. */
     val isFavorite: Boolean = false,
+    /**
+     * When the route itself was created or recorded (Strava created_at / start_date, or the GPX's
+     * own time), as opposed to [createdAtEpochMs], when it was imported into the app. Null if unknown.
+     */
+    val originalDateEpochMs: Long? = null,
 ) {
     val startPoint: RoutePoint? get() = points.firstOrNull()
 

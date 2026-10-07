@@ -43,6 +43,7 @@ class StravaRepository(
             distanceKm = if (parsed.distanceKm > 0) parsed.distanceKm else route.distance / 1000.0,
             elevationGainM = if (parsed.elevationGainM > 0) parsed.elevationGainM else route.elevation_gain,
             stravaRouteId = route.id,
+            originalDateEpochMs = parseStravaDate(route.created_at) ?: parsed.originalDateEpochMs,
         )
     }
 
@@ -54,7 +55,7 @@ class StravaRepository(
             streams = streams,
             fallbackDistanceKm = activity.distance / 1000.0,
             fallbackElevationGainM = activity.total_elevation_gain,
-        )
+        ).copy(originalDateEpochMs = parseStravaDate(activity.start_date))
     }
 
     suspend fun importSegmentAsRoute(segment: StravaSegmentSummary): Route {
@@ -117,3 +118,7 @@ class StravaRepository(
         )
     }
 }
+
+/** Strava's ISO-8601 timestamps (e.g. "2024-05-01T07:12:00Z"); null when missing or malformed. */
+private fun parseStravaDate(iso: String?): Long? =
+    iso?.let { runCatching { java.time.Instant.parse(it).toEpochMilli() }.getOrNull() }

@@ -31,6 +31,8 @@ object GpxParser {
         var currentLon = 0.0
         var currentEle: Double? = null
         var currentTime: Instant? = null
+        // A <time> outside any point: the file's own creation time (<metadata><time>).
+        var fileTime: Instant? = null
         var inTrkOrRtePoint = false
         var textBuffer = StringBuilder()
         var nameDepth = -1
@@ -57,7 +59,11 @@ object GpxParser {
                 XmlPullParser.END_TAG -> {
                     when (parser.name) {
                         "ele" -> if (inTrkOrRtePoint) currentEle = textBuffer.toString().trim().toDoubleOrNull()
-                        "time" -> if (inTrkOrRtePoint) currentTime = parseTime(textBuffer.toString().trim())
+                        "time" -> if (inTrkOrRtePoint) {
+                            currentTime = parseTime(textBuffer.toString().trim())
+                        } else if (fileTime == null) {
+                            fileTime = parseTime(textBuffer.toString().trim())
+                        }
                         "trkpt", "rtept" -> {
                             rawPoints += RawPoint(currentLat, currentLon, currentEle, currentTime)
                             inTrkOrRtePoint = false
@@ -110,6 +116,7 @@ object GpxParser {
             distanceKm = cumulativeDistance / 1000.0,
             elevationGainM = elevationGain,
             hasTimestamps = hasTimestamps,
+            originalDateEpochMs = (fileTime ?: rawPoints.firstNotNullOfOrNull { it.time })?.toEpochMilli(),
         )
     }
 
