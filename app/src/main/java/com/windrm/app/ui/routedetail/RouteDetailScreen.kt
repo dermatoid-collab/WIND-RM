@@ -151,15 +151,22 @@ fun RouteDetailScreen(
 
         Column(Modifier.fillMaxSize().padding(padding)) {
             FormRow(icon = Icons.Filled.Event, onClick = { showTimeDialog = true }) {
+                // Same label/value sizes and start inset as the Average Speed field below, so the two rows line up.
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.starting), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        stringResource(R.string.starting),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 16.dp),
+                    )
                     Text(
                         if (viewModel.startsNow) {
                             stringResource(R.string.starting_now)
                         } else {
                             viewModel.plannedDate.atTime(viewModel.plannedHour, viewModel.plannedMinute).format(plannedLabelFormatter)
                         },
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(start = 16.dp, top = 2.dp),
                     )
                     HorizontalDivider(Modifier.padding(top = 8.dp))
                 }
@@ -182,7 +189,7 @@ fun RouteDetailScreen(
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.headlineSmall,
+                    textStyle = MaterialTheme.typography.titleMedium,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent,
