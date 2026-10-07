@@ -19,6 +19,8 @@ class RouteRepository(private val dao: RouteDao) {
     suspend fun findByStravaRouteId(stravaRouteId: Long): Route? =
         dao.getByStravaRouteId(stravaRouteId)?.toRoute()
 
+    suspend fun setFavorite(routeId: Long, favorite: Boolean) = dao.setFavorite(routeId, favorite)
+
     suspend fun deleteRoute(route: Route) {
         dao.deleteById(route.id)
     }

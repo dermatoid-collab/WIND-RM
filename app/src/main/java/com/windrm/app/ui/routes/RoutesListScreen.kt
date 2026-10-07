@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -66,6 +68,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
+/** Tab order in the routes screen; the home menu opens a given tab by index. */
+const val TAB_RECENT = 0
+const val TAB_FAVORITES = 1
+const val TAB_STRAVA = 2
+
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,14 +116,14 @@ fun RoutesListScreen(
             )
         },
         floatingActionButton = {
-            if (selectedTab == 0) {
+            if (selectedTab == TAB_RECENT) {
                 FloatingActionButton(onClick = { gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*")) }) {
                     Icon(Icons.Filled.UploadFile, contentDescription = stringResource(R.string.import_gpx))
                 }
             }
         },
         bottomBar = {
-            if (selectedTab == 1 && viewModel.stravaAuthorized) {
+            if (selectedTab == TAB_STRAVA && viewModel.stravaAuthorized) {
                 StravaSectionBar(
                     selected = viewModel.stravaSection,
                     onSelect = viewModel::selectStravaSection,
@@ -126,13 +133,27 @@ fun RoutesListScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text(stringResource(R.string.tab_recent)) })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(stringResource(R.string.tab_strava)) })
+                Tab(selected = selectedTab == TAB_RECENT, onClick = { selectedTab = TAB_RECENT }, text = { Text(stringResource(R.string.tab_recent)) })
+                Tab(selected = selectedTab == TAB_FAVORITES, onClick = { selectedTab = TAB_FAVORITES }, text = { Text(stringResource(R.string.tab_favorites)) })
+                Tab(selected = selectedTab == TAB_STRAVA, onClick = { selectedTab = TAB_STRAVA }, text = { Text(stringResource(R.string.tab_strava)) })
             }
 
             when (selectedTab) {
-                0 -> RecentRoutesTab(routes, onRouteSelected, onDelete = viewModel::deleteRoute)
-                1 -> StravaTab(
+                TAB_RECENT -> RouteListTab(
+                    routes = routes,
+                    emptyMessage = stringResource(R.string.no_routes_yet),
+                    onSelected = onRouteSelected,
+                    onToggleFavorite = viewModel::toggleFavorite,
+                    onDelete = viewModel::deleteRoute,
+                )
+                TAB_FAVORITES -> RouteListTab(
+                    routes = routes.filter { it.isFavorite },
+                    emptyMessage = stringResource(R.string.no_favorites_yet),
+                    onSelected = onRouteSelected,
+                    onToggleFavorite = viewModel::toggleFavorite,
+                    onDelete = viewModel::deleteRoute,
+                )
+                TAB_STRAVA -> StravaTab(
                     viewModel = viewModel,
                     onConnect = {
                         if (viewModel.stravaConfigured) viewModel.connectStrava() else showStravaInfo = true
@@ -178,20 +199,31 @@ private fun StravaSectionBar(selected: StravaSection, onSelect: (StravaSection) 
 }
 
 @Composable
-private fun RecentRoutesTab(routes: List<Route>, onSelected: (Route) -> Unit, onDelete: (Route) -> Unit) {
+private fun RouteListTab(
+    routes: List<Route>,
+    emptyMessage: String,
+    onSelected: (Route) -> Unit,
+    onToggleFavorite: (Route) -> Unit,
+    onDelete: (Route) -> Unit,
+) {
     if (routes.isEmpty()) {
-        EmptyState(stringResource(R.string.no_routes_yet))
+        EmptyState(emptyMessage)
         return
     }
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(routes, key = { it.id }) { route ->
-            RouteCard(route = route, onClick = { onSelected(route) }, onDelete = { onDelete(route) })
+            RouteCard(
+                route = route,
+                onClick = { onSelected(route) },
+                onToggleFavorite = { onToggleFavorite(route) },
+                onDelete = { onDelete(route) },
+            )
         }
     }
 }
 
 @Composable
-private fun RouteCard(route: Route, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun RouteCard(route: Route, onClick: () -> Unit, onToggleFavorite: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             RoutePolylinePreview(points = route.points.map { it.lat to it.lon })
@@ -209,6 +241,7 @@ private fun RouteCard(route: Route, onClick: () -> Unit, onDelete: () -> Unit) {
                     }
                 }
             }
+            FavoriteButton(isFavorite = route.isFavorite, onClick = onToggleFavorite)
             IconButton(onClick = onDelete) {
                 Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete_route))
             }
@@ -365,6 +398,20 @@ private fun ImportableCard(importing: Boolean, onImport: () -> Unit, content: @C
         }
     }
 }
+
+/** Star toggle shared by the route cards and the route detail screen. */
+@Composable
+fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit, tint: Color = FAVORITE_STAR) {
+    IconButton(onClick = onClick) {
+        Icon(
+            if (isFavorite) Icons.Filled.Star else Icons.Filled.StarBorder,
+            contentDescription = stringResource(if (isFavorite) R.string.remove_favorite else R.string.add_favorite),
+            tint = tint,
+        )
+    }
+}
+
+private val FAVORITE_STAR = Color(0xFFF2A900)
 
 @Composable
 private fun EmptyState(message: String) {

@@ -30,6 +30,8 @@ data class Route(
     val hasTimestamps: Boolean = false,
     /** Strava route id (from the Route Builder) this was imported from, if any. */
     val stravaRouteId: Long? = null,
+    /** Starred by the user; listed under Favorites. */
+    val isFavorite: Boolean = false,
 ) {
     val startPoint: RoutePoint? get() = points.firstOrNull()
 

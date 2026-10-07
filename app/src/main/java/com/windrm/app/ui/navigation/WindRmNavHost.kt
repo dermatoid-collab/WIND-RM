@@ -19,6 +19,9 @@ import com.windrm.app.ui.routedetail.RouteDetailScreen
 import com.windrm.app.ui.routedetail.RouteDetailViewModel
 import com.windrm.app.ui.routes.RoutesListScreen
 import com.windrm.app.ui.routes.RoutesListViewModel
+import com.windrm.app.ui.routes.TAB_FAVORITES
+import com.windrm.app.ui.routes.TAB_RECENT
+import com.windrm.app.ui.routes.TAB_STRAVA
 import com.windrm.app.ui.settings.SettingsScreen
 import com.windrm.app.ui.settings.SettingsViewModel
 
@@ -36,8 +39,9 @@ fun WindRmNavHost(container: AppContainer) {
             )
             HomeScreen(
                 viewModel = viewModel,
-                onOpenRecent = { navController.navigate(Destination.RoutesList.path(0)) },
-                onOpenStrava = { navController.navigate(Destination.RoutesList.path(1)) },
+                onOpenRecent = { navController.navigate(Destination.RoutesList.path(TAB_RECENT)) },
+                onOpenFavorites = { navController.navigate(Destination.RoutesList.path(TAB_FAVORITES)) },
+                onOpenStrava = { navController.navigate(Destination.RoutesList.path(TAB_STRAVA)) },
                 onOpenSettings = { navController.navigate(Destination.Settings.route) },
                 onRouteImported = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
             )

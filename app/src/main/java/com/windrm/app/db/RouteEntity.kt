@@ -1,5 +1,6 @@
 package com.windrm.app.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
@@ -24,6 +25,8 @@ data class RouteEntity(
     val elevationGainM: Double,
     val hasTimestamps: Boolean,
     val stravaRouteId: Long?,
+    // Default matches the 1 -> 2 migration's DEFAULT 0, so Room's schema check agrees.
+    @ColumnInfo(defaultValue = "0") val isFavorite: Boolean = false,
 ) {
     fun toRoute(): Route = Route(
         id = id,
@@ -35,6 +38,7 @@ data class RouteEntity(
         elevationGainM = elevationGainM,
         hasTimestamps = hasTimestamps,
         stravaRouteId = stravaRouteId,
+        isFavorite = isFavorite,
     )
 
     companion object {
@@ -48,6 +52,7 @@ data class RouteEntity(
             elevationGainM = route.elevationGainM,
             hasTimestamps = route.hasTimestamps,
             stravaRouteId = route.stravaRouteId,
+            isFavorite = route.isFavorite,
         )
     }
 }

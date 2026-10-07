@@ -5,6 +5,10 @@
     <string name="routes_title">WIND-RM</string>
     <string name="tab_recent">Recent</string>
     <string name="tab_strava">Strava</string>
+    <string name="tab_favorites">Favorites</string>
+    <string name="no_favorites_yet">No favorites yet. Tap the star on a route to add it here.</string>
+    <string name="add_favorite">Add to favorites</string>
+    <string name="remove_favorite">Remove from favorites</string>
     <string name="menu_files">Files</string>
     <string name="import_gpx">Import GPX</string>
     <string name="connect_strava">Connect Strava</string>

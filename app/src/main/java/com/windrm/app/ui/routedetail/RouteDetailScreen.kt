@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
+import com.windrm.app.ui.routes.FavoriteButton
 import com.windrm.app.ui.components.RouteMapView
 import java.time.DayOfWeek
 import java.time.Instant
@@ -71,6 +72,9 @@ fun RouteDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
                     }
+                },
+                actions = {
+                    route?.let { FavoriteButton(isFavorite = it.isFavorite, onClick = viewModel::toggleFavorite, tint = Color.White) }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,

@@ -56,6 +56,10 @@ class RoutesListViewModel(
 
     val stravaConfigured: Boolean get() = stravaAuthManager.isConfigured
 
+    fun toggleFavorite(route: Route) {
+        viewModelScope.launch { routeRepository.setFavorite(route.id, !route.isFavorite) }
+    }
+
     init {
         viewModelScope.launch {
             stravaAuthorized = stravaAuthManager.isAuthorized()

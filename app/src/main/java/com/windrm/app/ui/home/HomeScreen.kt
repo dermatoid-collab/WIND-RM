@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Umbrella
 import androidx.compose.material.icons.filled.WbSunny
@@ -54,6 +55,7 @@ import kotlin.math.roundToInt
 fun HomeScreen(
     viewModel: HomeViewModel,
     onOpenRecent: () -> Unit,
+    onOpenFavorites: () -> Unit,
     onOpenStrava: () -> Unit,
     onOpenSettings: () -> Unit,
     onRouteImported: (Route) -> Unit,
@@ -95,6 +97,7 @@ fun HomeScreen(
 
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MenuRow(Icons.Filled.History, stringResource(R.string.tab_recent), onOpenRecent)
+                MenuRow(Icons.Filled.Star, stringResource(R.string.tab_favorites), onOpenFavorites)
                 MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
                 MenuRow(Icons.Filled.UploadFile, stringResource(R.string.menu_files)) {
                     gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*"))

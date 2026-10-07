@@ -45,6 +45,13 @@ class RouteDetailViewModel(
         }
     }
 
+    fun toggleFavorite() {
+        val current = route ?: return
+        val updated = current.copy(isFavorite = !current.isFavorite)
+        route = updated
+        viewModelScope.launch { routeRepository.setFavorite(updated.id, updated.isFavorite) }
+    }
+
     fun setPlannedTime(date: LocalDate, hour: Int, minute: Int) {
         startsNow = false
         plannedDate = date

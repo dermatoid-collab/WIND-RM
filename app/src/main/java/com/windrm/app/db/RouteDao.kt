@@ -24,6 +24,9 @@ interface RouteDao {
     @Delete
     suspend fun delete(route: RouteEntity)
 
+    @Query("UPDATE routes SET isFavorite = :favorite WHERE id = :id")
+    suspend fun setFavorite(id: Long, favorite: Boolean)
+
     @Query("DELETE FROM routes WHERE id = :id")
     suspend fun deleteById(id: Long)
 }
