@@ -13,7 +13,10 @@ import com.windrm.app.repository.WeatherRepository
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.SettingsRepository
 import kotlinx.coroutines.launch
+import com.windrm.app.model.WeatherPoint
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 sealed interface ForecastUiState {
     data object Loading : ForecastUiState
@@ -26,7 +29,7 @@ class ForecastViewModel(
     private val weatherRepository: WeatherRepository,
     private val settingsRepository: SettingsRepository,
     private val routeId: Long,
-    private val startEpochS: Long,
+    initialStartEpochS: Long,
     private val speedKmh: Double,
     private val pacing: PacingMode,
     /** Kept part of the route, metres from its start (the route screen's crop slider). */
@@ -42,8 +45,37 @@ class ForecastViewModel(
     var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
         private set
 
+    /** Start of the ride; changed from inside the forecast with the start-time picker. */
+    var startEpochS by mutableStateOf(initialStartEpochS)
+        private set
+
+    /** Hourly weather at the route start over the whole forecast horizon, for the start-time picker. */
+    var startPickerWeather by mutableStateOf<List<WeatherPoint>?>(null)
+        private set
+    var forecastHorizonDays by mutableStateOf(15)
+        private set
+
+    fun loadStartPickerWeather() {
+        if (startPickerWeather != null) return
+        val start = (uiState as? ForecastUiState.Success)?.result?.route?.points?.firstOrNull() ?: return
+        viewModelScope.launch {
+            val today = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+            runCatching { weatherRepository.hourlyWeatherAt(start.lat, start.lon, today, (forecastHorizonDays + 1) * 24) }
+                .onSuccess { startPickerWeather = it }
+        }
+    }
+
+    fun changeStart(epochS: Long) {
+        startEpochS = epochS
+        load()
+    }
+
     init {
-        viewModelScope.launch { mapStyle = settingsRepository.current().mapStyle }
+        viewModelScope.launch {
+            val settings = settingsRepository.current()
+            mapStyle = settings.mapStyle
+            forecastHorizonDays = settings.forecastHorizonDays
+        }
         load()
     }
 

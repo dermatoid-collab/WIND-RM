@@ -19,6 +19,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -87,6 +88,7 @@ import kotlin.math.roundToInt
 fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val state = viewModel.uiState
+    var showStartPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -94,6 +96,12 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                 title = routeTitle(state),
                 onBack = onBack,
                 onShare = (state as? ForecastUiState.Success)?.let { { shareForecast(context, it.result) } },
+                onStartTime = (state as? ForecastUiState.Success)?.let {
+                    {
+                        viewModel.loadStartPickerWeather()
+                        showStartPicker = true
+                    }
+                },
             )
         },
     ) { padding ->
@@ -111,11 +119,24 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
             }
         }
     }
+
+    if (showStartPicker) {
+        StartTimePickerDialog(
+            initialStart = java.time.Instant.ofEpochSecond(viewModel.startEpochS),
+            hourlyWeather = viewModel.startPickerWeather,
+            horizonDays = viewModel.forecastHorizonDays,
+            onDismiss = { showStartPicker = false },
+            onConfirm = { start ->
+                showStartPicker = false
+                viewModel.changeStart(start.epochSecond)
+            },
+        )
+    }
 }
 
 /** Single-row orange bar: back, route name, share -- as short as the touch targets allow. */
 @Composable
-private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Unit)?) {
+private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Unit)?, onStartTime: (() -> Unit)?) {
     Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(48.dp),
@@ -131,6 +152,11 @@ private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Uni
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            onStartTime?.let {
+                IconButton(onClick = it) {
+                    Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.start_time), tint = Color.White)
+                }
+            }
             onShare?.let {
                 IconButton(onClick = it) {
                     Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = Color.White)

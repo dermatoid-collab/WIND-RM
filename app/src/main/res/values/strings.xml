@@ -94,6 +94,12 @@
     <string name="pacing_constant">Constant</string>
     <string name="pacing_realistic">Realistic</string>
     <string name="add_stop">Add a stop</string>
+    <string name="start_time">Start time</string>
+    <string name="start_time_hint">Select the best start time by tapping on the chart below.</string>
+    <string name="start_time_no_data">No forecast available for this day.</string>
+    <string name="today">Today</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="day_at_time">%1$s at %2$s</string>
     <string name="stop_place_hint">Tap the route where you\'ll stop</string>
     <string name="stop_duration">Stop duration</string>
     <string name="stop_longer">5 minutes longer</string>

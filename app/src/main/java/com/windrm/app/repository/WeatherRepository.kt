@@ -81,6 +81,19 @@ class WeatherRepository(
     }
 
     /** Current conditions + a short hourly glance at [lat]/[lon], for the home screen. */
+    /** Hourly conditions at one place, [hours] round hours from [from]: feeds the start-time picker. */
+    suspend fun hourlyWeatherAt(lat: Double, lon: Double, from: Instant, hours: Int): List<WeatherPoint> {
+        val first = from.truncatedTo(ChronoUnit.HOURS)
+        val last = first.plusSeconds(hours * 3600L)
+        val response = weatherApi.forecast(
+            latitude = "$lat,$lat",
+            longitude = "$lon,$lon",
+            startDate = dateFormatter.withZone(ZoneOffset.UTC).format(first),
+            endDate = dateFormatter.withZone(ZoneOffset.UTC).format(last),
+        ).firstOrNull()
+        return (0..hours).map { buildWeatherPoint(first.plusSeconds(it * 3600L), response) }
+    }
+
     suspend fun currentWeather(lat: Double, lon: Double, locationLabel: String, hoursAhead: Int = 6): CurrentWeatherSnapshot {
         val now = Instant.now()
         val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(now)
