@@ -130,7 +130,7 @@ fun RoutesListScreen(
         },
         floatingActionButton = {
             if (selectedTab == TAB_RECENT) {
-                FloatingActionButton(onClick = { gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*")) }) {
+                FloatingActionButton(onClick = { gpxLauncher.launch(arrayOf("application/gpx+xml", "application/vnd.garmin.tcx+xml", "application/octet-stream", "*/*")) }) {
                     Icon(Icons.Filled.UploadFile, contentDescription = stringResource(R.string.import_gpx))
                 }
             }
@@ -232,8 +232,9 @@ private fun GpxFileCard(entry: GpxFolder.Entry, onClick: () -> Unit) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                Text(entry.name.removeSuffix(".gpx").removeSuffix(".GPX"), style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                Text(entry.name.substringBeforeLast('.'), style = MaterialTheme.typography.titleMedium, maxLines = 1)
                 val details = listOfNotNull(
+                    entry.name.substringAfterLast('.', "").uppercase().ifEmpty { null },
                     entry.folder,
                     entry.lastModifiedMs?.let { dateFormatter.format(Instant.ofEpochMilli(it)) },
                     entry.sizeBytes?.let { "%.0f kB".format(it / 1024.0) },

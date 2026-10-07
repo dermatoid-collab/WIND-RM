@@ -1,15 +1,10 @@
 package com.windrm.app.gpx
 
 import android.util.Xml
-import com.windrm.app.domain.elevationGainM
-import com.windrm.app.domain.haversineMeters
 import com.windrm.app.model.Route
-import com.windrm.app.model.RoutePoint
-import com.windrm.app.model.RouteSource
 import org.xmlpull.v1.XmlPullParser
 import java.io.InputStream
 import java.time.Instant
-import java.time.format.DateTimeParseException
 
 class GpxParseException(message: String) : Exception(message)
 
@@ -25,9 +20,13 @@ object GpxParser {
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
         parser.setInput(input, null)
+        return parseWith(parser, fallbackName)
+    }
 
+    /** The parsing itself, on an already set-up pull parser (also what the JVM tests drive). */
+    internal fun parseWith(parser: XmlPullParser, fallbackName: String): Route {
         var routeName: String? = null
-        val rawPoints = mutableListOf<RawPoint>()
+        val rawPoints = mutableListOf<RawTrackPoint>()
         var currentLat = 0.0
         var currentLon = 0.0
         var currentEle: Double? = null
@@ -61,12 +60,12 @@ object GpxParser {
                     when (parser.name) {
                         "ele" -> if (inTrkOrRtePoint) currentEle = textBuffer.toString().trim().toDoubleOrNull()
                         "time" -> if (inTrkOrRtePoint) {
-                            currentTime = parseTime(textBuffer.toString().trim())
+                            currentTime = parseInstantOrNull(textBuffer.toString().trim())
                         } else if (fileTime == null) {
-                            fileTime = parseTime(textBuffer.toString().trim())
+                            fileTime = parseInstantOrNull(textBuffer.toString().trim())
                         }
                         "trkpt", "rtept" -> {
-                            rawPoints += RawPoint(currentLat, currentLon, currentEle, currentTime)
+                            rawPoints += RawTrackPoint(currentLat, currentLon, currentEle, currentTime)
                             inTrkOrRtePoint = false
                         }
                         "name" -> if (depth == nameDepth) routeName = textBuffer.toString().trim().ifEmpty { null }
@@ -77,49 +76,6 @@ object GpxParser {
             eventType = parser.next()
         }
 
-        if (rawPoints.size < 2) {
-            throw GpxParseException("The GPX file doesn't contain a valid route (at least 2 points are required).")
-        }
-
-        val hasTimestamps = rawPoints.all { it.time != null }
-        val startTime = if (hasTimestamps) rawPoints.first().time else null
-
-        var cumulativeDistance = 0.0
-        val points = ArrayList<RoutePoint>(rawPoints.size)
-        for ((index, raw) in rawPoints.withIndex()) {
-            if (index > 0) {
-                val prev = rawPoints[index - 1]
-                cumulativeDistance += haversineMeters(prev.lat, prev.lon, raw.lat, raw.lon)
-            }
-            val timeOffsetS = if (hasTimestamps && startTime != null && raw.time != null) {
-                raw.time.epochSecond - startTime.epochSecond
-            } else null
-            points += RoutePoint(
-                lat = raw.lat,
-                lon = raw.lon,
-                eleM = raw.ele,
-                distanceFromStartM = cumulativeDistance,
-                timeOffsetS = timeOffsetS,
-            )
-        }
-
-        return Route(
-            name = routeName ?: fallbackName,
-            source = RouteSource.LOCAL,
-            createdAtEpochMs = System.currentTimeMillis(),
-            points = points,
-            distanceKm = cumulativeDistance / 1000.0,
-            elevationGainM = elevationGainM(rawPoints.map { it.ele }),
-            hasTimestamps = hasTimestamps,
-            originalDateEpochMs = (fileTime ?: rawPoints.firstNotNullOfOrNull { it.time })?.toEpochMilli(),
-        )
+        return buildTrackRoute(rawPoints, routeName ?: fallbackName, fileTime, "GPX")
     }
-
-    private fun parseTime(raw: String): Instant? = try {
-        if (raw.isEmpty()) null else Instant.parse(raw)
-    } catch (e: DateTimeParseException) {
-        null
-    }
-
-    private data class RawPoint(val lat: Double, val lon: Double, val ele: Double?, val time: Instant?)
 }

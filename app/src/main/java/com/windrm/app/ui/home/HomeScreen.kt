@@ -103,7 +103,7 @@ fun HomeScreen(
                 MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
                 MenuRow(Icons.Filled.Add, stringResource(R.string.menu_create_route), onCreateRoute)
                 MenuRow(Icons.Filled.UploadFile, stringResource(R.string.menu_files)) {
-                    gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*"))
+                    gpxLauncher.launch(arrayOf("application/gpx+xml", "application/vnd.garmin.tcx+xml", "application/octet-stream", "*/*"))
                 }
                 viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 MenuRow(Icons.Filled.Settings, stringResource(R.string.menu_settings), onOpenSettings)

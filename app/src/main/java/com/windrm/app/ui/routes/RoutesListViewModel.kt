@@ -61,7 +61,7 @@ class RoutesListViewModel(
 
     val stravaConfigured: Boolean get() = stravaAuthManager.isConfigured
 
-    /** The GPX folder chosen in Settings (null = none), its name, and the GPX files found in it. */
+    /** The GPX folder chosen in Settings (null = none), its name, and the GPX and TCX files found in it. */
     var gpxFolderUri by mutableStateOf<Uri?>(null)
         private set
     var gpxFolderName by mutableStateOf<String?>(null)
@@ -86,7 +86,7 @@ class RoutesListViewModel(
                 gpxFiles = emptyList()
             } else {
                 runCatching {
-                    withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, tree) to GpxFolder.listGpx(appContext, tree) }
+                    withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, tree) to GpxFolder.listTracks(appContext, tree) }
                 }
                     .onSuccess { (name, files) ->
                         gpxFolderName = name
