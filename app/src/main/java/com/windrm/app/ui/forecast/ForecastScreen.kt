@@ -1,38 +1,31 @@
 package com.windrm.app.ui.forecast
 
 import android.widget.Toast
-import androidx.compose.material3.AlertDialog
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,29 +34,37 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
-import androidx.compose.material3.Surface
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
-import com.windrm.app.model.RouteForecastPoint
-import com.windrm.app.model.DaylightInfo
 import com.windrm.app.domain.RideLevel
 import com.windrm.app.domain.RideQuality
 import com.windrm.app.domain.RideQualityEvaluator
 import com.windrm.app.model.AirQualityPoint
+import com.windrm.app.model.DaylightInfo
+import com.windrm.app.model.RouteForecastPoint
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.aqiLabel
@@ -71,8 +72,8 @@ import com.windrm.app.settings.MapStyle
 import com.windrm.app.ui.components.AqiDial
 import com.windrm.app.ui.components.ChartBand
 import com.windrm.app.ui.components.ChartSeries
-import com.windrm.app.ui.components.MultiSeriesChart
 import com.windrm.app.ui.components.MapMarker
+import com.windrm.app.ui.components.MultiSeriesChart
 import com.windrm.app.ui.components.RouteMapView
 import com.windrm.app.ui.components.SemiCircularGauge
 import com.windrm.app.ui.components.WindArrowPoint
@@ -98,6 +99,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -595,6 +597,8 @@ private fun ForecastContent(
                     ),
                 )
             }
+
+            DataSourcesFooter(showAirQuality = points.any { it.airQuality != null })
         }
     }
 }
@@ -690,6 +694,35 @@ private fun DaylightSummary(result: RouteForecastResult, formatter: DateTimeForm
         d.sunset?.let { Text("${stringResource(R.string.sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.titleMedium) }
         d.civilSunrise?.let { Text("${stringResource(R.string.civil_sunrise)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyLarge) }
         d.civilSunset?.let { Text("${stringResource(R.string.civil_sunset)}: ${formatter.format(it)}", style = MaterialTheme.typography.bodyLarge) }
+    }
+}
+
+/**
+ * Open-Meteo's licence asks for a link wherever its data is shown, and CAMS for a credit wherever its
+ * air-quality data is; the full list of sources is in Settings > About. Part of the shared page too.
+ */
+@Composable
+private fun DataSourcesFooter(showAirQuality: Boolean) {
+    val uriHandler = LocalUriHandler.current
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            stringResource(R.string.source_weather_short),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable { uriHandler.openUri("https://open-meteo.com/") },
+        )
+        if (showAirQuality) {
+            Text(
+                stringResource(R.string.source_air_quality_short),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.clickable { uriHandler.openUri("https://atmosphere.copernicus.eu/") },
+            )
+        }
     }
 }
 

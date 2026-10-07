@@ -136,5 +136,25 @@
     <string name="stop_shorter">5 minutes shorter</string>
     <string name="remove_stop">Remove stop</string>
     <string name="stops_summary">%1$d stop(s) · %2$s</string>
-    <string name="settings_attribution">Map data © OpenStreetMap contributors. Weather data by Open-Meteo.com. Activity, route and segment import by Strava.</string>
+    <string name="source_weather_short">Weather data by Open-Meteo.com</string>
+    <string name="source_air_quality_short">Air quality: Copernicus Atmosphere Monitoring Service (CAMS) via Open-Meteo</string>
+    <string name="settings_sources">Data sources and credits</string>
+    <string name="source_weather_title">Weather forecast</string>
+    <string name="source_weather_text">Weather data by Open-Meteo.com, licensed under CC BY 4.0. Forecast models from national weather services, including ECMWF, DWD, NOAA NCEP, Météo-France, ItaliaMeteo-ARPAE, MeteoSwiss, KNMI and DMI. Sunrise and sunset times also come from Open-Meteo.</string>
+    <string name="source_air_quality_title">Air quality</string>
+    <string name="source_air_quality_text">Generated using Copernicus Atmosphere Monitoring Service information %1$d, via Open-Meteo. Neither the European Commission nor ECMWF is responsible for any use that may be made of the Copernicus information or data it contains.
+
+METEO FRANCE, Institut national de l\'environnement industriel et des risques (Ineris), Aarhus University, Norwegian Meteorological Institute (MET Norway), Jülich Institut für Energie- und Klimaforschung (IEK), Institute of Environmental Protection – National Research Institute (IEP-NRI), Koninklijk Nederlands Meteorologisch Instituut (KNMI), Nederlandse Organisatie voor toegepast-natuurwetenschappelijk onderzoek (TNO), Swedish Meteorological and Hydrological Institute (SMHI), Finnish Meteorological Institute (FMI), Italian National Agency for New Technologies, Energy and Sustainable Economic Development (ENEA) and Barcelona Supercomputing Center (BSC) (2022): CAMS European air quality forecasts, ENSEMBLE data. Copernicus Atmosphere Monitoring Service (CAMS) Atmosphere Data Store (ADS).</string>
+    <string name="source_maps_title">Maps</string>
+    <string name="source_maps_text">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL). OSM Standard tiles by the OpenStreetMap Foundation.
+OpenTopoMap: map style © OpenTopoMap (CC-BY-SA), elevation data SRTM.
+Mapbox Outdoors: © Mapbox.
+CARTO Positron: © CARTO.
+Thunderforest Outdoors: maps © Thunderforest.</string>
+    <string name="source_strava_title">Strava</string>
+    <string name="source_strava_text">Activity, route and segment import powered by Strava. WIND-RM is not developed or endorsed by Strava.</string>
+    <string name="source_places_title">Place names</string>
+    <string name="source_places_text">The Home location name comes from your device\'s Android geocoder. Elevation profiles come from the imported GPX file or Strava data.</string>
+    <string name="source_software_title">Open-source software</string>
+    <string name="source_software_text">osmdroid, Retrofit and OkHttp (Square), Kotlin and kotlinx (JetBrains), AndroidX and Jetpack Compose (Google): all under the Apache License 2.0.</string>
 </resources>

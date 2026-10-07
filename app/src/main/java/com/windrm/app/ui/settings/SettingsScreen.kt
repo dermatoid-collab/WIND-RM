@@ -3,6 +3,7 @@ package com.windrm.app.ui.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -211,14 +213,48 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             SettingsSection(stringResource(R.string.settings_about)) {
-                Text(
-                    stringResource(R.string.settings_attribution),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                DataSources()
                 BuildInfo(Modifier.padding(top = 16.dp))
             }
         }
+    }
+}
+
+/**
+ * Every external data source with the credit its licence asks for, plus the open-source libraries.
+ * Titles with a link open the provider's site or licence page.
+ */
+@Composable
+private fun DataSources() {
+    val year = remember { java.time.Year.now().value }
+    Text(stringResource(R.string.settings_sources), style = MaterialTheme.typography.titleMedium)
+    SourceEntry(stringResource(R.string.source_weather_title), stringResource(R.string.source_weather_text), "https://open-meteo.com/")
+    SourceEntry(
+        stringResource(R.string.source_air_quality_title),
+        stringResource(R.string.source_air_quality_text, year),
+        "https://atmosphere.copernicus.eu/",
+    )
+    SourceEntry(stringResource(R.string.source_maps_title), stringResource(R.string.source_maps_text), "https://www.openstreetmap.org/copyright")
+    SourceEntry(stringResource(R.string.source_strava_title), stringResource(R.string.source_strava_text), "https://www.strava.com/")
+    SourceEntry(stringResource(R.string.source_places_title), stringResource(R.string.source_places_text), null)
+    SourceEntry(
+        stringResource(R.string.source_software_title),
+        stringResource(R.string.source_software_text),
+        "https://www.apache.org/licenses/LICENSE-2.0",
+    )
+}
+
+@Composable
+private fun SourceEntry(title: String, text: String, url: String?) {
+    val uriHandler = LocalUriHandler.current
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Text(
+            if (url != null) "$title ↗" else title,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (url != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+            modifier = if (url != null) Modifier.clickable { uriHandler.openUri(url) } else Modifier,
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
