@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.History
@@ -58,6 +59,7 @@ fun HomeScreen(
     onOpenFavorites: () -> Unit,
     onOpenStrava: () -> Unit,
     onOpenSettings: () -> Unit,
+    onCreateRoute: () -> Unit,
     onRouteImported: (Route) -> Unit,
 ) {
     val context = LocalContext.current
@@ -99,6 +101,7 @@ fun HomeScreen(
                 MenuRow(Icons.Filled.History, stringResource(R.string.tab_recent), onOpenRecent)
                 MenuRow(Icons.Filled.Star, stringResource(R.string.tab_favorites), onOpenFavorites)
                 MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
+                MenuRow(Icons.Filled.Add, stringResource(R.string.menu_create_route), onCreateRoute)
                 MenuRow(Icons.Filled.UploadFile, stringResource(R.string.menu_files)) {
                     gpxLauncher.launch(arrayOf("application/gpx+xml", "application/octet-stream", "*/*"))
                 }

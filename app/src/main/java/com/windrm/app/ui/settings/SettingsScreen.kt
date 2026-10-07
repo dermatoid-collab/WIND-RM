@@ -241,6 +241,7 @@ private fun DataSources() {
         "https://atmosphere.copernicus.eu/",
     )
     SourceEntry(stringResource(R.string.source_maps_title), stringResource(R.string.source_maps_text), "https://www.openstreetmap.org/copyright")
+    SourceEntry(stringResource(R.string.source_routing_title), stringResource(R.string.source_routing_text), "https://brouter.de/")
     SourceEntry(stringResource(R.string.source_strava_title), stringResource(R.string.source_strava_text), "https://www.strava.com/")
     SourceEntry(stringResource(R.string.source_places_title), stringResource(R.string.source_places_text), null)
     SourceEntry(

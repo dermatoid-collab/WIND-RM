@@ -79,6 +79,11 @@ fun RouteMapView(
     onMapTap: ((lat: Double, lon: Double) -> Unit)? = null,
     /** Dp.Unspecified = fill the height the parent gives it (e.g. a weighted Column slot). */
     height: Dp = 280.dp,
+    /** False keeps the view where the user left it when [points] change (the route builder grows the track under their finger). */
+    autoFit: Boolean = true,
+    /** (latitude, longitude) the map opens on while there is no route to fit; null = osmdroid's default. */
+    initialCenter: Pair<Double, Double>? = null,
+    initialZoom: Double = 14.0,
 ) {
     val mapRef = remember { MapViewRef() }
     // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
@@ -97,6 +102,10 @@ fun RouteMapView(
                 // route had actually changed. A tag on the view remembers what was last applied so
                 // each is only redone when it genuinely changes.
                 val lastState = mapView.tag as? MapViewFitState
+                if (lastState == null && points.isEmpty() && initialCenter != null) {
+                    mapView.controller.setZoom(initialZoom)
+                    mapView.controller.setCenter(GeoPoint(initialCenter.first, initialCenter.second))
+                }
                 if (lastState?.style != mapStyle) {
                     val tileSource = tileSourceFor(mapStyle)
                     mapView.setTileSource(tileSource)
@@ -168,10 +177,15 @@ fun RouteMapView(
                     markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
                     if (stops.isNotEmpty()) mapView.overlays.add(StopsOverlay(stops, density, onStopTap, cropRangeM))
 
-                    if (lastState?.points != points) {
+                    if (autoFit && lastState?.points != points) {
                         val bbox = boundingBoxOf(geoPoints)
                         mapView.post { mapView.zoomToBoundingBox(bbox, false, 80) }
                     }
+                }
+                // With no track yet (a route being started) the markers still need drawing.
+                if (points.isEmpty()) {
+                    val density = mapView.resources.displayMetrics.density
+                    markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
                 }
                 mapView.tag = MapViewFitState(mapStyle, points)
                 mapView.invalidate()

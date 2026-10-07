@@ -12,6 +12,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.windrm.app.di.AppContainer
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.ui.builder.RouteBuilderScreen
+import com.windrm.app.ui.builder.RouteBuilderViewModel
 import com.windrm.app.ui.forecast.ForecastScreen
 import com.windrm.app.ui.forecast.ForecastViewModel
 import com.windrm.app.ui.home.HomeScreen
@@ -44,7 +46,29 @@ fun WindRmNavHost(container: AppContainer) {
                 onOpenFavorites = { navController.navigate(Destination.RoutesList.path(TAB_FAVORITES)) },
                 onOpenStrava = { navController.navigate(Destination.RoutesList.path(TAB_STRAVA)) },
                 onOpenSettings = { navController.navigate(Destination.Settings.route) },
+                onCreateRoute = { navController.navigate(Destination.RouteBuilder.route) },
                 onRouteImported = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
+            )
+        }
+
+        composable(Destination.RouteBuilder.route) {
+            val appContext = LocalContext.current.applicationContext
+            val viewModel = viewModel<RouteBuilderViewModel>(
+                factory = viewModelFactory {
+                    initializer {
+                        RouteBuilderViewModel(appContext, container.routeRepository, container.settingsRepository, container.routingRepository)
+                    }
+                },
+            )
+            RouteBuilderScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                // The saved route replaces the builder in the back stack, so Back from its screen goes Home.
+                onSaved = { route ->
+                    navController.navigate(Destination.RouteDetail.path(route.id)) {
+                        popUpTo(Destination.RouteBuilder.route) { inclusive = true }
+                    }
+                },
             )
         }
 

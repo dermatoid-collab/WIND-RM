@@ -7,6 +7,8 @@ sealed class Destination(val route: String) {
 
     data object Settings : Destination("settings")
 
+    data object RouteBuilder : Destination("builder")
+
     data object RoutesList : Destination("routes/{initialTab}") {
         const val ARG_INITIAL_TAB = "initialTab"
         fun path(initialTab: Int = 0) = "routes/$initialTab"

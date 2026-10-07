@@ -503,7 +503,7 @@ private fun FormRow(icon: ImageVector, onClick: (() -> Unit)? = null, content: @
 
 /** Two or more mutually exclusive choices in one pill, the selected one filled with the accent colour. */
 @Composable
-private fun SegmentedChoice(
+internal fun SegmentedChoice(
     options: List<Pair<String, ImageVector>>,
     selected: Int,
     onSelect: (Int) -> Unit,
