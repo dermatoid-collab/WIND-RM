@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.RideThresholds
 import com.windrm.app.location.DeviceLocation
 import com.windrm.app.remote.strava.StravaAuthEvent
 import com.windrm.app.remote.strava.StravaAuthManager
@@ -77,6 +78,10 @@ class SettingsViewModel(
     fun setMaxDescentSpeedKmh(speedKmh: Double) = viewModelScope.launch {
         settingsRepository.setMaxDescentSpeedKmh(speedKmh.coerceIn(10.0, 120.0))
     }
+
+    fun setRideThresholds(thresholds: RideThresholds) = viewModelScope.launch { settingsRepository.setRideThresholds(thresholds) }
+
+    fun resetRideThresholds() = viewModelScope.launch { settingsRepository.resetRideThresholds() }
 
     fun setForecastHorizonDays(days: Int) = viewModelScope.launch {
         settingsRepository.setForecastHorizonDays(days.coerceIn(1, 16))

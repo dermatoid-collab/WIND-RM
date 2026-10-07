@@ -106,7 +106,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
     var showStartPicker by remember { mutableStateOf(false) }
     var showShareChoice by remember { mutableStateOf(false) }
     var showQuality by remember { mutableStateOf(false) }
-    val quality = (state as? ForecastUiState.Success)?.result?.let { remember(it) { RideQualityEvaluator.evaluate(it) } }
+    val quality = (state as? ForecastUiState.Success)?.result?.let { remember(it, viewModel.rideThresholds) { RideQualityEvaluator.evaluate(it, viewModel.rideThresholds) } }
     // The pinned map and the scrolling content are recorded separately so the share export can
     // stitch the whole page together, including the parts scrolled out of view.
     val mapLayer = rememberGraphicsLayer()

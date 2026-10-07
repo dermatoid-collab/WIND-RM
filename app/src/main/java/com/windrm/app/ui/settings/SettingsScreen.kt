@@ -2,13 +2,20 @@ package com.windrm.app.ui.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -29,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,9 +46,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.windrm.app.BuildConfig
 import com.windrm.app.R
+import com.windrm.app.domain.RideThresholds
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.ThemeMode
 
@@ -156,6 +166,10 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                 )
             }
 
+            SettingsSection(stringResource(R.string.settings_ride_light)) {
+                RideThresholdsEditor(settings.rideThresholds, viewModel::setRideThresholds, viewModel::resetRideThresholds)
+            }
+
             SettingsSection(stringResource(R.string.settings_home_location)) {
                 if (settings.hasFixedHomeLocation) {
                     Text(
@@ -262,6 +276,123 @@ private fun NumberSetting(label: String, value: Double, unit: String, onChange: 
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
     )
 }
+
+/**
+ * One row per traffic-light metric with its yellow and red limits side by side. Each edit is
+ * clamped to a plausible range and saved at once; ice risk has a single (red) limit.
+ */
+@Composable
+private fun RideThresholdsEditor(
+    limits: RideThresholds,
+    onChange: (RideThresholds) -> Unit,
+    onReset: () -> Unit,
+) {
+    Text(
+        stringResource(R.string.settings_ride_light_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Spacer(Modifier.weight(THRESHOLD_LABEL_WEIGHT))
+        LimitHeader(stringResource(R.string.settings_ride_yellow), RIDE_YELLOW, Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        LimitHeader(stringResource(R.string.settings_ride_red), RIDE_RED, Modifier.weight(1f))
+    }
+    ThresholdRow(stringResource(R.string.settings_ride_feels_cold), limits.feelsColdYellowC, limits.feelsColdRedC, -30.0..40.0, downwards = true,
+        onYellow = { onChange(limits.copy(feelsColdYellowC = it)) }, onRed = { onChange(limits.copy(feelsColdRedC = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_feels_hot), limits.feelsHotYellowC, limits.feelsHotRedC, 0.0..55.0,
+        onYellow = { onChange(limits.copy(feelsHotYellowC = it)) }, onRed = { onChange(limits.copy(feelsHotRedC = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_rain_prob), limits.rainProbYellowPct, limits.rainProbRedPct, 0.0..100.0,
+        onYellow = { onChange(limits.copy(rainProbYellowPct = it)) }, onRed = { onChange(limits.copy(rainProbRedPct = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_rain), limits.rainYellowMmH, limits.rainRedMmH, 0.0..50.0,
+        onYellow = { onChange(limits.copy(rainYellowMmH = it)) }, onRed = { onChange(limits.copy(rainRedMmH = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_wind), limits.windYellowKmh, limits.windRedKmh, 0.0..150.0,
+        onYellow = { onChange(limits.copy(windYellowKmh = it)) }, onRed = { onChange(limits.copy(windRedKmh = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_gusts), limits.gustYellowKmh, limits.gustRedKmh, 0.0..200.0,
+        onYellow = { onChange(limits.copy(gustYellowKmh = it)) }, onRed = { onChange(limits.copy(gustRedKmh = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_aqi), limits.aqiYellow, limits.aqiRed, 0.0..500.0,
+        onYellow = { onChange(limits.copy(aqiYellow = it)) }, onRed = { onChange(limits.copy(aqiRed = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_uv), limits.uvYellow, limits.uvRed, 0.0..15.0,
+        onYellow = { onChange(limits.copy(uvYellow = it)) }, onRed = { onChange(limits.copy(uvRed = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_dew), limits.dewPointYellowC, limits.dewPointRedC, -20.0..35.0,
+        onYellow = { onChange(limits.copy(dewPointYellowC = it)) }, onRed = { onChange(limits.copy(dewPointRedC = it)) })
+    ThresholdRow(stringResource(R.string.settings_ride_ice), null, limits.iceMaxTempC, -10.0..10.0,
+        onYellow = {}, onRed = { onChange(limits.copy(iceMaxTempC = it)) })
+    TextButton(onClick = onReset, modifier = Modifier.padding(top = 8.dp)) {
+        Text(stringResource(R.string.settings_ride_reset))
+    }
+}
+
+@Composable
+private fun LimitHeader(text: String, color: Color, modifier: Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).background(color, CircleShape))
+        Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 6.dp))
+    }
+}
+
+/** [downwards] metrics (cold) worsen as the value drops, so red must sit below yellow instead of above. */
+@Composable
+private fun ThresholdRow(
+    label: String,
+    yellow: Double?,
+    red: Double,
+    range: ClosedFloatingPointRange<Double>,
+    downwards: Boolean = false,
+    onYellow: (Double) -> Unit,
+    onRed: (Double) -> Unit,
+) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(THRESHOLD_LABEL_WEIGHT).padding(end = 8.dp))
+        if (yellow != null) {
+            LimitField(yellow, range, onYellow, Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+        Spacer(Modifier.width(8.dp))
+        LimitField(red, range, onRed, Modifier.weight(1f))
+    }
+    val misordered = yellow != null && (if (downwards) red > yellow else red < yellow)
+    if (misordered) {
+        Text(
+            stringResource(R.string.settings_ride_order_error),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+}
+
+/**
+ * Keeps what the user is typing (e.g. "0," on the way to "0,5") and only rewrites the text when the
+ * stored value changes from elsewhere, such as "Restore defaults".
+ */
+@Composable
+private fun LimitField(value: Double, range: ClosedFloatingPointRange<Double>, onChange: (Double) -> Unit, modifier: Modifier) {
+    var text by remember { mutableStateOf(formatLimit(value)) }
+    LaunchedEffect(value) {
+        if (parseNumber(text) != value) text = formatLimit(value)
+    }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { input ->
+            text = input
+            parseNumber(input)?.let { onChange(it.coerceIn(range)) }
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        textStyle = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
+        singleLine = true,
+        modifier = modifier,
+    )
+}
+
+private const val THRESHOLD_LABEL_WEIGHT = 1.6f
+private val RIDE_YELLOW = Color(0xFFF2B400)
+private val RIDE_RED = Color(0xFFD7261E)
+
+private fun parseNumber(text: String): Double? = text.trim().replace(',', '.').toDoubleOrNull()
+
+private fun formatLimit(value: Double): String =
+    if (value == value.toInt().toDouble()) value.toInt().toString() else value.toString()
 
 private fun formatSpeed(speedKmh: Double): String =
     if (speedKmh == speedKmh.toInt().toDouble()) speedKmh.toInt().toString() else "%.1f".format(speedKmh)

@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.domain.RideThresholds
 import com.windrm.app.domain.cropped
 import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.repository.RouteRepository
@@ -52,6 +53,10 @@ class ForecastViewModel(
     /** Hourly weather at the route start over the whole forecast horizon, for the start-time picker. */
     var startPickerWeather by mutableStateOf<List<WeatherPoint>?>(null)
         private set
+
+    /** Limits for the ride traffic light, from Settings. */
+    var rideThresholds by mutableStateOf(RideThresholds())
+        private set
     var forecastHorizonDays by mutableStateOf(15)
         private set
 
@@ -75,6 +80,7 @@ class ForecastViewModel(
             val settings = settingsRepository.current()
             mapStyle = settings.mapStyle
             forecastHorizonDays = settings.forecastHorizonDays
+            rideThresholds = settings.rideThresholds
         }
         load()
     }

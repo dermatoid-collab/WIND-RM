@@ -12,55 +12,81 @@ enum class RideLevel { GREEN, YELLOW, RED }
 /** One reason the ride isn't green: the worst point for that metric, where and when it happens. */
 data class RideIssue(val level: RideLevel, val text: String, val distanceKm: Double, val time: Instant)
 
+/**
+ * Limits for the ride traffic light, editable in Settings. A value reaches yellow at its yellow limit and red
+ * once past its red limit; cold limits work downwards (yellow below, red below).
+ */
+data class RideThresholds(
+    val feelsColdYellowC: Double = 10.0,
+    val feelsColdRedC: Double = 4.0,
+    val feelsHotYellowC: Double = 28.0,
+    val feelsHotRedC: Double = 33.0,
+    val rainProbYellowPct: Double = 30.0,
+    val rainProbRedPct: Double = 60.0,
+    val rainYellowMmH: Double = 0.2,
+    val rainRedMmH: Double = 1.0,
+    val windYellowKmh: Double = 20.0,
+    val windRedKmh: Double = 35.0,
+    val gustYellowKmh: Double = 35.0,
+    val gustRedKmh: Double = 50.0,
+    val aqiYellow: Double = 40.0,
+    val aqiRed: Double = 60.0,
+    val uvYellow: Double = 6.0,
+    val uvRed: Double = 8.0,
+    val dewPointYellowC: Double = 18.0,
+    val dewPointRedC: Double = 22.0,
+    val iceMaxTempC: Double = 2.0,
+)
+
 /** Traffic light for the whole ride: the worst level among all metrics, with what triggered it. */
 data class RideQuality(val level: RideLevel, val issues: List<RideIssue>)
 
 /**
- * Checks every forecast point against fixed cycling thresholds (green / yellow / red) for feels-like
+ * Checks every forecast point against the cycling [RideThresholds] (green / yellow / red) for feels-like
  * temperature, rain probability and intensity, wind, gusts, air quality, UV, daylight, ice risk and
  * mugginess. Each metric reports only its worst point.
  */
 object RideQualityEvaluator {
 
-    fun evaluate(result: RouteForecastResult): RideQuality {
+    fun evaluate(result: RouteForecastResult, limits: RideThresholds = RideThresholds()): RideQuality {
         val issues = listOfNotNull(
             worst(result.points) { p ->
                 val t = p.weather.feelsLikeC
                 val level = when {
-                    t < 4 || t > 33 -> RideLevel.RED
-                    t < 10 || t > 28 -> RideLevel.YELLOW
+                    t < limits.feelsColdRedC || t > limits.feelsHotRedC -> RideLevel.RED
+                    t < limits.feelsColdYellowC || t > limits.feelsHotYellowC -> RideLevel.YELLOW
                     else -> RideLevel.GREEN
                 }
-                Rated(level, maxOf(10 - t, t - 28)) { "Feels like ${t.roundToInt()}°C" }
+                Rated(level, maxOf(limits.feelsColdYellowC - t, t - limits.feelsHotYellowC)) { "Feels like ${t.roundToInt()}°C" }
             },
             worst(result.points) { p ->
                 val v = p.weather.precipitationProbabilityPct
-                Rated(level(v, yellowFrom = 30.0, redAbove = 60.0), v) { "Rain probability ${v.roundToInt()}%" }
+                Rated(level(v, limits.rainProbYellowPct, limits.rainProbRedPct), v) { "Rain probability ${v.roundToInt()}%" }
             },
             worst(result.points) { p ->
                 val v = p.weather.precipitationMm
-                Rated(level(v, yellowFrom = 0.2, redAbove = 1.0), v) { "Rain %.1f mm/h".format(v) }
+                Rated(level(v, limits.rainYellowMmH, limits.rainRedMmH), v) { "Rain %.1f mm/h".format(v) }
             },
             worst(result.points) { p ->
                 val v = p.weather.windSpeedKmh
-                Rated(level(v, yellowFrom = 20.0, redAbove = 35.0), v) { "Wind ${v.roundToInt()} km/h" }
+                Rated(level(v, limits.windYellowKmh, limits.windRedKmh), v) { "Wind ${v.roundToInt()} km/h" }
             },
             worst(result.points) { p ->
                 val v = p.weather.windGustKmh
-                Rated(level(v, yellowFrom = 35.0, redAbove = 50.0), v) { "Gusts up to ${v.roundToInt()} km/h" }
+                Rated(level(v, limits.gustYellowKmh, limits.gustRedKmh), v) { "Gusts up to ${v.roundToInt()} km/h" }
             },
             worst(result.points) { p ->
                 val v = p.airQuality?.europeanAqi ?: 0.0
                 val level = when {
-                    v > 60 -> RideLevel.RED
-                    v > 40 -> RideLevel.YELLOW
+                    v > limits.aqiRed -> RideLevel.RED
+                    v > limits.aqiYellow -> RideLevel.YELLOW
                     else -> RideLevel.GREEN
                 }
                 Rated(level, v) { "AQI ${v.roundToInt()} (${aqiLabel(v)})" }
             },
             worst(result.points) { p ->
                 val v = p.weather.uvIndex
-                Rated(level(v, yellowFrom = 6.0, redAbove = 8.0), v) { "UV index %.1f".format(v) }
+                Rated(level(v, limits.uvYellow, limits.uvRed), v) { "UV index %.1f".format(v) }
             },
             worst(result.points) { p ->
                 val level = light(p, result.daylight)
@@ -69,12 +95,12 @@ object RideQualityEvaluator {
             worst(result.points) { p ->
                 val w = p.weather
                 val wet = w.precipitationMm > 0.0 || (w.humidityPct >= 90 && w.temperatureC - w.dewPointC <= 1.0)
-                val level = if (w.temperatureC <= 2.0 && wet) RideLevel.RED else RideLevel.GREEN
+                val level = if (w.temperatureC <= limits.iceMaxTempC && wet) RideLevel.RED else RideLevel.GREEN
                 Rated(level, -w.temperatureC) { "Ice risk: ${w.temperatureC.roundToInt()}°C and wet" }
             },
             worst(result.points) { p ->
                 val v = p.weather.dewPointC
-                Rated(level(v, yellowFrom = 18.0, redAbove = 22.0), v) { "Muggy: dew point ${v.roundToInt()}°C" }
+                Rated(level(v, limits.dewPointYellowC, limits.dewPointRedC), v) { "Muggy: dew point ${v.roundToInt()}°C" }
             },
         ).sortedByDescending { it.level }
         return RideQuality(issues.maxOfOrNull { it.level } ?: RideLevel.GREEN, issues)
