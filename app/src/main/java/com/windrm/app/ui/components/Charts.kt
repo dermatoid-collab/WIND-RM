@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,7 +96,7 @@ fun MultiSeriesChart(
     Column(modifier = modifier.fillMaxWidth()) {
         Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 8.dp))
 
-        TimeAxisLabels(xLabels)
+        TimeAxisLabels(xLabels, yUnit.trim())
         if (!daylightBar.isNullOrEmpty()) DaylightBar(daylightBar)
 
         val allValues = series.flatMap { it.values }.ifEmpty { listOf(0f) }
@@ -106,7 +107,7 @@ fun MultiSeriesChart(
         val max = if (rawMin == rawMax) rawMax + 1f else rawMax
 
         Row(Modifier.fillMaxWidth().height(chartHeight)) {
-            YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = false, height = chartHeight)
+            YAxisLabels(min, max, Modifier.width(Y_AXIS_WIDTH), alignEnd = false, height = chartHeight)
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().height(chartHeight)) {
                 Canvas(
                     modifier = Modifier
@@ -222,7 +223,7 @@ fun MultiSeriesChart(
                     )
                 }
             }
-            YAxisLabels(min, max, yUnit, Modifier.width(Y_AXIS_WIDTH), alignEnd = true, height = chartHeight)
+            YAxisLabels(min, max, Modifier.width(Y_AXIS_WIDTH), alignEnd = true, height = chartHeight)
         }
 
         if (series.any { it.label.isNotEmpty() }) {
@@ -270,17 +271,18 @@ private fun niceStep(values: List<Float>): Float {
     return if (range <= 0.01f) 1f else range / 4f
 }
 
+/**
+ * Time labels across the top, with the y-axis unit (if any) written once above each axis column
+ * instead of after every axis value, where it wrapped in the narrow column.
+ */
 @Composable
-private fun TimeAxisLabels(labels: List<String>) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Y_AXIS_WIDTH, end = Y_AXIS_WIDTH, bottom = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        labels.forEach { label ->
-            Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun TimeAxisLabels(labels: List<String>, unit: String) {
+    Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        AxisText(unit, Modifier.width(Y_AXIS_WIDTH))
+        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+            labels.forEach { label -> AxisText(label) }
         }
+        AxisText(unit, Modifier.width(Y_AXIS_WIDTH), textAlign = TextAlign.End)
     }
 }
 
@@ -306,19 +308,36 @@ private fun DaylightBar(levels: List<Float>) {
 }
 
 @Composable
-private fun YAxisLabels(min: Float, max: Float, unit: String, modifier: Modifier, alignEnd: Boolean, height: Dp) {
+private fun YAxisLabels(min: Float, max: Float, modifier: Modifier, alignEnd: Boolean, height: Dp) {
     Column(
         modifier = modifier.height(height),
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
     ) {
-        Text(formatAxisValue(max) + unit, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(formatAxisValue((max + min) / 2) + unit, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(formatAxisValue(min) + unit, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AxisText(formatAxisValue(max))
+        AxisText(formatAxisValue((max + min) / 2))
+        AxisText(formatAxisValue(min))
     }
 }
 
-private fun formatAxisValue(v: Float): String = if (v == v.toInt().toFloat()) v.toInt().toString() else "%.1f".format(v)
+@Composable
+private fun AxisText(text: String, modifier: Modifier = Modifier, textAlign: TextAlign? = null) {
+    Text(
+        text,
+        modifier = modifier,
+        fontSize = 11.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        softWrap = false,
+        textAlign = textAlign,
+    )
+}
+
+// Whole numbers above 100 (e.g. elevation): a decimal there only costs width in the narrow axis column.
+private fun formatAxisValue(v: Float): String = when {
+    v == v.toInt().toFloat() || kotlin.math.abs(v) >= 100f -> v.roundToInt().toString()
+    else -> "%.1f".format(v)
+}
 
 /** Rounds to [decimals] places and drops a trailing ".0", e.g. 12.0 -> "12", 12.34 -> "12.3". */
 private fun formatValue(v: Float, decimals: Int): String {
