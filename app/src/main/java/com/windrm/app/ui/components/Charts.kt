@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.windrm.app.ui.theme.DaylightColor
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -124,20 +126,51 @@ fun MultiSeriesChart(
                             val scrub = onScrub ?: return@pointerInput
                             fun fractionForX(x: Float): Float =
                                 if (size.width <= 0) 0f else (x / size.width).coerceIn(0f, 1f)
+                            // A tap, a hold or a sideways drag scrubs; a vertical drag is left to the
+                            // enclosing scroll, so a page of charts still scrolls from on top of them.
                             awaitEachGesture {
                                 val down = awaitFirstDown()
-                                scrub(fractionForX(down.position.x))
-                                down.consume()
-                                var pointer = down
-                                while (pointer.pressed) {
-                                    val event = awaitPointerEvent()
-                                    pointer = event.changes.first()
-                                    if (pointer.pressed) {
-                                        scrub(fractionForX(pointer.position.x))
-                                        pointer.consume()
+                                val slop = viewConfiguration.touchSlop
+                                var scrubbing = false
+                                var dx = 0f
+                                var dy = 0f
+                                while (true) {
+                                    val event = if (scrubbing) {
+                                        awaitPointerEvent()
+                                    } else {
+                                        // Holding still for a moment counts as a decision to scrub.
+                                        withTimeoutOrNull(SCRUB_HOLD_MS) { awaitPointerEvent() }
                                     }
+                                    if (event == null) {
+                                        scrubbing = true
+                                        scrub(fractionForX(down.position.x))
+                                        continue
+                                    }
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) {
+                                        // Lifted before deciding: a tap selects that point.
+                                        if (!scrubbing && !change.isConsumed) {
+                                            scrubbing = true
+                                            scrub(fractionForX(change.position.x))
+                                        }
+                                        break
+                                    }
+                                    if (!scrubbing) {
+                                        // The scroll container took the gesture over.
+                                        if (change.isConsumed) break
+                                        val delta = change.positionChange()
+                                        dx += delta.x
+                                        dy += delta.y
+                                        when {
+                                            abs(dx) > slop && abs(dx) > abs(dy) -> scrubbing = true
+                                            abs(dy) > slop -> break
+                                            else -> continue
+                                        }
+                                    }
+                                    scrub(fractionForX(change.position.x))
+                                    change.consume()
                                 }
-                                onScrubEnd?.invoke()
+                                if (scrubbing) onScrubEnd?.invoke()
                             }
                         },
                 ) {
@@ -402,3 +435,6 @@ private fun Legend(series: List<ChartSeries>) {
         }
     }
 }
+
+/** How long a finger must rest on a chart before it scrubs without moving sideways. */
+private const val SCRUB_HOLD_MS = 120L
