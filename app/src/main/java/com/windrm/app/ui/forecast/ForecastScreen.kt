@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -89,7 +88,6 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
         topBar = {
             CompactTopBar(
                 title = routeTitle(state),
-                subtitle = subTitle(state),
                 onBack = onBack,
                 onShare = (state as? ForecastUiState.Success)?.let { { shareForecast(context, it.result) } },
             )
@@ -111,9 +109,9 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
     }
 }
 
-/** Single-row orange bar: back, route name with start date/time, share -- as short as the touch targets allow. */
+/** Single-row orange bar: back, route name, share -- as short as the touch targets allow. */
 @Composable
-private fun CompactTopBar(title: String, subtitle: String?, onBack: () -> Unit, onShare: (() -> Unit)?) {
+private fun CompactTopBar(title: String, onBack: () -> Unit, onShare: (() -> Unit)?) {
     Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(48.dp),
@@ -127,12 +125,8 @@ private fun CompactTopBar(title: String, subtitle: String?, onBack: () -> Unit, 
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
+                modifier = Modifier.weight(1f),
             )
-            subtitle?.let {
-                Text("  ·  $it", style = MaterialTheme.typography.bodySmall, maxLines = 1, softWrap = false)
-            }
-            Spacer(Modifier.weight(1f))
             onShare?.let {
                 IconButton(onClick = it) {
                     Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
@@ -145,13 +139,6 @@ private fun CompactTopBar(title: String, subtitle: String?, onBack: () -> Unit, 
 @Composable
 private fun routeTitle(state: ForecastUiState): String =
     (state as? ForecastUiState.Success)?.result?.route?.name ?: ""
-
-@Composable
-private fun subTitle(state: ForecastUiState): String? {
-    val result = (state as? ForecastUiState.Success)?.result ?: return null
-    val formatter = DateTimeFormatter.ofPattern("d MMM HH:mm").withZone(ZoneId.systemDefault())
-    return formatter.format(result.startTime)
-}
 
 @Composable
 private fun LoadingContent() {
