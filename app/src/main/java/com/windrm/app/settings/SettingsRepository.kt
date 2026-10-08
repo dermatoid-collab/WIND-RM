@@ -28,9 +28,12 @@ enum class MapStyle(val label: String, val requiresApiKey: Boolean) {
     CARTO_POSITRON("CARTO Positron", requiresApiKey = true),
     THUNDERFOREST_OUTDOORS("Thunderforest Outdoors", requiresApiKey = true),
 
-    // Base map without names plus a transparent layer of names only, drawn above the route (like Strava)
-    CARTO_VOYAGER("CARTO Voyager (names above the route)", requiresApiKey = false),
-    CARTO_DARK("CARTO Dark Matter (names above the route)", requiresApiKey = false),
+    // Base map without names plus a transparent layer of names only, drawn above the route (like Strava).
+    // CARTO needs its free key, like CARTO Positron; Esri's gray canvas needs none.
+    CARTO_VOYAGER("CARTO Voyager (names above the route)", requiresApiKey = true),
+    CARTO_DARK("CARTO Dark Matter (names above the route)", requiresApiKey = true),
+    ESRI_LIGHT_GRAY("Esri Light Gray (names above the route)", requiresApiKey = false),
+    ESRI_DARK_GRAY("Esri Dark Gray (names above the route)", requiresApiKey = false),
 }
 
 /**

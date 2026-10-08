@@ -223,7 +223,7 @@
 
 METEO FRANCE, Institut national de l\'environnement industriel et des risques (Ineris), Aarhus University, Norwegian Meteorological Institute (MET Norway), Jülich Institut für Energie- und Klimaforschung (IEK), Institute of Environmental Protection – National Research Institute (IEP-NRI), Koninklijk Nederlands Meteorologisch Instituut (KNMI), Nederlandse Organisatie voor toegepast-natuurwetenschappelijk onderzoek (TNO), Swedish Meteorological and Hydrological Institute (SMHI), Finnish Meteorological Institute (FMI), Italian National Agency for New Technologies, Energy and Sustainable Economic Development (ENEA) and Barcelona Supercomputing Center (BSC) (2022): CAMS European air quality forecasts, ENSEMBLE data. Copernicus Atmosphere Monitoring Service (CAMS) Atmosphere Data Store (ADS).</string>
     <string name="source_maps_title">Maps</string>
-    <string name="source_maps_text">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL). OSM Standard tiles by the OpenStreetMap Foundation. CARTO Voyager and Dark Matter tiles © CARTO.
+    <string name="source_maps_text">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL). OSM Standard tiles by the OpenStreetMap Foundation. CARTO Voyager and Dark Matter tiles © CARTO. Esri Light Gray and Dark Gray tiles © Esri, HERE, Garmin and OpenStreetMap contributors.
 OpenTopoMap: map style © OpenTopoMap (CC-BY-SA), elevation data SRTM.
 Mapbox Outdoors: © Mapbox.
 CARTO Positron: © CARTO.

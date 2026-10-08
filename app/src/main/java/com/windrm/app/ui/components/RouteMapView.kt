@@ -504,22 +504,37 @@ private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
         "MapboxOutdoors", 20, "https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/", "?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
     )
     MapStyle.CARTO_VOYAGER -> xyzTileSource(
-        "CartoVoyagerNoLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/", ".png", CARTO_COPYRIGHT,
+        "CartoVoyagerNoLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
     )
     MapStyle.CARTO_DARK -> xyzTileSource(
-        "CartoDarkNoLabels", 20, "https://basemaps.cartocdn.com/dark_nolabels/", ".png", CARTO_COPYRIGHT,
+        "CartoDarkNoLabels", 20, "https://basemaps.cartocdn.com/dark_nolabels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
+    )
+    MapStyle.ESRI_LIGHT_GRAY -> xyzTileSource(
+        "EsriLightGrayBase", 16, "$ESRI_TILES/Canvas/World_Light_Gray_Base/MapServer/tile/", "", ESRI_COPYRIGHT, yBeforeX = true,
+    )
+    MapStyle.ESRI_DARK_GRAY -> xyzTileSource(
+        "EsriDarkGrayBase", 16, "$ESRI_TILES/Canvas/World_Dark_Gray_Base/MapServer/tile/", "", ESRI_COPYRIGHT, yBeforeX = true,
     )
 }
 
+private val CARTO_SUFFIX get() = ".png?api_key=${BuildConfig.CARTO_API_KEY}"
 private const val CARTO_COPYRIGHT = "© OpenStreetMap contributors © CARTO"
+private const val ESRI_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services"
+private const val ESRI_COPYRIGHT = "Tiles © Esri, HERE, Garmin, © OpenStreetMap contributors"
 
 /** The transparent layer of place names that goes above the route for the styles that draw their names separately. */
 private fun labelsSourceFor(style: MapStyle): ITileSource? = when (style) {
     MapStyle.CARTO_VOYAGER -> xyzTileSource(
-        "CartoVoyagerLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/", ".png", CARTO_COPYRIGHT,
+        "CartoVoyagerLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
     )
     MapStyle.CARTO_DARK -> xyzTileSource(
-        "CartoDarkLabels", 20, "https://basemaps.cartocdn.com/dark_only_labels/", ".png", CARTO_COPYRIGHT,
+        "CartoDarkLabels", 20, "https://basemaps.cartocdn.com/dark_only_labels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
+    )
+    MapStyle.ESRI_LIGHT_GRAY -> xyzTileSource(
+        "EsriLightGrayLabels", 16, "$ESRI_TILES/Canvas/World_Light_Gray_Reference/MapServer/tile/", "", ESRI_COPYRIGHT, yBeforeX = true,
+    )
+    MapStyle.ESRI_DARK_GRAY -> xyzTileSource(
+        "EsriDarkGrayLabels", 16, "$ESRI_TILES/Canvas/World_Dark_Gray_Reference/MapServer/tile/", "", ESRI_COPYRIGHT, yBeforeX = true,
     )
     else -> null
 }
@@ -563,10 +578,22 @@ private class LabelsLayer {
 /** A simple z/x/y raster tile source, built directly on osmdroid's base class for reliability
  * across osmdroid versions (unlike the XYZTileSource convenience class, which isn't available
  * in every release). */
-private fun xyzTileSource(name: String, maxZoom: Int, baseUrl: String, urlSuffix: String, copyright: String = ""): OnlineTileSourceBase =
+private fun xyzTileSource(
+    name: String,
+    maxZoom: Int,
+    baseUrl: String,
+    urlSuffix: String,
+    copyright: String = "",
+    /** Esri's servers number tiles zoom/row/column, i.e. y before x. */
+    yBeforeX: Boolean = false,
+): OnlineTileSourceBase =
     object : OnlineTileSourceBase(name, 0, maxZoom, 256, urlSuffix, arrayOf(baseUrl), copyright) {
-        override fun getTileURLString(pMapTileIndex: Long): String =
-            baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex) + "/" + MapTileIndex.getY(pMapTileIndex) + urlSuffix
+        override fun getTileURLString(pMapTileIndex: Long): String {
+            val x = MapTileIndex.getX(pMapTileIndex)
+            val y = MapTileIndex.getY(pMapTileIndex)
+            val (first, second) = if (yBeforeX) y to x else x to y
+            return baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + first + "/" + second + urlSuffix
+        }
     }
 
 private fun createMapView(context: Context): MapView = MapView(context).apply {

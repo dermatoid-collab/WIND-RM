@@ -397,7 +397,7 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
 
 private fun apiKeyFor(style: MapStyle): String = when (style) {
     MapStyle.MAPBOX_OUTDOORS -> BuildConfig.MAPBOX_ACCESS_TOKEN
-    MapStyle.CARTO_POSITRON -> BuildConfig.CARTO_API_KEY
+    MapStyle.CARTO_POSITRON, MapStyle.CARTO_VOYAGER, MapStyle.CARTO_DARK -> BuildConfig.CARTO_API_KEY
     MapStyle.THUNDERFOREST_OUTDOORS -> BuildConfig.THUNDERFOREST_API_KEY
     else -> ""
 }

@@ -82,8 +82,8 @@ Per far funzionare anche **"Connetti Strava"** nell'APK compilato da GitHub, agg
 semplicemente la tab Strava resterà "non configurata".
 
 Allo stesso modo, per offrire anche gli stili mappa **Mapbox Outdoors** (lo stesso usato
-dall'app di Strava), **CARTO Positron** e **Thunderforest Outdoors** nella schermata Settings
-(oltre a OSM Standard e OpenTopoMap, sempre disponibili senza chiave), aggiungi i secret
+dall'app di Strava), **CARTO Positron**, **CARTO Voyager / Dark Matter** (i nomi dei luoghi sopra la traccia) e **Thunderforest Outdoors** nella schermata Settings
+(oltre a OSM Standard, OpenTopoMap ed Esri Light/Dark Gray, sempre disponibili senza chiave), aggiungi i secret
 `MAPBOX_ACCESS_TOKEN` (gratuito su <https://account.mapbox.com/access-tokens/>),
 `CARTO_API_KEY` (gratuita su <https://carto.com/basemaps/apikey/>) e
 `THUNDERFOREST_API_KEY` (gratuita su <https://www.thunderforest.com/pricing/>, piano Hobby).
