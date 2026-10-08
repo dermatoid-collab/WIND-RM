@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -218,16 +219,11 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
 
             RouteStats(viewModel, draft, profileValues)
 
+            // Undo and Clear are as wide as each other; the middle one is wider so "Back to start" stays on one line.
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = viewModel::undo, enabled = viewModel.waypoints.isNotEmpty() && !viewModel.busy, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.builder_undo))
-                }
-                OutlinedButton(onClick = viewModel::returnToStart, enabled = viewModel.canReturnToStart() && !viewModel.busy, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.builder_back_to_start))
-                }
-                OutlinedButton(onClick = viewModel::clear, enabled = viewModel.waypoints.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.builder_clear))
-                }
+                ActionPill(stringResource(R.string.builder_undo), viewModel::undo, viewModel.waypoints.isNotEmpty() && !viewModel.busy, Modifier.weight(1f))
+                ActionPill(stringResource(R.string.builder_back_to_start), viewModel::returnToStart, viewModel.canReturnToStart() && !viewModel.busy, Modifier.weight(1.5f))
+                ActionPill(stringResource(R.string.builder_clear), viewModel::clear, viewModel.waypoints.isNotEmpty(), Modifier.weight(1f))
             }
         }
     }
@@ -315,6 +311,13 @@ private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileV
         }
 
         ElevationSparkline(profileValues, Modifier.fillMaxWidth().height(56.dp))
+    }
+}
+
+@Composable
+private fun ActionPill(text: String, onClick: () -> Unit, enabled: Boolean, modifier: Modifier) {
+    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
+        Text(text, style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false)
     }
 }
 
