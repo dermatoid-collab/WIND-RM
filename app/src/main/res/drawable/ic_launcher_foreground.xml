@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Sun over a mountain ridge with a road winding towards the viewer, on a dark (#1A1B26) background.
+  A yellow sun rising behind a green mountain ridge, with a sand-coloured road winding towards the viewer,
+  on the sky-blue background of the adaptive icon.
   Drawn in the 398 x 379 coordinates of the reference artwork and scaled into the 72 dp visible
-  area of the adaptive icon; the sun stays inside the 66 dp safe zone, while the ridge lines and
+  area of the adaptive icon; the sun stays inside the 66 dp safe zone, while the mountain and
   the road run past the edges so every launcher mask crops them as bleeds.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -23,14 +24,21 @@
                     android:type="linear"
                     android:startX="220" android:startY="50"
                     android:endX="300" android:endY="200"
-                    android:startColor="#FE8C18"
-                    android:endColor="#F7600C" />
+                    android:startColor="#FFE866"
+                    android:endColor="#FFC21A" />
             </aapt:attr>
         </path>
-        <!-- Gap between the sun and the ridge, in the colour of the icon background -->
-        <path
-            android:fillColor="#1A1B26"
-            android:pathData="M100,214 L210,116 L282,188 L305,169 L510,360 L510,520 L100,520 Z" />
+        <!-- Mountain: the whole body under the ridge, darker towards the foot -->
+        <path android:pathData="M-110,329.6 L112,144.7 L160,189.7 L210,140.3 L283,213.3 L305,192 L510,364 L510,520 L-110,520 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="0" android:startY="140"
+                    android:endX="0" android:endY="520"
+                    android:startColor="#3E9B4F"
+                    android:endColor="#1F6B34" />
+            </aapt:attr>
+        </path>
         <!-- Ridge: three strokes; the overlapping ends give the notched valleys -->
         <path
             android:pathData="M-110,329.6 L112,144.7 L160,189.7 M155,189.3 L210,140.3 L290,220.3 M283,210 L305,192 L510,364"
@@ -43,8 +51,8 @@
                     android:type="linear"
                     android:startX="0" android:startY="140"
                     android:endX="398" android:endY="270"
-                    android:startColor="#FD7E12"
-                    android:endColor="#F25A06" />
+                    android:startColor="#7BD389"
+                    android:endColor="#4FB866" />
             </aapt:attr>
         </path>
         <!-- Road -->
@@ -54,8 +62,8 @@
                     android:type="linear"
                     android:startX="100" android:startY="237"
                     android:endX="150" android:endY="380"
-                    android:startColor="#F86A0C"
-                    android:endColor="#F44F02" />
+                    android:startColor="#FBF3D5"
+                    android:endColor="#EAD9A0" />
             </aapt:attr>
         </path>
     </group>
