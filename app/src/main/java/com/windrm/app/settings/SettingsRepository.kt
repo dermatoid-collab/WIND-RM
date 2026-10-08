@@ -145,6 +145,14 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun current(): AppSettings = settings.first()
 
+    /** The id BRouter's server gave the custom routing profile stored under [key] (null = none uploaded yet). */
+    suspend fun brouterProfileId(key: String): String? =
+        context.settingsDataStore.data.first()[stringPreferencesKey("brouter_profile_$key")]
+
+    suspend fun setBrouterProfileId(key: String, id: String) {
+        context.settingsDataStore.edit { it[stringPreferencesKey("brouter_profile_$key")] = id }
+    }
+
     suspend fun setMapStyle(style: MapStyle) {
         context.settingsDataStore.edit { it[keyMapStyle] = style.name }
     }

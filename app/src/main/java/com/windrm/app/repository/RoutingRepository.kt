@@ -9,6 +9,8 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import java.io.IOException
 
@@ -112,13 +114,18 @@ private fun interpolate(a: RoutedPoint, b: RoutedPoint, t: Double) = RoutedPoint
  * BRouter profiles. All of them route by cost (distance and climb), never by popularity, so the
  * result is the most direct way. Profile names are the ones BRouter's public server ships; they
  * live here so a rename is a one-line change.
+ *
+ * The two ride profiles are WIND-RM's own ([customKey]): BRouter's fastbike with the main roads (primary,
+ * secondary) made as cheap as the shortest way and the small streets dearer, so the route stays on the
+ * through road instead of cutting through towns. They are uploaded to the server once; [brouterName] is
+ * the stock profile used if that upload is not possible.
  */
-enum class BuilderProfile(val brouterName: String) {
-    /** Ride, paved only: the fast road-bike profile, then checked against the way tags. */
-    ROAD_PAVED("fastbike"),
+enum class BuilderProfile(val brouterName: String, val customKey: String? = null) {
+    /** Ride, paved only: main roads first, unpaved ways ten times dearer, then checked against the way tags. */
+    ROAD_PAVED("fastbike", "ride_paved"),
 
-    /** Ride with unpaved roads allowed by the user: the touring profile accepts tracks. */
-    ROAD_ANY("trekking"),
+    /** Ride with unpaved roads allowed by the user: main roads first, unpaved ways only a little dearer. */
+    ROAD_ANY("trekking", "ride_any"),
 
     /** Trekking: mountain hiking paths and trails. */
     TREK("hiking-mountain"),
@@ -133,12 +140,52 @@ enum class BuilderProfile(val brouterName: String) {
     }
 }
 
+/** Where the app remembers the id the server gave each uploaded profile, so it is uploaded once and not at every start. */
+interface ProfileIdStore {
+    suspend fun get(key: String): String?
+    suspend fun put(key: String, id: String)
+}
+
 enum class RoutingError { NO_ROUTE, NO_CONNECTION, FAILED }
 
 class RoutingException(val error: RoutingError, cause: Throwable? = null) : Exception(error.name, cause)
 
 /** Routes between points along real roads and trails, and says what surface each stretch has. */
-class RoutingRepository(private val api: BRouterApi) {
+class RoutingRepository(
+    private val api: BRouterApi,
+    /** The text of the custom profile stored under a [BuilderProfile.customKey]. */
+    private val profileText: (String) -> String = { error("No custom profiles") },
+    private val idStore: ProfileIdStore? = null,
+) {
+    private val uploadedIds = HashMap<String, String>()
+
+    /**
+     * The profile to ask the server for: the custom one of [profile] (uploaded now if the server has not
+     * seen it yet, with [forceUpload] even if it has), or the stock one when it can't be uploaded.
+     */
+    private suspend fun profileName(profile: BuilderProfile, forceUpload: Boolean = false): String {
+        val key = profile.customKey ?: return profile.brouterName
+        // A new text of the profile gets a new key, so an app update never reuses an old upload.
+        val versioned = "${key}_v$PROFILE_VERSION"
+        if (!forceUpload) {
+            uploadedIds[versioned]?.let { return it }
+            idStore?.get(versioned)?.let {
+                uploadedIds[versioned] = it
+                return it
+            }
+        }
+        val id = try {
+            val reply = api.uploadProfile(profileText(key).toRequestBody(PROFILE_MEDIA_TYPE))
+            reply["profileid"]?.jsonPrimitive?.content?.takeIf { reply["error"] == null }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } ?: return profile.brouterName
+        uploadedIds[versioned] = id
+        idStore?.put(versioned, id)
+        return id
+    }
 
     /**
      * The most direct route from [from] to [to]: BRouter's best one. With [BuilderProfile.ROAD_PAVED] a
@@ -168,7 +215,14 @@ class RoutingRepository(private val api: BRouterApi) {
     private suspend fun fetch(from: LatLon, to: LatLon, profile: BuilderProfile, alternative: Int): RoutedSegment {
         val lonLats = "%.6f,%.6f|%.6f,%.6f".format(java.util.Locale.US, from.lon, from.lat, to.lon, to.lat)
         val json = try {
-            api.route(lonLats, profile.brouterName, alternative)
+            try {
+                api.route(lonLats, profileName(profile), alternative)
+            } catch (e: HttpException) {
+                // A server error (not a "no route" answer, which is a 400) on a custom profile: the server may have
+                // lost the uploaded file. Upload it again and ask once more.
+                if (profile.customKey == null || e.code() < 500) throw e
+                api.route(lonLats, profileName(profile, forceUpload = true), alternative)
+            }
         } catch (e: HttpException) {
             // BRouter answers 4xx/5xx with a plain-text reason (no way near the point, outside the data...).
             throw RoutingException(RoutingError.NO_ROUTE, e)
@@ -183,6 +237,10 @@ class RoutingRepository(private val api: BRouterApi) {
 
     companion object {
         private const val MAX_ALTERNATIVE_INDEX = 3
+
+        /** Bump when the text of a custom profile changes: it is then uploaded again under a new id. */
+        private const val PROFILE_VERSION = 1
+        private val PROFILE_MEDIA_TYPE = "text/plain; charset=utf-8".toMediaType()
 
         /** A paved alternative is taken over the direct route only if it is at most 10% (plus 200 m) longer. */
         private const val MAX_DETOUR_FACTOR = 1.10

@@ -2,12 +2,14 @@ package com.windrm.app.di
 
 import android.content.Context
 import com.windrm.app.BuildConfig
+import com.windrm.app.R
 import com.windrm.app.db.AppDatabase
 import com.windrm.app.remote.brouter.BRouterApi
 import com.windrm.app.remote.openmeteo.OpenMeteoApi
 import com.windrm.app.remote.strava.StravaApi
 import com.windrm.app.remote.strava.StravaAuthManager
 import com.windrm.app.remote.strava.StravaTokenStore
+import com.windrm.app.repository.ProfileIdStore
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.RoutingRepository
 import com.windrm.app.repository.StravaRepository
@@ -54,8 +56,22 @@ class AppContainer(context: Context) {
 
     val routeRepository = RouteRepository(database.routeDao())
     val weatherRepository = WeatherRepository(weatherApi, airQualityApi)
-    val routingRepository = RoutingRepository(bRouterApi)
+    val settingsRepository = SettingsRepository(context)
+    val routingRepository = RoutingRepository(
+        bRouterApi,
+        profileText = { key ->
+            val resource = when (key) {
+                "ride_paved" -> R.raw.windrm_ride_paved
+                "ride_any" -> R.raw.windrm_ride_any
+                else -> error("No routing profile $key")
+            }
+            context.resources.openRawResource(resource).bufferedReader().use { it.readText() }
+        },
+        idStore = object : ProfileIdStore {
+            override suspend fun get(key: String) = settingsRepository.brouterProfileId(key)
+            override suspend fun put(key: String, id: String) = settingsRepository.setBrouterProfileId(key, id)
+        },
+    )
     val stravaAuthManager = StravaAuthManager(context, stravaApi, stravaTokenStore)
     val stravaRepository = StravaRepository(stravaApi, stravaAuthManager)
-    val settingsRepository = SettingsRepository(context)
 }

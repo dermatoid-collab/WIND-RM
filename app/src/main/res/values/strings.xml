@@ -51,7 +51,7 @@
     <string name="builder_error_connection">Can’t reach the routing service. Check your connection.</string>
     <string name="builder_error_failed">Routing failed. Try again in a moment.</string>
     <string name="source_routing_title">Route builder</string>
-    <string name="source_routing_text">Routing by BRouter (brouter.de), based on OpenStreetMap data © OpenStreetMap contributors (ODbL). Elevations from SRTM.</string>
+    <string name="source_routing_text">Routing by BRouter (brouter.de; the road weights are derived from its fastbike profile, MIT licence), based on OpenStreetMap data © OpenStreetMap contributors (ODbL). Elevations from SRTM.</string>
     <string name="import_gpx">Import GPX</string>
     <string name="connect_strava">Connect Strava</string>
     <string name="strava_connect_prompt">Connect your Strava account to import your activities, routes and segments.</string>
