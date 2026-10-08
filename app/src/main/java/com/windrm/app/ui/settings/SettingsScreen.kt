@@ -3,6 +3,7 @@ package com.windrm.app.ui.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.windrm.app.BuildConfig
 import com.windrm.app.R
 import com.windrm.app.ui.components.AppBar
+import com.windrm.app.ui.theme.themeSwatches
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.settings.MapStyle
@@ -243,10 +245,41 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             SettingsSection(stringResource(R.string.settings_appearance)) {
-                ThemeMode.entries.forEach { mode ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = settings.themeMode == mode, onClick = { viewModel.setThemeMode(mode) })
-                        Text(mode.label, modifier = Modifier.padding(start = 4.dp))
+                val groups = listOf(
+                    null to listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK),
+                    R.string.settings_palettes_dark to ThemeMode.entries.filter { it.dark == true && it != ThemeMode.DARK },
+                    R.string.settings_palettes_light to ThemeMode.entries.filter { it.dark == false && it != ThemeMode.LIGHT },
+                )
+                groups.forEach { (title, modes) ->
+                    if (title != null) {
+                        Text(
+                            stringResource(title),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+                        )
+                    }
+                    modes.forEach { mode ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.setThemeMode(mode) },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = settings.themeMode == mode, onClick = { viewModel.setThemeMode(mode) })
+                            Text(mode.label, modifier = Modifier.weight(1f).padding(start = 4.dp))
+                            // What the palette looks like: page, bar and the two accents.
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(end = 8.dp)) {
+                                themeSwatches(mode).forEach { color ->
+                                    Box(
+                                        Modifier
+                                            .size(18.dp)
+                                            .background(color, CircleShape)
+                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

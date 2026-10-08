@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Sun over a mountain ridge with a road winding towards the viewer, on a white background.
+  Sun over a mountain ridge with a road winding towards the viewer, on a dark (#1A1B26) background.
   Drawn in the 398 x 379 coordinates of the reference artwork and scaled into the 72 dp visible
   area of the adaptive icon; the sun stays inside the 66 dp safe zone, while the ridge lines and
   the road run past the edges so every launcher mask crops them as bleeds.
@@ -27,9 +27,9 @@
                     android:endColor="#F7600C" />
             </aapt:attr>
         </path>
-        <!-- White gap between the sun and the ridge -->
+        <!-- Gap between the sun and the ridge, in the colour of the icon background -->
         <path
-            android:fillColor="#FFFFFF"
+            android:fillColor="#1A1B26"
             android:pathData="M100,214 L210,116 L282,188 L305,169 L510,360 L510,520 L100,520 Z" />
         <!-- Ridge: three strokes; the overlapping ends give the notched valleys -->
         <path

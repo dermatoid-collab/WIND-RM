@@ -136,6 +136,8 @@
     <string name="settings_use_current_location">Use current location as Home</string>
     <string name="settings_use_live_gps">Use live GPS instead</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_palettes_dark">Dark palettes</string>
+    <string name="settings_palettes_light">Light palettes</string>
     <string name="settings_about">About</string>
     <string name="settings_build">build</string>
     <string name="settings_built_on">Built %1$s</string>

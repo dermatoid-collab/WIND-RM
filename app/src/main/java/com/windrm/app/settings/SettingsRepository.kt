@@ -29,11 +29,29 @@ enum class MapStyle(val label: String, val requiresApiKey: Boolean) {
     THUNDERFOREST_OUTDOORS("Thunderforest Outdoors", requiresApiKey = true),
 }
 
-enum class ThemeMode(val label: String) {
+/**
+ * How the app looks: the system / light / dark choice of the orange default palette, or one of the
+ * colour palettes. [dark] says whether a palette is a dark or a light one (null = follows the phone).
+ */
+enum class ThemeMode(val label: String, val dark: Boolean? = null) {
     SYSTEM("System default"),
-    LIGHT("Light"),
-    DARK("Dark"),
-    TOKYO_NIGHT("Tokyo Night"),
+    LIGHT("Light", false),
+    DARK("Dark", true),
+
+    // Dark palettes
+    TOKYO_NIGHT("Tokyo Night", true),
+    NORD("Nord", true),
+    DRACULA("Dracula", true),
+    GRUVBOX_DARK("Gruvbox Dark", true),
+    CATPPUCCIN_MOCHA("Catppuccin Mocha", true),
+    ONE_DARK("One Dark", true),
+    SOLARIZED_DARK("Solarized Dark", true),
+    AMOLED("Black (OLED)", true),
+
+    // Light palettes
+    SOLARIZED_LIGHT("Solarized Light", false),
+    CATPPUCCIN_LATTE("Catppuccin Latte", false),
+    GRUVBOX_LIGHT("Gruvbox Light", false),
 }
 
 data class AppSettings(

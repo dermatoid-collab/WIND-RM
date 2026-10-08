@@ -3,6 +3,7 @@ package com.windrm.app
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -21,17 +22,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // The bars at the top of every screen are always a saturated colour: the status bar icons are always light.
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         handleIntent(intent)
 
         setContent {
             val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
-            val darkTheme = when (settings.themeMode) {
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
-                ThemeMode.LIGHT -> false
-                ThemeMode.DARK, ThemeMode.TOKYO_NIGHT -> true
-            }
-            WindRmTheme(darkTheme = darkTheme, tokyoNight = settings.themeMode == ThemeMode.TOKYO_NIGHT) {
+            WindRmTheme(mode = settings.themeMode) {
                 WindRmNavHost(container)
             }
         }
