@@ -3,6 +3,9 @@ package com.windrm.app.remote.openmeteo
 import retrofit2.http.GET
 import retrofit2.http.Query
 
+@kotlinx.serialization.Serializable
+data class ElevationResponse(val elevation: List<Double?> = emptyList())
+
 interface OpenMeteoApi {
 
     @GET("v1/forecast")
@@ -34,6 +37,13 @@ interface OpenMeteoApi {
         @Query("timezone") timezone: String = "UTC",
         @Query("cell_selection") cellSelection: String = "land",
     ): List<OpenMeteoResponse>
+
+    /** Terrain height (Copernicus DEM, 90 m) at up to 100 points: used for the straight-line stretches of a hand-drawn route. */
+    @GET("v1/elevation")
+    suspend fun elevation(
+        @Query("latitude") latitude: String,
+        @Query("longitude") longitude: String,
+    ): ElevationResponse
 
     companion object {
         const val WEATHER_BASE_URL = "https://api.open-meteo.com/"

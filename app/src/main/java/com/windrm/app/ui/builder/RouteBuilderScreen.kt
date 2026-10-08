@@ -72,7 +72,7 @@ import kotlin.math.roundToInt
 
 private val PavedColor = Color(0xFF6B7280)
 private val UnpavedColor = Color(0xFFA8793F)
-private val TrailColor = Color(0xFF4F8A3A)
+private val ManualColor = Color(0xFFD7263D)
 private val StartMarkerArgb = 0xFF2E9E44.toInt()
 private val MidMarkerArgb = 0xFFE53935.toInt()
 private const val SPARKLINE_MAX_POINTS = 240
@@ -116,6 +116,9 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
     val roughRuns = remember(viewModel.segments) {
         viewModel.segments.flatMap { it.roughRuns() }.map { run -> run.map { RoutePoint(lat = it.lat, lon = it.lon) } }
     }
+    val manualRuns = remember(viewModel.segments) {
+        viewModel.segments.filter { it.manual }.map { s -> s.points.map { RoutePoint(lat = it.lat, lon = it.lon) } }
+    }
     val kmMarkers = remember(draft, viewModel.activity) {
         kmMarkersOf(draft?.points.orEmpty(), if (viewModel.activity == ActivityType.TREK) TREK_KM_STEP else RIDE_KM_STEP)
     }
@@ -151,18 +154,22 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                     selected = viewModel.activity.ordinal,
                     onSelect = { viewModel.changeActivity(ActivityType.entries[it]) },
                 )
-                if (viewModel.activity == ActivityType.RIDE) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.builder_paved_only), style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                stringResource(if (viewModel.allowUnpaved) R.string.builder_unpaved_allowed else R.string.builder_paved_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(checked = !viewModel.allowUnpaved, onCheckedChange = { viewModel.changeAllowUnpaved(!it) })
+                // Both switches on one row: paved roads only (a ride's choice) and manual mode (straight lines, off the roads).
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (viewModel.activity == ActivityType.RIDE) {
+                        ToggleItem(
+                            stringResource(R.string.builder_paved_only),
+                            checked = !viewModel.allowUnpaved,
+                            onChange = { viewModel.changeAllowUnpaved(!it) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
+                    ToggleItem(
+                        stringResource(R.string.builder_manual_mode),
+                        checked = viewModel.manualMode,
+                        onChange = viewModel::changeManualMode,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 
@@ -184,6 +191,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                         onMapTap = { lat, lon -> viewModel.onMapTap(lat, lon) },
                         casedLine = true,
                         roughRuns = roughRuns,
+                        manualRuns = manualRuns,
                         kmMarkers = kmMarkers,
                         arrows = arrows,
                         onTrackTap = { index, lat, lon -> if (!viewModel.busy) trackTap = TrackTap(index, lat, lon) },
@@ -284,33 +292,46 @@ private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileV
         }
 
         val rough = viewModel.unpavedM + viewModel.trailM
+        val manual = viewModel.manualM
         val total = viewModel.pavedM + rough
         val known = viewModel.surfaceKnown && total > 0
+        // The bar splits the route by surface: paved, unpaved and drawn by hand.
+        val barParts = if (known) listOf(viewModel.pavedM to PavedColor, rough to UnpavedColor, manual to ManualColor) else listOf(manual to ManualColor)
         Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.outlineVariant)) {
-            if (known) {
-                listOf(viewModel.pavedM to PavedColor, rough to UnpavedColor)
-                    .filter { it.first > 0 }
-                    .forEach { (meters, color) -> Box(Modifier.weight(meters.toFloat()).fillMaxHeight().background(color)) }
-            }
+            barParts.filter { it.first > 0 }.forEach { (meters, color) -> Box(Modifier.weight(meters.toFloat()).fillMaxHeight().background(color)) }
         }
-        if (known) {
+        if (known || manual > 0) {
             // On a paved-only ride the unpaved part is a shortfall: its length is shown in the warning color.
             val roughColor = if (viewModel.leftoverRoughM > 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+            val plain = MaterialTheme.colorScheme.onSurfaceVariant
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                LegendItem(PavedColor, "${stringResource(R.string.builder_paved)} ${(viewModel.pavedM / total * 100).roundToInt()}%", MaterialTheme.colorScheme.onSurfaceVariant)
-                if (rough > 0) {
-                    LegendItem(
-                        UnpavedColor,
-                        "${stringResource(R.string.builder_unpaved)} ${(rough / total * 100).roundToInt()}% · ${formatMeters(rough)}",
-                        roughColor,
-                    )
+                if (known) {
+                    LegendItem(PavedColor, "${stringResource(R.string.builder_paved)} ${(viewModel.pavedM / total * 100).roundToInt()}%", plain)
+                    if (rough > 0) {
+                        LegendItem(
+                            UnpavedColor,
+                            "${stringResource(R.string.builder_unpaved)} ${(rough / total * 100).roundToInt()}% · ${formatMeters(rough)}",
+                            roughColor,
+                        )
+                    }
                 }
+                if (manual > 0) LegendItem(ManualColor, "${stringResource(R.string.builder_manual)} · ${formatMeters(manual)}", plain)
             }
-        } else if (viewModel.segments.isNotEmpty()) {
+        }
+        if (!known && viewModel.segments.any { !it.manual }) {
             Text(stringResource(R.string.builder_unknown_surface), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
         ElevationSparkline(profileValues, Modifier.fillMaxWidth().height(56.dp))
+    }
+}
+
+/** A label with its switch, for the row of switches under Ride / Trekking. */
+@Composable
+private fun ToggleItem(label: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
+        Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

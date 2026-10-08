@@ -102,6 +102,8 @@ fun RouteMapView(
     casedLine: Boolean = false,
     /** Stretches of [points] drawn as a dashed red line on white (unpaved ways), edged like [casedLine]. */
     roughRuns: List<List<RoutePoint>> = emptyList(),
+    /** Stretches of [points] drawn by hand, straight and off any road: a dotted red line on white, edged like [casedLine]. */
+    manualRuns: List<List<RoutePoint>> = emptyList(),
     kmMarkers: List<KmMarker> = emptyList(),
     arrows: List<MapArrow> = emptyList(),
     /** A tap on the line itself: the index of the line segment of [points] (point i to i + 1) and the place tapped, snapped onto it. */
@@ -170,6 +172,13 @@ fun RouteMapView(
                             mapView.overlays.add(routeLine(mapView, geo, CASING_ARGB, 5.6f * density))
                             mapView.overlays.add(routeLine(mapView, geo, Color.WHITE, 3.6f * density))
                             mapView.overlays.add(routeLine(mapView, geo, ROUTE_ARGB, 2f * density, dashDp = floatArrayOf(5f, 4f)))
+                        }
+                        manualRuns.forEach { run ->
+                            val geo = run.map { GeoPoint(it.lat, it.lon) }
+                            mapView.overlays.add(routeLine(mapView, geo, CASING_ARGB, 5.6f * density))
+                            mapView.overlays.add(routeLine(mapView, geo, Color.WHITE, 3.6f * density))
+                            // Dots: a dash of almost nothing with round caps.
+                            mapView.overlays.add(routeLine(mapView, geo, ROUTE_ARGB, 2.6f * density, dashDp = floatArrayOf(0.1f, 5f)))
                         }
                     }
 
@@ -256,7 +265,7 @@ private fun routeLine(mapView: MapView, geoPoints: List<GeoPoint>, argb: Int, wi
         // osmdroid draws each segment separately; with the default BUTT caps every
         // tiny GPX direction change leaves a notch, which read as a "fuzzy" line.
         outlinePaint.isAntiAlias = true
-        outlinePaint.strokeCap = if (dashDp == null) Paint.Cap.ROUND else Paint.Cap.BUTT
+        outlinePaint.strokeCap = if (dashDp == null || dashDp[0] < 1f) Paint.Cap.ROUND else Paint.Cap.BUTT
         outlinePaint.strokeJoin = Paint.Join.ROUND
         if (dashDp != null) outlinePaint.pathEffect = DashPathEffect(floatArrayOf(dashDp[0] * density, dashDp[1] * density), 0f)
         // A tap on the line must reach the map-tap overlay below (placing a stop is

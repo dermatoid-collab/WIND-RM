@@ -67,6 +67,12 @@ class AppContainer(context: Context) {
             }
             context.resources.openRawResource(resource).bufferedReader().use { it.readText() }
         },
+        elevations = { places ->
+            // Open-Meteo answers for up to 100 points at a time, in order; no answer is not an error.
+            runCatching {
+                weatherApi.elevation(places.joinToString(",") { "%.6f".format(java.util.Locale.US, it.lat) }, places.joinToString(",") { "%.6f".format(java.util.Locale.US, it.lon) }).elevation
+            }.getOrNull()
+        },
         idStore = object : ProfileIdStore {
             override suspend fun get(key: String) = settingsRepository.brouterProfileId(key)
             override suspend fun put(key: String, id: String) = settingsRepository.setBrouterProfileId(key, id)

@@ -18,6 +18,8 @@
     <string name="builder_title">Create route</string>
     <string name="builder_save">Save</string>
     <string name="builder_paved_only">Paved roads only</string>
+    <string name="builder_manual_mode">Manual mode</string>
+    <string name="builder_manual">Manual</string>
     <string name="builder_paved_hint">Unpaved only if you allow it</string>
     <string name="builder_unpaved_allowed">Unpaved roads allowed: you chose it</string>
     <string name="builder_routing_note">Routing: most direct (shortest distance)</string>

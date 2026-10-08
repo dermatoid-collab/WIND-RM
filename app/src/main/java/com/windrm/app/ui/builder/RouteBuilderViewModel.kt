@@ -52,6 +52,13 @@ class RouteBuilderViewModel(
     var allowUnpaved by mutableStateOf(false)
         private set
 
+    /**
+     * Manual mode: new points are joined by straight lines, off any road or path, until it is switched off again.
+     * Stretches already drawn keep the way they were made.
+     */
+    var manualMode by mutableStateOf(false)
+        private set
+
     /** Tapped points, snapped to the road network; always one more than [segments] once routing started. */
     var waypoints by mutableStateOf<List<LatLon>>(emptyList())
         private set
@@ -93,7 +100,9 @@ class RouteBuilderViewModel(
     val pavedM: Double get() = segments.sumOf { it.pavedM }
     val unpavedM: Double get() = segments.sumOf { it.unpavedM }
     val trailM: Double get() = segments.sumOf { it.trailM }
-    val surfaceKnown: Boolean get() = segments.isNotEmpty() && segments.all { it.surfaceKnown }
+    /** The surface can be judged when every routed stretch (hand-drawn ones have no surface) has its way tags. */
+    val surfaceKnown: Boolean get() = segments.filter { !it.manual }.let { routed -> routed.isNotEmpty() && routed.all { it.surfaceKnown } }
+    val manualM: Double get() = segments.filter { it.manual }.sumOf { it.lengthM }
 
     /** Unpaved or trail metres inside a route that is meant to be paved only. */
     val leftoverRoughM: Double get() = if (strictPaved) unpavedM + trailM else 0.0
@@ -141,12 +150,20 @@ class RouteBuilderViewModel(
         if (from == null) waypoints = listOf(target) else extend(from, target)
     }
 
-    /** Routes from the current end of the route to [to] and adds the stretch. */
+    fun changeManualMode(on: Boolean) {
+        manualMode = on
+    }
+
+    /** One stretch between two points: along the roads, or a straight line when it is [manual]. */
+    private suspend fun leg(from: LatLon, to: LatLon, manual: Boolean): RoutedSegment =
+        if (manual) routingRepository.straight(from, to) else routingRepository.route(from, to, profile)
+
+    /** Adds the stretch from the current end of the route to [to]: routed, or straight in manual mode. */
     private fun extend(from: LatLon, to: LatLon) {
         job = viewModelScope.launch {
             busy = true
             try {
-                append(routingRepository.route(from, to, profile))
+                append(leg(from, to, manualMode))
             } catch (e: RoutingException) {
                 error = e.error
             } finally {
@@ -180,9 +197,15 @@ class RouteBuilderViewModel(
         job = viewModelScope.launch {
             busy = true
             try {
-                val before = if (index > 0) routingRepository.route(points[index - 1], target, profile) else null
-                val after = if (index < points.size - 1) routingRepository.route(target, points[index + 1], profile) else null
+                val last = points.size - 1
+                val beforeManual = index > 0 && segments[index - 1].manual
+                val afterManual = index < last && segments[index].manual
+                // The routed sides first: the road decides where the point lands; hand-drawn sides then go to that place.
+                var before = if (index > 0 && !beforeManual) routingRepository.route(points[index - 1], target, profile) else null
+                var after = if (index < last && !afterManual) routingRepository.route(target, points[index + 1], profile) else null
                 val snapped = (before?.points?.last() ?: after?.points?.first())?.let { LatLon(it.lat, it.lon) } ?: target
+                if (index > 0 && beforeManual) before = routingRepository.straight(points[index - 1], snapped)
+                if (index < last && afterManual) after = routingRepository.straight(snapped, points[index + 1])
                 val newSegments = segments.toMutableList()
                 if (before != null) newSegments[index - 1] = before
                 if (after != null) newSegments[index] = after
@@ -255,7 +278,11 @@ class RouteBuilderViewModel(
             busy = true
             try {
                 val routed = ArrayList<RoutedSegment>()
-                for (i in 1 until points.size) routed += routingRepository.route(points[i - 1], points[i], profile)
+                // Hand-drawn stretches have no roads to choose again: they stay as they are.
+                for (i in 1 until points.size) {
+                    val kept = segments.getOrNull(i - 1)?.takeIf { it.manual }
+                    routed += kept ?: routingRepository.route(points[i - 1], points[i], profile)
+                }
                 segments = routed
             } catch (e: RoutingException) {
                 activity = previous.first

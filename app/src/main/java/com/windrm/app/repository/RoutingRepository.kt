@@ -29,6 +29,8 @@ data class RoutedSegment(
     val surfaceKnown: Boolean,
     /** Where the unpaved or trail ways lie: (from, to) in metres from the start of this stretch, in BRouter's own distances. */
     val roughSpans: List<Pair<Double, Double>> = emptyList(),
+    /** Drawn by hand as a straight line, with no road or path behind it (the route builder's manual mode). */
+    val manual: Boolean = false,
 ) {
     val roughM: Double get() = unpavedM + trailM
 
@@ -97,6 +99,7 @@ data class RoutedSegment(
             trailM = 0.0,
             surfaceKnown = surfaceKnown,
             roughSpans = spans,
+            manual = manual,
         )
         val before = roughSpans.mapNotNull { (f, t2) -> if (f < cutM) f to minOf(t2, cutM) else null }
         val after = roughSpans.mapNotNull { (f, t2) -> if (t2 > cutM) (maxOf(f, cutM) - cutM) to (t2 - cutM) else null }
@@ -159,7 +162,33 @@ class RoutingRepository(
     /** The text of the custom profile stored under a [BuilderProfile.customKey]. */
     private val profileText: (String) -> String = { error("No custom profiles") },
     private val idStore: ProfileIdStore? = null,
+    /** Heights of the given points (null = unknown), for the straight lines of manual mode. */
+    private val elevations: (suspend (List<LatLon>) -> List<Double?>?)? = null,
 ) {
+    /**
+     * A straight line from [from] to [to], with no road or path behind it: the stretch of a route drawn by hand.
+     * It is cut into points about every 100 m (at most 100 in all), with their terrain height when it can be had.
+     */
+    suspend fun straight(from: LatLon, to: LatLon): RoutedSegment {
+        val length = haversineMeters(from.lat, from.lon, to.lat, to.lon)
+        val intervals = (length / STRAIGHT_STEP_M).toInt().coerceIn(1, MAX_STRAIGHT_POINTS - 1)
+        val places = (0..intervals).map { i ->
+            val t = i.toDouble() / intervals
+            LatLon(from.lat + (to.lat - from.lat) * t, from.lon + (to.lon - from.lon) * t)
+        }
+        val heights = try {
+            elevations?.invoke(places)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }?.takeIf { it.size == places.size }
+        return RoutedSegment(
+            points = places.mapIndexed { i, p -> RoutedPoint(p.lat, p.lon, heights?.get(i)) },
+            pavedM = 0.0, unpavedM = 0.0, trailM = 0.0, surfaceKnown = false, manual = true,
+        )
+    }
+
     private val uploadedIds = HashMap<String, String>()
     private var lastUploadError: String? = null
     private var lastNote: String? = null
@@ -263,6 +292,8 @@ class RoutingRepository(
 
     companion object {
         private const val MAX_ALTERNATIVE_INDEX = 3
+        private const val STRAIGHT_STEP_M = 100.0
+        private const val MAX_STRAIGHT_POINTS = 100
 
         /** Bump when the text of a custom profile changes: it is then uploaded again under a new id. */
         private const val PROFILE_VERSION = 2
