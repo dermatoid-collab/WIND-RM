@@ -27,6 +27,10 @@ enum class MapStyle(val label: String, val requiresApiKey: Boolean) {
     MAPBOX_OUTDOORS("Mapbox Outdoors (same as Strava)", requiresApiKey = true),
     CARTO_POSITRON("CARTO Positron", requiresApiKey = true),
     THUNDERFOREST_OUTDOORS("Thunderforest Outdoors", requiresApiKey = true),
+
+    // Base map without names plus a transparent layer of names only, drawn above the route (like Strava)
+    CARTO_VOYAGER("CARTO Voyager (names above the route)", requiresApiKey = false),
+    CARTO_DARK("CARTO Dark Matter (names above the route)", requiresApiKey = false),
 }
 
 /**
@@ -57,6 +61,8 @@ enum class ThemeMode(val label: String, val dark: Boolean? = null) {
 data class AppSettings(
     val mapStyle: MapStyle = MapStyle.OSM_STANDARD,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Which routing profile the last route used: the WIND-RM main-roads one or the stock one (and why). */
+    val routingProfileNote: String? = null,
     val defaultAvgSpeedKmh: Double = 25.0,
     val forecastHorizonDays: Int = 15,
     val homeLat: Double? = null,
@@ -95,6 +101,7 @@ private class CaiField(
 class SettingsRepository(private val context: Context) {
     private val keyMapStyle = stringPreferencesKey("map_style")
     private val keyThemeMode = stringPreferencesKey("theme_mode")
+    private val keyRoutingProfileNote = stringPreferencesKey("routing_profile_note")
     private val keyDefaultAvgSpeedKmh = doublePreferencesKey("default_avg_speed_kmh")
     private val keyForecastHorizonDays = intPreferencesKey("forecast_horizon_days")
     private val keyHomeLat = doublePreferencesKey("home_lat")
@@ -145,6 +152,7 @@ class SettingsRepository(private val context: Context) {
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
             mapStyle = prefs[keyMapStyle]?.let { runCatching { MapStyle.valueOf(it) }.getOrNull() } ?: MapStyle.OSM_STANDARD,
+            routingProfileNote = prefs[keyRoutingProfileNote],
             themeMode = prefs[keyThemeMode]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM,
             defaultAvgSpeedKmh = prefs[keyDefaultAvgSpeedKmh] ?: 25.0,
             forecastHorizonDays = prefs[keyForecastHorizonDays] ?: 15,
@@ -166,6 +174,11 @@ class SettingsRepository(private val context: Context) {
     /** The id BRouter's server gave the custom routing profile stored under [key] (null = none uploaded yet). */
     suspend fun brouterProfileId(key: String): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("brouter_profile_$key")]
+
+    /** Which routing profile the last route really used (see [com.windrm.app.repository.ProfileIdStore.note]). */
+    suspend fun setRoutingProfileNote(text: String) {
+        context.settingsDataStore.edit { it[keyRoutingProfileNote] = text }
+    }
 
     suspend fun setBrouterProfileId(key: String, id: String) {
         context.settingsDataStore.edit { it[stringPreferencesKey("brouter_profile_$key")] = id }

@@ -144,6 +144,9 @@ enum class BuilderProfile(val brouterName: String, val customKey: String? = null
 interface ProfileIdStore {
     suspend fun get(key: String): String?
     suspend fun put(key: String, id: String)
+
+    /** Which profile the routing really used, in words: shown in Settings so a stock-profile fallback can't go unnoticed. */
+    suspend fun note(text: String) {}
 }
 
 enum class RoutingError { NO_ROUTE, NO_CONNECTION, FAILED }
@@ -158,11 +161,26 @@ class RoutingRepository(
     private val idStore: ProfileIdStore? = null,
 ) {
     private val uploadedIds = HashMap<String, String>()
+    private var lastUploadError: String? = null
+    private var lastNote: String? = null
 
     /**
      * The profile to ask the server for: the custom one of [profile] (uploaded now if the server has not
      * seen it yet, with [forceUpload] even if it has), or the stock one when it can't be uploaded.
      */
+    private suspend fun reportProfile(profile: BuilderProfile, name: String) {
+        if (profile.customKey == null) return
+        val note = if (name != profile.brouterName) {
+            "WIND-RM main-roads profile ($name)"
+        } else {
+            "stock ${profile.brouterName} profile, the WIND-RM one could not be uploaded" + (lastUploadError?.let { ": $it" } ?: "")
+        }
+        if (note != lastNote) {
+            lastNote = note
+            idStore?.note(note)
+        }
+    }
+
     private suspend fun profileName(profile: BuilderProfile, forceUpload: Boolean = false): String {
         val key = profile.customKey ?: return profile.brouterName
         // A new text of the profile gets a new key, so an app update never reuses an old upload.
@@ -176,12 +194,16 @@ class RoutingRepository(
         }
         val id = try {
             val reply = api.uploadProfile(profileText(key).toRequestBody(PROFILE_MEDIA_TYPE))
-            reply["profileid"]?.jsonPrimitive?.content?.takeIf { reply["error"] == null }
+            val error = reply["error"]?.jsonPrimitive?.content
+            if (error != null) lastUploadError = error
+            reply["profileid"]?.jsonPrimitive?.content?.takeIf { error == null }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
+            lastUploadError = e.message ?: e.javaClass.simpleName
             null
         } ?: return profile.brouterName
+        lastUploadError = null
         uploadedIds[versioned] = id
         idStore?.put(versioned, id)
         return id
@@ -215,13 +237,17 @@ class RoutingRepository(
     private suspend fun fetch(from: LatLon, to: LatLon, profile: BuilderProfile, alternative: Int): RoutedSegment {
         val lonLats = "%.6f,%.6f|%.6f,%.6f".format(java.util.Locale.US, from.lon, from.lat, to.lon, to.lat)
         val json = try {
+            val name = profileName(profile)
+            reportProfile(profile, name)
             try {
-                api.route(lonLats, profileName(profile), alternative)
+                api.route(lonLats, name, alternative)
             } catch (e: HttpException) {
                 // A server error (not a "no route" answer, which is a 400) on a custom profile: the server may have
                 // lost the uploaded file. Upload it again and ask once more.
                 if (profile.customKey == null || e.code() < 500) throw e
-                api.route(lonLats, profileName(profile, forceUpload = true), alternative)
+                val again = profileName(profile, forceUpload = true)
+                reportProfile(profile, again)
+                api.route(lonLats, again, alternative)
             }
         } catch (e: HttpException) {
             // BRouter answers 4xx/5xx with a plain-text reason (no way near the point, outside the data...).
@@ -239,7 +265,7 @@ class RoutingRepository(
         private const val MAX_ALTERNATIVE_INDEX = 3
 
         /** Bump when the text of a custom profile changes: it is then uploaded again under a new id. */
-        private const val PROFILE_VERSION = 1
+        private const val PROFILE_VERSION = 2
         private val PROFILE_MEDIA_TYPE = "text/plain; charset=utf-8".toMediaType()
 
         /** A paved alternative is taken over the direct route only if it is at most 10% (plus 200 m) longer. */

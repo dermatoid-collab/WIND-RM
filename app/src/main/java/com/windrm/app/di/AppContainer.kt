@@ -70,6 +70,7 @@ class AppContainer(context: Context) {
         idStore = object : ProfileIdStore {
             override suspend fun get(key: String) = settingsRepository.brouterProfileId(key)
             override suspend fun put(key: String, id: String) = settingsRepository.setBrouterProfileId(key, id)
+            override suspend fun note(text: String) = settingsRepository.setRoutingProfileNote(text)
         },
     )
     val stravaAuthManager = StravaAuthManager(context, stravaApi, stravaTokenStore)

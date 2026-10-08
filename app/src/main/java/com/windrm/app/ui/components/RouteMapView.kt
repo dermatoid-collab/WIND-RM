@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,6 +35,7 @@ import com.windrm.app.domain.cropPoints
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteStop
 import com.windrm.app.settings.MapStyle
+import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.ITileSource
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -46,6 +48,7 @@ import org.osmdroid.views.overlay.CopyrightOverlay
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.TilesOverlay
 
 /** A point along the route where a wind-direction arrow should be drawn, in meteorological "from" degrees. */
 data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double, val windSpeedKmh: Double)
@@ -106,6 +109,8 @@ fun RouteMapView(
 ) {
     val mapRef = remember { MapViewRef() }
     val drag = remember { DragState() }
+    val labels = remember { LabelsLayer() }
+    DisposableEffect(Unit) { onDispose { labels.release() } }
     // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
     // while the surrounding Column is scrolling, bleeding over the next section's title.
     val sized = if (height == Dp.Unspecified) modifier.fillMaxWidth().fillMaxHeight() else modifier.fillMaxWidth().height(height)
@@ -168,6 +173,9 @@ fun RouteMapView(
                         }
                     }
 
+                    // Place names (for the styles that draw them as a separate layer) go above the line.
+                    labels.overlayFor(mapStyle, mapView.context)?.let { mapView.overlays.add(it) }
+
                     // Start drawn first so the finish flag ends up on top when they coincide (a
                     // loop route), per the "finish must always show in front of start" requirement.
                     mapView.overlays.add(StartFinishOverlay(shownGeoPoints.first(), shownGeoPoints.last(), mapView.resources.displayMetrics.density))
@@ -202,6 +210,7 @@ fun RouteMapView(
                 }
                 // With no track yet (a route being started) the markers still need drawing.
                 if (points.isEmpty()) {
+                    labels.overlayFor(mapStyle, mapView.context)?.let { mapView.overlays.add(it) }
                     val density = mapView.resources.displayMetrics.density
                     markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
                 }
@@ -283,7 +292,7 @@ private class DragHandlesOverlay(
         if (shadow || drag.index < 0) return
         val out = android.graphics.Point()
         mapView.projection.toPixels(GeoPoint(drag.lat, drag.lon), out)
-        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 18f * density, haloPaint)
+        canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), 21.6f * density, haloPaint)
         canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), MARKER_DIAMETER_DP / 2 * density, dotPaint)
         canvas.drawCircle(out.x.toFloat(), out.y.toFloat(), MARKER_DIAMETER_DP / 2 * density, ringPaint)
     }
@@ -485,13 +494,68 @@ private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
     MapStyle.MAPBOX_OUTDOORS -> xyzTileSource(
         "MapboxOutdoors", 20, "https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/", "?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
     )
+    MapStyle.CARTO_VOYAGER -> xyzTileSource(
+        "CartoVoyagerNoLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/", ".png", CARTO_COPYRIGHT,
+    )
+    MapStyle.CARTO_DARK -> xyzTileSource(
+        "CartoDarkNoLabels", 20, "https://basemaps.cartocdn.com/dark_nolabels/", ".png", CARTO_COPYRIGHT,
+    )
+}
+
+private const val CARTO_COPYRIGHT = "© OpenStreetMap contributors © CARTO"
+
+/** The transparent layer of place names that goes above the route for the styles that draw their names separately. */
+private fun labelsSourceFor(style: MapStyle): ITileSource? = when (style) {
+    MapStyle.CARTO_VOYAGER -> xyzTileSource(
+        "CartoVoyagerLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/", ".png", CARTO_COPYRIGHT,
+    )
+    MapStyle.CARTO_DARK -> xyzTileSource(
+        "CartoDarkLabels", 20, "https://basemaps.cartocdn.com/dark_only_labels/", ".png", CARTO_COPYRIGHT,
+    )
+    else -> null
+}
+
+/**
+ * The names layer of the current style: a second tile provider and its overlay, made once per style and kept
+ * across the many rebuilds of the overlay list. [release] stops the provider's threads.
+ */
+private class LabelsLayer {
+    private var style: MapStyle? = null
+    private var provider: MapTileProviderBasic? = null
+    private var overlay: TilesOverlay? = null
+
+    fun overlayFor(style: MapStyle, context: Context): TilesOverlay? {
+        val source = labelsSourceFor(style)
+        if (source == null) {
+            release()
+            return null
+        }
+        if (this.style != style) {
+            release()
+            val tileProvider = MapTileProviderBasic(context.applicationContext, source)
+            overlay = TilesOverlay(tileProvider, context).apply {
+                loadingBackgroundColor = Color.TRANSPARENT
+                loadingLineColor = Color.TRANSPARENT
+            }
+            provider = tileProvider
+            this.style = style
+        }
+        return overlay
+    }
+
+    fun release() {
+        provider?.detach()
+        provider = null
+        overlay = null
+        style = null
+    }
 }
 
 /** A simple z/x/y raster tile source, built directly on osmdroid's base class for reliability
  * across osmdroid versions (unlike the XYZTileSource convenience class, which isn't available
  * in every release). */
-private fun xyzTileSource(name: String, maxZoom: Int, baseUrl: String, urlSuffix: String): OnlineTileSourceBase =
-    object : OnlineTileSourceBase(name, 0, maxZoom, 256, urlSuffix, arrayOf(baseUrl)) {
+private fun xyzTileSource(name: String, maxZoom: Int, baseUrl: String, urlSuffix: String, copyright: String = ""): OnlineTileSourceBase =
+    object : OnlineTileSourceBase(name, 0, maxZoom, 256, urlSuffix, arrayOf(baseUrl), copyright) {
         override fun getTileURLString(pMapTileIndex: Long): String =
             baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + MapTileIndex.getX(pMapTileIndex) + "/" + MapTileIndex.getY(pMapTileIndex) + urlSuffix
     }
@@ -647,14 +711,14 @@ private class StopsOverlay(
 }
 
 /** Start, finish and position markers all share one size: 12 dp across with a 2 dp white ring. */
-private const val MARKER_DIAMETER_DP = 12f
+private const val MARKER_DIAMETER_DP = 14.4f
 private const val HIGHLIGHT_ARGB = 0xFF1E88E5.toInt()
 private const val STOP_ARGB = 0xFFE5532D.toInt()
 
 private fun markerRingPaint(density: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     color = Color.WHITE
     style = Paint.Style.STROKE
-    strokeWidth = 2f * density
+    strokeWidth = 2.4f * density
 }
 
 /**

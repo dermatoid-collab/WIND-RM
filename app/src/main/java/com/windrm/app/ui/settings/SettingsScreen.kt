@@ -286,6 +286,12 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
 
             SettingsSection(stringResource(R.string.settings_about)) {
                 DataSources()
+                Text(
+                    stringResource(R.string.settings_routing_profile, settings.routingProfileNote ?: stringResource(R.string.settings_routing_profile_none)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
                 BuildInfo(Modifier.padding(top = 16.dp))
             }
         }

@@ -136,6 +136,8 @@
     <string name="settings_use_current_location">Use current location as Home</string>
     <string name="settings_use_live_gps">Use live GPS instead</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_routing_profile">Route builder profile in use: %1$s</string>
+    <string name="settings_routing_profile_none">not used yet</string>
     <string name="settings_palettes_dark">Dark palettes</string>
     <string name="settings_palettes_light">Light palettes</string>
     <string name="settings_about">About</string>
@@ -219,7 +221,7 @@
 
 METEO FRANCE, Institut national de l\'environnement industriel et des risques (Ineris), Aarhus University, Norwegian Meteorological Institute (MET Norway), Jülich Institut für Energie- und Klimaforschung (IEK), Institute of Environmental Protection – National Research Institute (IEP-NRI), Koninklijk Nederlands Meteorologisch Instituut (KNMI), Nederlandse Organisatie voor toegepast-natuurwetenschappelijk onderzoek (TNO), Swedish Meteorological and Hydrological Institute (SMHI), Finnish Meteorological Institute (FMI), Italian National Agency for New Technologies, Energy and Sustainable Economic Development (ENEA) and Barcelona Supercomputing Center (BSC) (2022): CAMS European air quality forecasts, ENSEMBLE data. Copernicus Atmosphere Monitoring Service (CAMS) Atmosphere Data Store (ADS).</string>
     <string name="source_maps_title">Maps</string>
-    <string name="source_maps_text">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL). OSM Standard tiles by the OpenStreetMap Foundation.
+    <string name="source_maps_text">Map data © OpenStreetMap contributors, available under the Open Database License (ODbL). OSM Standard tiles by the OpenStreetMap Foundation. CARTO Voyager and Dark Matter tiles © CARTO.
 OpenTopoMap: map style © OpenTopoMap (CC-BY-SA), elevation data SRTM.
 Mapbox Outdoors: © Mapbox.
 CARTO Positron: © CARTO.
