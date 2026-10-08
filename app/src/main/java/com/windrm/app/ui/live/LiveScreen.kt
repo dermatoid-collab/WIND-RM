@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.windrm.app.R
+import com.windrm.app.ui.components.AppBar
 import com.windrm.app.domain.TrackMatcher
 import com.windrm.app.ui.components.MapMarker
 import com.windrm.app.ui.components.RouteMapView
@@ -70,7 +71,7 @@ private const val FINE = Manifest.permission.ACCESS_FINE_LOCATION
 private val OFF_ROUTE_ARGB = 0xFFE5532D.toInt()
 
 @Composable
-fun LiveScreen(viewModel: LiveViewModel, onBack: () -> Unit) {
+fun LiveScreen(viewModel: LiveViewModel, onBack: () -> Unit, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val view = LocalView.current
     var asked by rememberSaveable { mutableStateOf(false) }
@@ -96,25 +97,11 @@ fun LiveScreen(viewModel: LiveViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
-                Row(
-                    Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White) }
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(stringResource(R.string.live_title), style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            viewModel.route?.name ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    // Balances the back button so the title stays centred.
-                    Box(Modifier.padding(horizontal = 24.dp))
-                }
-            }
+            AppBar(
+                title = listOfNotNull(stringResource(R.string.live_title), viewModel.route?.name).joinToString(" · "),
+                onBack = onBack,
+                onOpenSettings = onOpenSettings,
+            )
         },
     ) { padding ->
         val route = viewModel.route

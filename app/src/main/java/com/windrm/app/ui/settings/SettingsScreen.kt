@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.windrm.app.BuildConfig
 import com.windrm.app.R
+import com.windrm.app.ui.components.AppBar
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
 import com.windrm.app.settings.MapStyle
@@ -74,18 +75,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                ),
-            )
+            AppBar(title = stringResource(R.string.settings_title), onBack = onBack)
         },
     ) { padding ->
         Column(

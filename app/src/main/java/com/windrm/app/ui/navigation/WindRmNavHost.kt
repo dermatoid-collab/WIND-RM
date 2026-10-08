@@ -67,6 +67,7 @@ fun WindRmNavHost(container: AppContainer) {
             RouteBuilderScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Destination.Settings.route) },
                 // The saved route replaces the builder in the back stack, so Back from its screen goes Home.
                 onSaved = { route ->
                     navController.navigate(Destination.RouteDetail.path(route.id)) {
@@ -100,6 +101,7 @@ fun WindRmNavHost(container: AppContainer) {
                 viewModel = viewModel,
                 initialTab = initialTab,
                 onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Destination.Settings.route) },
                 onRouteSelected = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
             )
         }
@@ -117,6 +119,7 @@ fun WindRmNavHost(container: AppContainer) {
             RouteDetailScreen(
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Destination.Settings.route) },
                 onForecast = { startEpochS, speedKmh, pacing, crop ->
                     navController.navigate(Destination.Forecast.path(routeId, startEpochS, speedKmh, pacing, crop.start, crop.endInclusive))
                 },
@@ -151,7 +154,11 @@ fun WindRmNavHost(container: AppContainer) {
                     }
                 },
             )
-            ForecastScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+            ForecastScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Destination.Settings.route) },
+            )
         }
 
         composable(
@@ -176,7 +183,11 @@ fun WindRmNavHost(container: AppContainer) {
                     initializer { LiveViewModel(appContext, container.routeRepository, container.settingsRepository, routeId, speed, pacing, crop) }
                 },
             )
-            LiveScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
+            LiveScreen(
+                viewModel = viewModel,
+                onBack = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(Destination.Settings.route) },
+            )
         }
     }
 }

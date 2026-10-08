@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
+import com.windrm.app.ui.components.SettingsGear
 import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.cropped
@@ -100,6 +101,7 @@ fun RouteDetailScreen(
     onBack: () -> Unit,
     onForecast: (startEpochS: Long, speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
     onLive: (speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val route = viewModel.route
     // The part actually ridden: header stats and the forecast follow the crop slider.
@@ -146,6 +148,7 @@ fun RouteDetailScreen(
                     } else {
                         Spacer(Modifier.size(48.dp))
                     }
+                    SettingsGear(onOpenSettings)
                 }
             }
         },

@@ -17,6 +17,15 @@ class WindRmApp : Application() {
             userAgentValue = packageName
             osmdroidBasePath = getExternalFilesDir("osmdroid") ?: filesDir
             osmdroidTileCache = java.io.File(osmdroidBasePath, "tiles")
+            // Raster tiles come one by one: osmdroid's defaults (2 download and 2 disk threads, 9 tiles kept in
+            // memory) leave a fast-panned map showing blank squares for a while. More threads and a bigger
+            // in-memory cache make panning and zooming back over seen ground much quicker.
+            tileDownloadThreads = 8
+            tileFileSystemThreads = 8
+            tileDownloadMaxQueueSize = 64
+            tileFileSystemMaxQueueSize = 64
+            cacheMapTileCount = 64
+            cacheMapTileOvershoot = 16
         }
     }
 }

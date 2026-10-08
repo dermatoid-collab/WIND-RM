@@ -60,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.windrm.app.R
+import com.windrm.app.ui.components.AppBar
 import com.windrm.app.model.CurrentWeatherSnapshot
 import com.windrm.app.model.Route
 import com.windrm.app.model.WeatherPoint
@@ -101,13 +102,7 @@ fun HomeScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                ),
-            )
+            AppBar(title = stringResource(R.string.app_name), onOpenSettings = onOpenSettings)
         },
         floatingActionButton = {
             NewFab(
@@ -140,7 +135,6 @@ fun HomeScreen(
                     MenuRow(Icons.Filled.DirectionsBike, stringResource(R.string.tab_strava), onOpenStrava)
                     MenuRow(Icons.Filled.Folder, stringResource(R.string.tab_files), onOpenFiles)
                     viewModel.gpxError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                    MenuRow(Icons.Filled.Settings, stringResource(R.string.menu_settings), onOpenSettings)
                 }
             }
             // Dims the page while the "+" menu is open; a tap on it closes the menu.

@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.windrm.app.R
+import com.windrm.app.ui.components.AppBar
 import com.windrm.app.domain.PolylineDecoder
 import com.windrm.app.gpx.GpxFolder
 import com.windrm.app.model.Route
@@ -86,6 +87,7 @@ fun RoutesListScreen(
     viewModel: RoutesListViewModel,
     initialTab: Int,
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
     onRouteSelected: (Route) -> Unit,
 ) {
     val context = LocalContext.current
@@ -115,18 +117,7 @@ fun RoutesListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.routes_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                ),
-            )
+            AppBar(title = stringResource(R.string.routes_title), onBack = onBack, onOpenSettings = onOpenSettings)
         },
         floatingActionButton = {
             if (selectedTab == TAB_RECENT) {

@@ -60,6 +60,9 @@ import com.windrm.app.domain.ActivityType
 import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.repository.RoutingError
+import com.windrm.app.ui.components.AppBar
+import com.windrm.app.ui.components.KmMarker
+import com.windrm.app.ui.components.MapArrow
 import com.windrm.app.ui.components.MapMarker
 import com.windrm.app.ui.components.RouteMapView
 import com.windrm.app.ui.routedetail.SegmentedChoice
@@ -80,10 +83,11 @@ private const val SPARKLINE_MAX_POINTS = 240
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onSaved: (Route) -> Unit) {
+fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onOpenSettings: () -> Unit, onSaved: (Route) -> Unit) {
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     var showSave by remember { mutableStateOf(false) }
+    var trackTap by remember { mutableStateOf<TrackTap?>(null) }
 
     val errorTexts = mapOf(
         RoutingError.NO_ROUTE to stringResource(R.string.builder_error_no_route),
@@ -108,16 +112,20 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
     }
     val dragHandles = remember(viewModel.waypoints) { viewModel.waypoints.map { RoutePoint(lat = it.lat, lon = it.lon) } }
     val profileValues = remember(viewModel.segments) { sparklineValues(mapPoints) }
+    val roughRuns = remember(viewModel.segments) {
+        viewModel.segments.flatMap { it.roughRuns() }.map { run -> run.map { RoutePoint(lat = it.lat, lon = it.lon) } }
+    }
+    val kmMarkers = remember(draft, viewModel.activity) {
+        kmMarkersOf(draft?.points.orEmpty(), if (viewModel.activity == ActivityType.TREK) TREK_KM_STEP else RIDE_KM_STEP)
+    }
+    val arrows = remember(viewModel.segments) { viewModel.segments.mapNotNull(::arrowOf) }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.builder_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-                    }
-                },
+            AppBar(
+                title = stringResource(R.string.builder_title),
+                onBack = onBack,
+                onOpenSettings = onOpenSettings,
                 actions = {
                     TextButton(
                         onClick = { showSave = true },
@@ -128,10 +136,6 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                         ),
                     ) { Text(stringResource(R.string.builder_save).uppercase()) }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = Color.White,
-                ),
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -159,11 +163,6 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                         Switch(checked = !viewModel.allowUnpaved, onCheckedChange = { viewModel.changeAllowUnpaved(!it) })
                     }
                 }
-                Text(
-                    stringResource(R.string.builder_routing_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
 
             Box(
@@ -182,6 +181,11 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                         mapStyle = viewModel.mapStyle,
                         markers = markers,
                         onMapTap = { lat, lon -> viewModel.onMapTap(lat, lon) },
+                        casedLine = true,
+                        roughRuns = roughRuns,
+                        kmMarkers = kmMarkers,
+                        arrows = arrows,
+                        onTrackTap = { index, lat, lon -> if (!viewModel.busy) trackTap = TrackTap(index, lat, lon) },
                         draggablePoints = dragHandles,
                         onPointDragged = { index, lat, lon -> viewModel.moveWaypoint(index, lat, lon) },
                         height = Dp.Unspecified,
@@ -198,7 +202,6 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
                 val hint = when (viewModel.waypoints.size) {
                     0 -> R.string.builder_tap_start
                     1 -> R.string.builder_tap_next
-                    2 -> R.string.builder_drag_hint
                     else -> null
                 }
                 if (hint != null && center != null) {
@@ -229,13 +232,30 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onS
         }
     }
 
-    viewModel.pendingUnpaved?.let { pending ->
+    trackTap?.let { tap ->
         AlertDialog(
-            onDismissRequest = viewModel::dismissUnpaved,
-            title = { Text(stringResource(R.string.builder_unpaved_title)) },
-            text = { Text(stringResource(R.string.builder_unpaved_message, pending.roughM.roundToInt())) },
-            confirmButton = { TextButton(onClick = viewModel::acceptUnpaved) { Text(stringResource(R.string.builder_use_stretch)) } },
-            dismissButton = { TextButton(onClick = viewModel::dismissUnpaved) { Text(stringResource(R.string.cancel)) } },
+            onDismissRequest = { trackTap = null },
+            title = { Text(stringResource(R.string.builder_track_title)) },
+            text = {
+                Column {
+                    TextButton(
+                        onClick = {
+                            viewModel.insertWaypointOnTrack(tap.segmentIndex, tap.lat, tap.lon)
+                            trackTap = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.builder_insert_waypoint), modifier = Modifier.fillMaxWidth()) }
+                    TextButton(
+                        onClick = {
+                            viewModel.endRouteOnTrack(tap.segmentIndex, tap.lat, tap.lon)
+                            trackTap = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.builder_end_here), modifier = Modifier.fillMaxWidth()) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { trackTap = null }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 
@@ -267,60 +287,90 @@ private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileV
             Stat("${viewModel.waypoints.size}", stringResource(R.string.builder_points))
         }
 
-        if (duration != null) {
-            Text(
-                stringResource(
-                    if (viewModel.activity == ActivityType.TREK) R.string.builder_time_cai else R.string.builder_time_speed,
-                    "%.0f".format(viewModel.estimateSpeedKmh),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        val total = viewModel.pavedM + viewModel.unpavedM + viewModel.trailM
+        val rough = viewModel.unpavedM + viewModel.trailM
+        val total = viewModel.pavedM + rough
         val known = viewModel.surfaceKnown && total > 0
         Row(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.outlineVariant)) {
             if (known) {
-                listOf(viewModel.pavedM to PavedColor, viewModel.unpavedM to UnpavedColor, viewModel.trailM to TrailColor)
+                listOf(viewModel.pavedM to PavedColor, rough to UnpavedColor)
                     .filter { it.first > 0 }
                     .forEach { (meters, color) -> Box(Modifier.weight(meters.toFloat()).fillMaxHeight().background(color)) }
             }
         }
         if (known) {
+            // On a paved-only ride the unpaved part is a shortfall: its length is shown in the warning color.
+            val roughColor = if (viewModel.leftoverRoughM > 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                listOf(
-                    Triple(R.string.builder_paved, viewModel.pavedM, PavedColor),
-                    Triple(R.string.builder_unpaved, viewModel.unpavedM, UnpavedColor),
-                    Triple(R.string.builder_trail, viewModel.trailM, TrailColor),
-                ).filter { it.second > 0 || it.first == R.string.builder_paved }.forEach { (label, meters, color) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-                        Text(
-                            "${stringResource(label)} ${(meters / total * 100).roundToInt()}%",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 5.dp),
-                        )
-                    }
+                LegendItem(PavedColor, "${stringResource(R.string.builder_paved)} ${(viewModel.pavedM / total * 100).roundToInt()}%", MaterialTheme.colorScheme.onSurfaceVariant)
+                if (rough > 0) {
+                    LegendItem(
+                        UnpavedColor,
+                        "${stringResource(R.string.builder_unpaved)} ${(rough / total * 100).roundToInt()}% · ${formatMeters(rough)}",
+                        roughColor,
+                    )
                 }
             }
         } else if (viewModel.segments.isNotEmpty()) {
             Text(stringResource(R.string.builder_unknown_surface), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
 
-        val leftover = viewModel.leftoverRoughM
-        if (leftover > 1.0) {
-            Text(
-                stringResource(R.string.builder_leftover_warning, leftover.roundToInt()),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-
         ElevationSparkline(profileValues, Modifier.fillMaxWidth().height(56.dp))
     }
 }
+
+@Composable
+private fun LegendItem(dot: Color, text: String, textColor: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).clip(CircleShape).background(dot))
+        Text(text, style = MaterialTheme.typography.bodySmall, color = textColor, modifier = Modifier.padding(start = 5.dp))
+    }
+}
+
+/** "510 m" / "1.2 km". */
+private fun formatMeters(meters: Double): String =
+    if (meters < 1000) "${meters.roundToInt()} m" else "%.1f km".format(meters / 1000)
+
+/** A tap on the drawn line: where, and which line segment of the track it is on. */
+private data class TrackTap(val segmentIndex: Int, val lat: Double, val lon: Double)
+
+/** A distance label at every [stepKm] kilometres along [points] (which carry their distance from the start). */
+private fun kmMarkersOf(points: List<RoutePoint>, stepKm: Int): List<KmMarker> {
+    if (points.size < 2) return emptyList()
+    val total = points.last().distanceFromStartM
+    val out = ArrayList<KmMarker>()
+    var index = 0
+    var km = stepKm
+    while (km * 1000.0 <= total) {
+        val d = km * 1000.0
+        while (index < points.size - 2 && points[index + 1].distanceFromStartM < d) index++
+        val a = points[index]
+        val b = points[index + 1]
+        val span = b.distanceFromStartM - a.distanceFromStartM
+        val t = if (span <= 0.0) 0.0 else ((d - a.distanceFromStartM) / span).coerceIn(0.0, 1.0)
+        out += KmMarker(RoutePoint(lat = a.lat + (b.lat - a.lat) * t, lon = a.lon + (b.lon - a.lon) * t), km.toString())
+        km += stepKm
+    }
+    return out
+}
+
+/** A direction arrow in the middle of a stretch, pointing the way the route goes there. */
+private fun arrowOf(segment: com.windrm.app.repository.RoutedSegment): MapArrow? {
+    val pts = segment.points
+    if (pts.size < 2) return null
+    val mid = pts.size / 2
+    val from = pts[(mid - 1).coerceAtLeast(0)]
+    val to = pts[(mid + 1).coerceAtMost(pts.size - 1)]
+    val phi1 = Math.toRadians(from.lat)
+    val phi2 = Math.toRadians(to.lat)
+    val dLon = Math.toRadians(to.lon - from.lon)
+    val y = kotlin.math.sin(dLon) * kotlin.math.cos(phi2)
+    val x = kotlin.math.cos(phi1) * kotlin.math.sin(phi2) - kotlin.math.sin(phi1) * kotlin.math.cos(phi2) * kotlin.math.cos(dLon)
+    val bearing = (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
+    return MapArrow(RoutePoint(lat = pts[mid].lat, lon = pts[mid].lon), bearing)
+}
+
+private const val RIDE_KM_STEP = 10
+private const val TREK_KM_STEP = 2
 
 /** "1h 05m" / "42 min". */
 private fun formatDuration(seconds: Long): String {

@@ -3,6 +3,7 @@ package com.windrm.app.ui.components
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.MotionEvent
@@ -52,6 +53,12 @@ data class WindArrowPoint(val point: RoutePoint, val windFromDeg: Double, val wi
 /** An extra dot on the route, e.g. where a gauge's min or max occurs. */
 data class MapMarker(val point: RoutePoint, val argb: Int)
 
+/** A label on the route at [point], like a distance marker: a dark pill with a small tail pointing at the line. */
+data class KmMarker(val point: RoutePoint, val label: String)
+
+/** A small direction arrow on the route at [point], pointing along [bearingDeg] (compass degrees, 0 = north). */
+data class MapArrow(val point: RoutePoint, val bearingDeg: Double)
+
 /** What was last applied to a MapView, stashed in its tag so update() can skip redundant work. */
 private data class MapViewFitState(val style: MapStyle, val points: List<RoutePoint>)
 
@@ -88,6 +95,14 @@ fun RouteMapView(
     draggablePoints: List<RoutePoint> = emptyList(),
     /** A dragged point was dropped: its index in [draggablePoints] and the new place. */
     onPointDragged: ((index: Int, lat: Double, lon: Double) -> Unit)? = null,
+    /** Draws the route line like Strava's: red with a thin darker red edge. */
+    casedLine: Boolean = false,
+    /** Stretches of [points] drawn as a dashed red line on white (unpaved ways), edged like [casedLine]. */
+    roughRuns: List<List<RoutePoint>> = emptyList(),
+    kmMarkers: List<KmMarker> = emptyList(),
+    arrows: List<MapArrow> = emptyList(),
+    /** A tap on the line itself: the index of the line segment of [points] (point i to i + 1) and the place tapped, snapped onto it. */
+    onTrackTap: ((segmentIndex: Int, lat: Double, lon: Double) -> Unit)? = null,
 ) {
     val mapRef = remember { MapViewRef() }
     val drag = remember { DragState() }
@@ -141,22 +156,17 @@ fun RouteMapView(
                     val geoPoints = points.map { GeoPoint(it.lat, it.lon) }
                     val shownPoints = cropRangeM?.let { cropPoints(points, it.start, it.endInclusive) } ?: points
                     val shownGeoPoints = shownPoints.map { GeoPoint(it.lat, it.lon) }
-                    val polyline = Polyline(mapView).apply {
-                        setPoints(shownGeoPoints)
-                        outlinePaint.color = Color.parseColor("#E53935")
-                        outlinePaint.strokeWidth = 3f * mapView.resources.displayMetrics.density
-                        // osmdroid draws each segment separately; with the default BUTT caps every
-                        // tiny GPX direction change leaves a notch, which read as a "fuzzy" line.
-                        outlinePaint.isAntiAlias = true
-                        outlinePaint.strokeCap = Paint.Cap.ROUND
-                        outlinePaint.strokeJoin = Paint.Join.ROUND
-                        // A tap on the line must reach the map-tap overlay below (placing a stop is
-                        // exactly a tap on the route): by default osmdroid swallows it and pops up an
-                        // empty info bubble instead.
-                        infoWindow = null
-                        setOnClickListener { _, _, _ -> false }
+                    val density = mapView.resources.displayMetrics.density
+                    if (casedLine) mapView.overlays.add(routeLine(mapView, shownGeoPoints, CASING_ARGB, 5.6f * density))
+                    mapView.overlays.add(routeLine(mapView, shownGeoPoints, ROUTE_ARGB, (if (casedLine) 3.6f else 3f) * density))
+                    if (casedLine) {
+                        roughRuns.forEach { run ->
+                            val geo = run.map { GeoPoint(it.lat, it.lon) }
+                            mapView.overlays.add(routeLine(mapView, geo, CASING_ARGB, 5.6f * density))
+                            mapView.overlays.add(routeLine(mapView, geo, Color.WHITE, 3.6f * density))
+                            mapView.overlays.add(routeLine(mapView, geo, ROUTE_ARGB, 2f * density, dashDp = floatArrayOf(5f, 4f)))
+                        }
                     }
-                    mapView.overlays.add(polyline)
 
                     // Start drawn first so the finish flag ends up on top when they coincide (a
                     // loop route), per the "finish must always show in front of start" requirement.
@@ -177,10 +187,13 @@ fun RouteMapView(
                         mapView.overlays.add(WindArrowsOverlay(thinnedArrows, mapView.resources.displayMetrics.density, active))
                     }
 
-                    val density = mapView.resources.displayMetrics.density
                     highlightPoint?.let { mapView.overlays.add(PointMarkerOverlay(it, HIGHLIGHT_ARGB, density)) }
                     markers.forEach { mapView.overlays.add(PointMarkerOverlay(it.point, it.argb, density)) }
                     if (stops.isNotEmpty()) mapView.overlays.add(StopsOverlay(stops, density, onStopTap, cropRangeM))
+                    if (arrows.isNotEmpty()) mapView.overlays.add(DirectionArrowsOverlay(arrows, density))
+                    if (kmMarkers.isNotEmpty()) mapView.overlays.add(KmMarkersOverlay(kmMarkers, density))
+                    // A tap on the line is handled before the tap on the bare map below it.
+                    onTrackTap?.let { mapView.overlays.add(TrackTapOverlay(points, density, it)) }
 
                     if (autoFit && lastState?.points != points) {
                         val bbox = boundingBoxOf(geoPoints)
@@ -218,6 +231,30 @@ fun RouteMapView(
                 )
             }
         }
+    }
+}
+
+private const val ROUTE_ARGB = 0xFFE53935.toInt()
+private const val CASING_ARGB = 0xFF9B1C18.toInt()
+
+/** One polyline of the route: [widthPx] wide, optionally dashed ([dashDp] = on/off lengths in dp). */
+private fun routeLine(mapView: MapView, geoPoints: List<GeoPoint>, argb: Int, widthPx: Float, dashDp: FloatArray? = null): Polyline {
+    val density = mapView.resources.displayMetrics.density
+    return Polyline(mapView).apply {
+        setPoints(geoPoints)
+        outlinePaint.color = argb
+        outlinePaint.strokeWidth = widthPx
+        // osmdroid draws each segment separately; with the default BUTT caps every
+        // tiny GPX direction change leaves a notch, which read as a "fuzzy" line.
+        outlinePaint.isAntiAlias = true
+        outlinePaint.strokeCap = if (dashDp == null) Paint.Cap.ROUND else Paint.Cap.BUTT
+        outlinePaint.strokeJoin = Paint.Join.ROUND
+        if (dashDp != null) outlinePaint.pathEffect = DashPathEffect(floatArrayOf(dashDp[0] * density, dashDp[1] * density), 0f)
+        // A tap on the line must reach the map-tap overlay below (placing a stop is
+        // exactly a tap on the route): by default osmdroid swallows it and pops up an
+        // empty info bubble instead.
+        infoWindow = null
+        setOnClickListener { _, _, _ -> false }
     }
 }
 
@@ -308,6 +345,117 @@ private class DragHandlesOverlay(
 }
 
 private const val MIN_DRAG_M = 5.0
+
+/** Distance labels along the route: black pills with white text and a tail pointing at the line, like Strava's. */
+private class KmMarkersOverlay(private val markers: List<KmMarker>, private val density: Float) : Overlay() {
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = 12f * density
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1C1C1C.toInt(); style = Paint.Style.FILL }
+    private val tail = Path()
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val out = android.graphics.Point()
+        val padX = 6f * density
+        val padY = 3f * density
+        val tailH = 5f * density
+        val fm = textPaint.fontMetrics
+        val textH = fm.descent - fm.ascent
+        for (m in markers) {
+            mapView.projection.toPixels(GeoPoint(m.point.lat, m.point.lon), out)
+            val w = textPaint.measureText(m.label) + 2 * padX
+            val h = textH + 2 * padY
+            val cx = out.x.toFloat()
+            val bottom = out.y - tailH - 1.5f * density
+            val rect = android.graphics.RectF(cx - w / 2, bottom - h, cx + w / 2, bottom)
+            canvas.drawRoundRect(rect, 5f * density, 5f * density, fillPaint)
+            tail.reset()
+            tail.moveTo(cx - 4f * density, bottom - 0.5f)
+            tail.lineTo(cx + 4f * density, bottom - 0.5f)
+            tail.lineTo(cx, out.y - 1.5f * density)
+            tail.close()
+            canvas.drawPath(tail, fillPaint)
+            canvas.drawText(m.label, cx, rect.centerY() - (fm.ascent + fm.descent) / 2, textPaint)
+        }
+    }
+}
+
+/** A white disc with a dark red edge and an arrow along the direction of travel, on the route. */
+private class DirectionArrowsOverlay(private val arrows: List<MapArrow>, private val density: Float) : Overlay() {
+    private val radius = 8f * density
+    private val discPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = CASING_ARGB; style = Paint.Style.STROKE; strokeWidth = 1.5f * density }
+    private val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = CASING_ARGB; style = Paint.Style.FILL }
+    private val arrow = Path().apply {
+        // Points up (north): tip, then the two back corners, with a notch in the middle.
+        moveTo(0f, -radius * 0.62f)
+        lineTo(radius * 0.46f, radius * 0.5f)
+        lineTo(0f, radius * 0.18f)
+        lineTo(-radius * 0.46f, radius * 0.5f)
+        close()
+    }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val out = android.graphics.Point()
+        for (a in arrows) {
+            mapView.projection.toPixels(GeoPoint(a.point.lat, a.point.lon), out)
+            canvas.save()
+            canvas.translate(out.x.toFloat(), out.y.toFloat())
+            canvas.drawCircle(0f, 0f, radius, discPaint)
+            canvas.drawCircle(0f, 0f, radius, edgePaint)
+            canvas.rotate(a.bearingDeg.toFloat())
+            canvas.drawPath(arrow, arrowPaint)
+            canvas.restore()
+        }
+    }
+}
+
+/**
+ * Reports a tap that lands on the route line (within ~22 dp): which line segment of [points] and where on it,
+ * snapped onto the line. Taps elsewhere pass on to the overlays below.
+ */
+private class TrackTapOverlay(
+    private val points: List<RoutePoint>,
+    private val density: Float,
+    private val onTap: (Int, Double, Double) -> Unit,
+) : Overlay() {
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) = Unit
+
+    override fun onSingleTapConfirmed(e: MotionEvent, mapView: MapView): Boolean {
+        if (points.size < 2) return false
+        val projection = mapView.projection
+        val a = android.graphics.Point()
+        val b = android.graphics.Point()
+        var bestIndex = -1
+        var bestDistance = 22f * density
+        var bestT = 0f
+        projection.toPixels(GeoPoint(points[0].lat, points[0].lon), a)
+        for (i in 0 until points.size - 1) {
+            projection.toPixels(GeoPoint(points[i + 1].lat, points[i + 1].lon), b)
+            val dx = (b.x - a.x).toFloat()
+            val dy = (b.y - a.y).toFloat()
+            val len2 = dx * dx + dy * dy
+            val t = if (len2 <= 0f) 0f else (((e.x - a.x) * dx + (e.y - a.y) * dy) / len2).coerceIn(0f, 1f)
+            val d = kotlin.math.hypot(a.x + t * dx - e.x, a.y + t * dy - e.y)
+            if (d < bestDistance) {
+                bestDistance = d
+                bestIndex = i
+                bestT = t
+            }
+            a.set(b.x, b.y)
+        }
+        if (bestIndex < 0) return false
+        val p = points[bestIndex]
+        val q = points[bestIndex + 1]
+        onTap(bestIndex, p.lat + (q.lat - p.lat) * bestT, p.lon + (q.lon - p.lon) * bestT)
+        return true
+    }
+}
 
 private class MapViewRef {
     var view: MapView? = null

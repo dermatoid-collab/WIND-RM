@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.windrm.app.R
+import com.windrm.app.ui.components.SettingsGear
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.RideLevel
 import com.windrm.app.domain.RideQuality
@@ -107,7 +108,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
+fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit, onOpenSettings: () -> Unit) {
     val context = LocalContext.current
     val state = viewModel.uiState
     var showStartPicker by remember { mutableStateOf(false) }
@@ -129,6 +130,7 @@ fun ForecastScreen(viewModel: ForecastViewModel, onBack: () -> Unit) {
                 quality = quality,
                 onQualityClick = { showQuality = true },
                 onBack = onBack,
+                onOpenSettings = onOpenSettings,
                 onShare = (state as? ForecastUiState.Success)?.let { { showShareChoice = true } },
                 onStartTime = (state as? ForecastUiState.Success)?.let {
                     {
@@ -213,12 +215,13 @@ private fun CompactTopBar(
     quality: RideQuality?,
     onQualityClick: () -> Unit,
     onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
     onShare: (() -> Unit)?,
     onStartTime: (() -> Unit)?,
 ) {
     Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
         Row(
-            Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(48.dp),
+            Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(com.windrm.app.ui.components.AppBarHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -242,6 +245,7 @@ private fun CompactTopBar(
                     Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
                 }
             }
+            SettingsGear(onOpenSettings)
         }
     }
 }
@@ -263,7 +267,7 @@ private fun TrafficLight(level: RideLevel, onClick: () -> Unit) {
     val description = stringResource(R.string.ride_quality)
     Box(
         Modifier
-            .size(width = 30.dp, height = 48.dp)
+            .size(width = 30.dp, height = com.windrm.app.ui.components.AppBarHeight)
             .clickable(onClickLabel = description, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

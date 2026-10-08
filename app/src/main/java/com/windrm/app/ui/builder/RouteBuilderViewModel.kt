@@ -35,8 +35,8 @@ import java.util.Locale
 
 /**
  * The route being drawn: points tapped on the map, joined by routed stretches. Each new point is
- * routed from the previous one along the most direct way; on a ride with "paved only" a stretch that
- * would use unpaved ways is held back until the user accepts it.
+ * routed from the previous one along the most direct way; on a ride with "paved only" the stretches
+ * that still have to use unpaved ways are shown as such, for the user to see.
  */
 class RouteBuilderViewModel(
     private val appContext: Context,
@@ -63,10 +63,6 @@ class RouteBuilderViewModel(
     var error by mutableStateOf<RoutingError?>(null)
         private set
 
-    /** A stretch with unpaved ways, waiting for the user to accept or drop it. */
-    var pendingUnpaved by mutableStateOf<RoutedSegment?>(null)
-        private set
-
     var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
         private set
 
@@ -87,9 +83,6 @@ class RouteBuilderViewModel(
     val estimateSpeedKmh: Double get() = if (activity == ActivityType.TREK) caiProfile.flatKmh else rideSpeedKmh
 
     private var job: Job? = null
-
-    /** What accepting the stretch in [pendingUnpaved] does: add it to the end, or put it in place of an edited one. */
-    private var applyPending: (() -> Unit)? = null
 
     val profile: BuilderProfile get() = BuilderProfile.of(activity, allowUnpaved)
 
@@ -141,7 +134,7 @@ class RouteBuilderViewModel(
     }
 
     fun onMapTap(lat: Double, lon: Double) {
-        if (busy || pendingUnpaved != null) return
+        if (busy) return
         error = null
         val target = LatLon(lat, lon)
         val from = waypoints.lastOrNull()
@@ -153,13 +146,7 @@ class RouteBuilderViewModel(
         job = viewModelScope.launch {
             busy = true
             try {
-                val segment = routingRepository.route(from, to, profile)
-                if (strictPaved && segment.surfaceKnown && segment.roughM > ROUGH_EPSILON_M) {
-                    applyPending = { append(segment) }
-                    pendingUnpaved = segment
-                } else {
-                    append(segment)
-                }
+                append(routingRepository.route(from, to, profile))
             } catch (e: RoutingException) {
                 error = e.error
             } finally {
@@ -176,24 +163,12 @@ class RouteBuilderViewModel(
         segments = segments + segment
     }
 
-    fun acceptUnpaved() {
-        applyPending?.invoke()
-        applyPending = null
-        pendingUnpaved = null
-    }
-
-    fun dismissUnpaved() {
-        applyPending = null
-        pendingUnpaved = null
-    }
-
     /**
      * A point dragged to a new place: the stretch before it and the one after it are routed again through
-     * its new position (snapped to the road). Nothing changes if routing fails or the user refuses an
-     * unpaved stretch.
+     * its new position (snapped to the road). Nothing changes if routing fails.
      */
     fun moveWaypoint(index: Int, lat: Double, lon: Double) {
-        if (busy || pendingUnpaved != null || index !in waypoints.indices) return
+        if (busy || index !in waypoints.indices) return
         error = null
         val target = LatLon(lat, lon)
         // A lone first point has no stretch to route: it simply moves.
@@ -207,29 +182,53 @@ class RouteBuilderViewModel(
             try {
                 val before = if (index > 0) routingRepository.route(points[index - 1], target, profile) else null
                 val after = if (index < points.size - 1) routingRepository.route(target, points[index + 1], profile) else null
-                val changed = listOfNotNull(before, after)
                 val snapped = (before?.points?.last() ?: after?.points?.first())?.let { LatLon(it.lat, it.lon) } ?: target
-                val commit = {
-                    val newSegments = segments.toMutableList()
-                    if (before != null) newSegments[index - 1] = before
-                    if (after != null) newSegments[index] = after
-                    segments = newSegments
-                    waypoints = points.toMutableList().also { it[index] = snapped }
-                }
-                val rough = changed.filter { it.surfaceKnown }.sumOf { it.roughM }
-                if (strictPaved && rough > ROUGH_EPSILON_M) {
-                    applyPending = commit
-                    // Only the amount is shown by the dialog.
-                    pendingUnpaved = RoutedSegment(emptyList(), 0.0, rough, 0.0, true)
-                } else {
-                    commit()
-                }
+                val newSegments = segments.toMutableList()
+                if (before != null) newSegments[index - 1] = before
+                if (after != null) newSegments[index] = after
+                segments = newSegments
+                waypoints = points.toMutableList().also { it[index] = snapped }
             } catch (e: RoutingException) {
                 error = e.error
             } finally {
                 busy = false
             }
         }
+    }
+
+    /**
+     * Where the line segment [flatIndex] of the drawn track (points of all stretches one after the other) lies:
+     * the stretch it belongs to and its index inside it.
+     */
+    private fun locate(flatIndex: Int): Pair<Int, Int>? {
+        var offset = 0
+        for ((s, segment) in segments.withIndex()) {
+            val last = offset + segment.points.size - 1
+            if (flatIndex < last) return s to (flatIndex - offset).coerceAtLeast(0)
+            offset += segment.points.size
+        }
+        return null
+    }
+
+    /** A new waypoint on the track at ([lat], [lon]), on line segment [flatIndex]: the stretch is cut there, with no new routing. */
+    fun insertWaypointOnTrack(flatIndex: Int, lat: Double, lon: Double) {
+        if (busy) return
+        val (s, j) = locate(flatIndex) ?: return
+        val (before, after) = segments[s].splitAt(j, lat, lon)
+        segments = segments.toMutableList().also {
+            it[s] = before
+            it.add(s + 1, after)
+        }
+        waypoints = waypoints.toMutableList().also { it.add(s + 1, LatLon(lat, lon)) }
+    }
+
+    /** The route ends at ([lat], [lon]) on line segment [flatIndex]: everything after it is dropped. */
+    fun endRouteOnTrack(flatIndex: Int, lat: Double, lon: Double) {
+        if (busy) return
+        val (s, j) = locate(flatIndex) ?: return
+        val (before, _) = segments[s].splitAt(j, lat, lon)
+        segments = segments.take(s) + before
+        waypoints = waypoints.take(s + 1) + LatLon(lat, lon)
     }
 
     fun changeActivity(newActivity: ActivityType) {
@@ -248,8 +247,6 @@ class RouteBuilderViewModel(
 
     /** A different profile means different roads: every stretch is routed again, or the change is undone. */
     private fun rerouteAll(previous: Pair<ActivityType, Boolean>) {
-        pendingUnpaved = null
-        applyPending = null
         error = null
         val points = waypoints
         if (points.size < 2) return
@@ -272,8 +269,6 @@ class RouteBuilderViewModel(
 
     fun undo() {
         if (busy) return
-        pendingUnpaved = null
-        applyPending = null
         error = null
         when {
             segments.isNotEmpty() -> {
@@ -287,8 +282,6 @@ class RouteBuilderViewModel(
     fun clear() {
         job?.cancel()
         busy = false
-        pendingUnpaved = null
-        applyPending = null
         error = null
         segments = emptyList()
         waypoints = emptyList()
@@ -301,7 +294,7 @@ class RouteBuilderViewModel(
     }
 
     fun returnToStart() {
-        if (busy || pendingUnpaved != null || !canReturnToStart()) return
+        if (busy || !canReturnToStart()) return
         error = null
         extend(waypoints.last(), waypoints.first())
     }
@@ -333,7 +326,6 @@ class RouteBuilderViewModel(
         const val DEFAULT_ZOOM = 14.0
         const val DEFAULT_COUNTRY_ZOOM = 6.0
         val DEFAULT_CENTER = 42.5 to 12.5
-        const val ROUGH_EPSILON_M = 1.0
         const val RETURN_MIN_M = 30.0
     }
 }
