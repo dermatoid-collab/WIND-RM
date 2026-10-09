@@ -129,4 +129,23 @@ class SettingsViewModel(
     }
 
     fun clearHomeLocation() = viewModelScope.launch { settingsRepository.clearHomeLocation() }
+
+    /** The favourite place gets the name the user typed. */
+    fun renameHome(label: String) = viewModelScope.launch { settingsRepository.setHomeLabel(label) }
+
+    /** The place tapped on the map becomes the favourite one, named after what the geocoder calls it (it can be renamed). */
+    fun setHomeFromMap(lat: Double, lon: Double) {
+        viewModelScope.launch {
+            val label = withContext(Dispatchers.IO) { DeviceLocation.reverseGeocode(appContext, lat, lon) }
+            settingsRepository.setHomeLocation(lat, lon, label)
+        }
+    }
+
+    /** Where the place picker opens: the favourite place, else the last known position, else the middle of Italy. */
+    fun pickerStart(): Pair<Double, Double> {
+        val s = settings
+        if (s.homeLat != null && s.homeLon != null) return s.homeLat to s.homeLon
+        val here = runCatching { DeviceLocation.lastKnown(appContext) }.getOrNull()
+        return if (here != null) here.latitude to here.longitude else 42.5 to 12.5
+    }
 }

@@ -89,6 +89,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
     val snackbar = remember { SnackbarHostState() }
     var showSave by remember { mutableStateOf(false) }
     var trackTap by remember { mutableStateOf<TrackTap?>(null) }
+    var waypointMenu by remember { mutableStateOf<Int?>(null) }
 
     val errorTexts = mapOf(
         RoutingError.NO_ROUTE to stringResource(R.string.builder_error_no_route),
@@ -197,6 +198,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                         onTrackTap = { index, lat, lon -> if (!viewModel.busy) trackTap = TrackTap(index, lat, lon) },
                         draggablePoints = dragHandles,
                         onPointDragged = { index, lat, lon -> viewModel.moveWaypoint(index, lat, lon) },
+                        onPointTapped = { index -> if (!viewModel.busy) waypointMenu = index },
                         height = Dp.Unspecified,
                         autoFit = false,
                         initialCenter = center,
@@ -236,6 +238,36 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
         }
     }
 
+    waypointMenu?.let { index ->
+        AlertDialog(
+            onDismissRequest = { waypointMenu = null },
+            title = { Text(stringResource(R.string.builder_waypoint_title, index + 1)) },
+            text = {
+                Column {
+                    // The last waypoint already is the end.
+                    if (index != viewModel.waypoints.lastIndex) {
+                        TextButton(
+                            onClick = {
+                                viewModel.endRouteAtWaypoint(index)
+                                waypointMenu = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.builder_end_here), modifier = Modifier.fillMaxWidth()) }
+                    }
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteWaypoint(index)
+                            waypointMenu = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.builder_delete_waypoint), modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { waypointMenu = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
     trackTap?.let { tap ->
         AlertDialog(
             onDismissRequest = { trackTap = null },
@@ -251,7 +283,7 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                     ) { Text(stringResource(R.string.builder_insert_waypoint), modifier = Modifier.fillMaxWidth()) }
                     TextButton(
                         onClick = {
-                            viewModel.endRouteOnTrack(tap.segmentIndex, tap.lat, tap.lon)
+                            viewModel.endRouteAt(tap.lat, tap.lon)
                             trackTap = null
                         },
                         modifier = Modifier.fillMaxWidth(),

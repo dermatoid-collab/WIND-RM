@@ -28,6 +28,8 @@
     <string name="builder_track_title">On the route</string>
     <string name="builder_insert_waypoint">Insert waypoint</string>
     <string name="builder_end_here">End here</string>
+    <string name="builder_delete_waypoint">Delete</string>
+    <string name="builder_waypoint_title">Point %1$d</string>
     <string name="builder_undo">Undo</string>
     <string name="builder_back_to_start">Back to start</string>
     <string name="builder_clear">Clear</string>
@@ -137,10 +139,14 @@
     <string name="settings_default_speed">Default average speed</string>
     <string name="settings_forecast_horizon">Planning horizon</string>
     <string name="settings_days_suffix">days</string>
-    <string name="settings_home_location">Home location</string>
-    <string name="settings_home_location_gps">Using live GPS</string>
+    <string name="settings_home_location">Favourite place (start)</string>
+    <string name="settings_home_location_gps">Using live GPS. Set a favourite place to open the maps there and show its weather on the home screen.</string>
+    <string name="settings_home_name">Name of the place</string>
+    <string name="settings_pick_on_map">Pick on the map</string>
+    <string name="settings_pick_on_map_hint">Tap the map to choose the place</string>
+    <string name="settings_pick_on_map_use">Use this place</string>
     <string name="settings_home_location_fixed">Fixed: %1$s</string>
-    <string name="settings_use_current_location">Use current location as Home</string>
+    <string name="settings_use_current_location">Use my current position</string>
     <string name="settings_use_live_gps">Use live GPS instead</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_routing_profile">Route builder profile in use: %1$s</string>

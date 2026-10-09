@@ -245,13 +245,62 @@ class RouteBuilderViewModel(
         waypoints = waypoints.toMutableList().also { it.add(s + 1, LatLon(lat, lon)) }
     }
 
-    /** The route ends at ([lat], [lon]) on line segment [flatIndex]: everything after it is dropped. */
-    fun endRouteOnTrack(flatIndex: Int, lat: Double, lon: Double) {
+    /**
+     * The route ends at ([lat], [lon]): a new last waypoint is added there, joined to the old end like any tapped
+     * point. Nothing already drawn is ever dropped, also when the place is on a stretch already ridden.
+     */
+    fun endRouteAt(lat: Double, lon: Double) {
         if (busy) return
-        val (s, j) = locate(flatIndex) ?: return
-        val (before, _) = segments[s].splitAt(j, lat, lon)
-        segments = segments.take(s) + before
-        waypoints = waypoints.take(s + 1) + LatLon(lat, lon)
+        val from = waypoints.lastOrNull() ?: return
+        error = null
+        extend(from, LatLon(lat, lon))
+    }
+
+    /** The route ends at the waypoint [index]: the way back to it is added after the old end; no waypoint is removed. */
+    fun endRouteAtWaypoint(index: Int) {
+        if (busy || index !in waypoints.indices || index == waypoints.lastIndex) return
+        error = null
+        extend(waypoints.last(), waypoints[index])
+    }
+
+    /**
+     * Deletes the waypoint [index], because the user asked for it: its two stretches become one, routed (or
+     * straight, when both were drawn by hand) from the waypoint before to the one after. Deleting an end just
+     * drops its stretch.
+     */
+    fun deleteWaypoint(index: Int) {
+        if (busy || index !in waypoints.indices) return
+        error = null
+        when {
+            waypoints.size == 1 -> clear()
+            index == 0 -> {
+                segments = segments.drop(1)
+                waypoints = waypoints.drop(1)
+            }
+            index == waypoints.lastIndex -> {
+                segments = segments.dropLast(1)
+                waypoints = waypoints.dropLast(1)
+            }
+            else -> {
+                val points = waypoints
+                val manual = segments[index - 1].manual && segments[index].manual
+                job = viewModelScope.launch {
+                    busy = true
+                    try {
+                        val joined = leg(points[index - 1], points[index + 1], manual)
+                        segments = segments.toMutableList().also {
+                            it[index - 1] = joined
+                            it.removeAt(index)
+                        }
+                        waypoints = points.toMutableList().also { it.removeAt(index) }
+                    } catch (e: RoutingException) {
+                        error = e.error
+                    } finally {
+                        busy = false
+                    }
+                }
+            }
+        }
     }
 
     fun changeActivity(newActivity: ActivityType) {
@@ -350,8 +399,9 @@ class RouteBuilderViewModel(
     private suspend fun writeToFolder(route: Route) = GpxFolderExport.save(appContext, settingsRepository, route, gpxFolderName)
 
     private companion object {
-        const val DEFAULT_ZOOM = 14.0
-        const val DEFAULT_COUNTRY_ZOOM = 6.0
+        // One zoom level more than before: twice as close.
+        const val DEFAULT_ZOOM = 15.0
+        const val DEFAULT_COUNTRY_ZOOM = 7.0
         val DEFAULT_CENTER = 42.5 to 12.5
         const val RETURN_MIN_M = 30.0
     }

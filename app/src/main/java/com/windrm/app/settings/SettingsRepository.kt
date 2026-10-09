@@ -299,6 +299,11 @@ class SettingsRepository(private val context: Context) {
         }
     }
 
+    /** Renames the favourite place; the position stays. */
+    suspend fun setHomeLabel(label: String) {
+        context.settingsDataStore.edit { prefs -> prefs[keyHomeLabel] = label }
+    }
+
     suspend fun clearHomeLocation() {
         context.settingsDataStore.edit { prefs ->
             prefs[keyHasHomeLocation] = false

@@ -99,6 +99,8 @@ fun RouteMapView(
     draggablePoints: List<RoutePoint> = emptyList(),
     /** A dragged point was dropped: its index in [draggablePoints] and the new place. */
     onPointDragged: ((index: Int, lat: Double, lon: Double) -> Unit)? = null,
+    /** A tap (no movement) on one of [draggablePoints]: its index. */
+    onPointTapped: ((index: Int) -> Unit)? = null,
     /** Draws the route line like Strava's: red with a thin darker red edge. */
     casedLine: Boolean = false,
     /** Stretches of [points] drawn as a dashed red line on white (unpaved ways), edged like [casedLine]. */
@@ -228,7 +230,7 @@ fun RouteMapView(
                 }
                 // On top of everything else so it gets first pick of a touch.
                 if (onPointDragged != null && draggablePoints.isNotEmpty()) {
-                    mapView.overlays.add(DragHandlesOverlay(draggablePoints, drag, mapView.resources.displayMetrics.density, onPointDragged))
+                    mapView.overlays.add(DragHandlesOverlay(draggablePoints, drag, mapView.resources.displayMetrics.density, onPointDragged, onPointTapped))
                 }
                 mapView.tag = MapViewFitState(mapStyle, points, keys)
                 mapView.invalidate()
@@ -295,6 +297,7 @@ private class DragHandlesOverlay(
     private val drag: DragState,
     private val density: Float,
     private val onDropped: (Int, Double, Double) -> Unit,
+    private val onTapped: ((Int) -> Unit)? = null,
 ) : Overlay() {
     private val ringPaint = markerRingPaint(density)
     private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = HIGHLIGHT_ARGB; style = Paint.Style.FILL }
@@ -351,7 +354,7 @@ private class DragHandlesOverlay(
                 drag.index = -1
                 mapView.invalidate()
                 // A touch that never left the point is a tap on it, not a move.
-                if (moved > MIN_DRAG_M) onDropped(index, p.latitude, p.longitude)
+                if (moved > MIN_DRAG_M) onDropped(index, p.latitude, p.longitude) else onTapped?.invoke(index)
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {

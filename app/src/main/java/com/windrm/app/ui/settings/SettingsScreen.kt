@@ -251,29 +251,52 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             SettingsSection(stringResource(R.string.settings_home_location)) {
+                var showPicker by remember { mutableStateOf(false) }
                 if (settings.hasFixedHomeLocation) {
-                    Text(
-                        stringResource(R.string.settings_home_location_fixed, settings.homeLabel ?: ""),
-                        style = MaterialTheme.typography.bodyMedium,
+                    // The favourite place: the home screen's weather and the start of every new route in the builder.
+                    var name by remember(settings.homeLabel) { mutableStateOf(settings.homeLabel.orEmpty()) }
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = {
+                            name = it
+                            viewModel.renameHome(it)
+                        },
+                        label = { Text(stringResource(R.string.settings_home_name)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    TextButton(onClick = { viewModel.clearHomeLocation() }, modifier = Modifier.padding(top = 4.dp)) {
-                        Text(stringResource(R.string.settings_use_live_gps))
-                    }
                 } else {
                     Text(stringResource(R.string.settings_home_location_gps), style = MaterialTheme.typography.bodyMedium)
-                    if (viewModel.homeLocationLoading) {
-                        CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
-                    } else {
-                        OutlinedButton(
-                            onClick = { locationPermissionLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) },
-                            modifier = Modifier.padding(top = 8.dp),
-                        ) {
+                }
+                if (viewModel.homeLocationLoading) {
+                    CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp))
+                } else {
+                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { showPicker = true }) { Text(stringResource(R.string.settings_pick_on_map)) }
+                        OutlinedButton(onClick = { locationPermissionLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION) }) {
                             Text(stringResource(R.string.settings_use_current_location))
                         }
                     }
-                    viewModel.homeLocationError?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
+                }
+                if (settings.hasFixedHomeLocation) {
+                    TextButton(onClick = { viewModel.clearHomeLocation() }) { Text(stringResource(R.string.settings_use_live_gps)) }
+                }
+                viewModel.homeLocationError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                if (showPicker) {
+                    val start = remember { viewModel.pickerStart() }
+                    PlacePickerDialog(
+                        mapStyle = settings.mapStyle,
+                        start = start,
+                        startZoom = if (settings.hasFixedHomeLocation) 15.0 else 7.0,
+                        chosenAtStart = if (settings.hasFixedHomeLocation) start else null,
+                        onDismiss = { showPicker = false },
+                        onConfirm = { lat, lon ->
+                            viewModel.setHomeFromMap(lat, lon)
+                            showPicker = false
+                        },
+                    )
                 }
             }
 
