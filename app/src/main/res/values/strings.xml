@@ -84,6 +84,11 @@
     <string name="temperature">Temperature</string>
     <string name="precipitation">Precipitation</string>
     <string name="wind">Wind</string>
+    <string name="head_tail_wind">Headwind and Tailwind</string>
+    <string name="headwind">Headwind</string>
+    <string name="tailwind">Tailwind</string>
+    <string name="crosswind">Crosswind</string>
+    <string name="relative_wind_hint">Press and drag on a chart to see the wind against your direction</string>
     <string name="uv_index">UV Index</string>
     <string name="precipitation_and_cloud_cover">Precipitation and Cloud Cover</string>
     <string name="wind_direction">Wind Direction</string>

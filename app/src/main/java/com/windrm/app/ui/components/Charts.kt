@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.layout
@@ -61,7 +62,17 @@ data class ChartSeries(
     val decimals: Int = 1,
     /** Multiplies the value shown in the tooltip only, e.g. to show a 0..12 plotted line as 0..100 %. */
     val tooltipFactor: Float = 1f,
-)
+    /**
+     * For a series that swings around zero: the colour used below the zero line ([color] is used above it).
+     * The area is filled between the line and zero instead of down to the bottom of the plot.
+     */
+    val negativeColor: Color? = null,
+    /** Replaces the default "label: value" line in the scrub tooltip with a text built from the value. */
+    val tooltipText: ((Float) -> String)? = null,
+) {
+    /** The colour for [value]: [negativeColor] below zero when the series has one, [color] otherwise. */
+    fun colorFor(value: Float): Color = if (value < 0f && negativeColor != null) negativeColor else color
+}
 
 /** A horizontal colored band drawn behind the chart, e.g. air-quality severity ranges. */
 data class ChartBand(
@@ -201,6 +212,10 @@ fun MultiSeriesChart(
                         val y = size.height * i / stepCount
                         drawLine(color = gridColor, start = Offset(0f, y), end = Offset(size.width, y), strokeWidth = 1.dp.toPx())
                     }
+                    if (min < 0f && max > 0f) {
+                        val zeroY = size.height * (1f - ((0f - min) / (max - min)))
+                        drawLine(color = Color.Gray.copy(alpha = 0.7f), start = Offset(0f, zeroY), end = Offset(size.width, zeroY), strokeWidth = 1.5.dp.toPx())
+                    }
                     if (xLabels.size > 1) {
                         for (i in xLabels.indices) {
                             val x = size.width * i / (xLabels.size - 1)
@@ -215,6 +230,25 @@ fun MultiSeriesChart(
                             smoothLinePath(s.values, min, max, stepX, size.height)
                         } else {
                             rawLinePath(s.values, min, max, stepX, size.height)
+                        }
+                        if (s.negativeColor != null) {
+                            // Swings around zero: filled between the line and zero, one colour each side of it.
+                            val zeroY = size.height * (1f - ((0f - min) / (max - min)).coerceIn(0f, 1f))
+                            val fillPath = Path().apply {
+                                addPath(linePath)
+                                lineTo((n - 1) * stepX, zeroY)
+                                lineTo(0f, zeroY)
+                                close()
+                            }
+                            clipRect(top = 0f, bottom = zeroY) {
+                                drawPath(fillPath, color = s.color.copy(alpha = 0.32f))
+                                drawPath(linePath, color = s.color, style = Stroke(width = 1.8.dp.toPx()))
+                            }
+                            clipRect(top = zeroY, bottom = size.height) {
+                                drawPath(fillPath, color = s.negativeColor.copy(alpha = 0.32f))
+                                drawPath(linePath, color = s.negativeColor, style = Stroke(width = 1.8.dp.toPx()))
+                            }
+                            return@forEach
                         }
                         if (s.filled) {
                             val fillPath = Path().apply {
@@ -234,7 +268,7 @@ fun MultiSeriesChart(
                             val v = s.valueAtFraction(f) ?: return@forEach
                             val y = size.height * (1f - ((v - min) / (max - min)).coerceIn(0f, 1f))
                             drawLine(
-                                color = s.color.copy(alpha = 0.6f),
+                                color = s.colorFor(v).copy(alpha = 0.6f),
                                 start = Offset(0f, y),
                                 end = Offset(size.width, y),
                                 strokeWidth = 1.dp.toPx(),
@@ -250,7 +284,7 @@ fun MultiSeriesChart(
                             val v = s.valueAtFraction(f) ?: return@forEach
                             val y = size.height * (1f - ((v - min) / (max - min)).coerceIn(0f, 1f))
                             drawCircle(color = Color.White, radius = 5.dp.toPx(), center = Offset(x, y))
-                            drawCircle(color = s.color, radius = 3.5.dp.toPx(), center = Offset(x, y))
+                            drawCircle(color = s.colorFor(v), radius = 3.5.dp.toPx(), center = Offset(x, y))
                         }
                     }
                 }
@@ -407,9 +441,10 @@ private fun ScrubTooltip(series: List<ChartSeries>, fraction: Float, label: Stri
     ) {
         label?.let { Text(it, style = MaterialTheme.typography.labelLarge) }
         series.forEach { s ->
-            if (s.label.isEmpty()) return@forEach
+            if (s.label.isEmpty() && s.tooltipText == null) return@forEach
             val v = s.valueAtFraction(fraction) ?: return@forEach
-            Text("${s.tooltipLabel}: ${formatValue(v * s.tooltipFactor, s.decimals)}${s.unit}", color = s.color, style = MaterialTheme.typography.bodyMedium)
+            val text = s.tooltipText?.invoke(v) ?: "${s.tooltipLabel}: ${formatValue(v * s.tooltipFactor, s.decimals)}${s.unit}"
+            Text(text, color = s.colorFor(v), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

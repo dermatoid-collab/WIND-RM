@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -66,6 +67,7 @@ import com.windrm.app.ui.components.SettingsGear
 import com.windrm.app.domain.PacingMode
 import com.windrm.app.domain.RideLevel
 import com.windrm.app.domain.RideQuality
+import com.windrm.app.domain.RelativeWindProfile
 import com.windrm.app.domain.RideQualityEvaluator
 import com.windrm.app.model.AirQualityPoint
 import com.windrm.app.model.DaylightInfo
@@ -79,6 +81,10 @@ import com.windrm.app.ui.components.ChartBand
 import com.windrm.app.ui.components.ChartSeries
 import com.windrm.app.ui.components.MapMarker
 import com.windrm.app.ui.components.MultiSeriesChart
+import com.windrm.app.ui.components.RelativeWindReadout
+import com.windrm.app.ui.components.headTailTooltip
+import com.windrm.app.ui.components.label
+import com.windrm.app.ui.components.mainKmh
 import com.windrm.app.ui.components.RouteMapView
 import com.windrm.app.ui.components.SemiCircularGauge
 import com.windrm.app.ui.components.WindArrowPoint
@@ -94,6 +100,8 @@ import com.windrm.app.ui.theme.DaylightColor
 import com.windrm.app.ui.theme.DewPointColor
 import com.windrm.app.ui.theme.FeelsLikeColor
 import com.windrm.app.ui.theme.GustColor
+import com.windrm.app.ui.theme.HeadwindColor
+import com.windrm.app.ui.theme.TailwindColor
 import com.windrm.app.ui.theme.HumidityColor
 import com.windrm.app.ui.theme.IntensityColor
 import com.windrm.app.ui.theme.PrecipColor
@@ -103,6 +111,8 @@ import com.windrm.app.ui.theme.WindColor
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -378,6 +388,8 @@ private fun ForecastContent(
     val timeFmt = remember { DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()) }
     val scrubLabel = "%.1f km, %s".format(fraction * totalDistanceM / 1000.0, timeFmt.format(timeAtFraction(points, fraction)))
     val elevationProfile = remember(track) { track.map { (it.eleM ?: 0.0).toFloat() } }
+    val relativeWind = remember(result) { RelativeWindProfile(points, track) }
+    val windHere = scrubFraction?.let { relativeWind.at(it) }
     val daylightLevels = remember(result) {
         (0 until DAYLIGHT_BAR_SAMPLES).map { k ->
             val f = k.toFloat() / (DAYLIGHT_BAR_SAMPLES - 1)
@@ -470,12 +482,40 @@ private fun ForecastContent(
                     scrubFraction = scrubFraction,
                     onScrub = onScrub,
                     onScrubEnd = onScrubEnd,
-                    scrubLabel = scrubLabel,
+                    // Scrubbing here also says whether the wind is in the face, from behind or from the side.
+                    scrubLabel = windHere?.let { "$scrubLabel\n${it.kind.label()} ${it.mainKmh().roundToInt()} km/h" } ?: scrubLabel,
                     series = listOf(
                         ChartSeries("Wind (km/h)", WindColor, points.map { it.weather.windSpeedKmh.toFloat() }, filled = false, tooltipLabel = "Wind", unit = " km/h", decimals = 0),
                         ChartSeries("Wind Gust (km/h)", GustColor, points.map { it.weather.windGustKmh.toFloat() }, tooltipLabel = "Gusts", unit = " km/h", decimals = 0),
                     ),
                 )
+                if (!relativeWind.isEmpty) {
+                    val headSeries = relativeWind.headSeries
+                    // Symmetric around zero, so the zero line sits in the middle and both sides read alike.
+                    val range = (ceil(headSeries.maxOf { abs(it) } / 5f) * 5f).coerceAtLeast(10f)
+                    Spacer(Modifier.height(16.dp))
+                    MultiSeriesChart(
+                        title = stringResource(R.string.head_tail_wind),
+                        xLabels = timeLabels,
+                        yUnit = " km/h",
+                        yRangeOverride = -range..range,
+                        scrubFraction = scrubFraction,
+                        onScrub = onScrub,
+                        onScrubEnd = onScrubEnd,
+                        scrubLabel = scrubLabel,
+                        bands = listOf(
+                            ChartBand(0f..range, HeadwindColor, stringResource(R.string.headwind)),
+                            ChartBand(-range..0f, TailwindColor, stringResource(R.string.tailwind)),
+                        ),
+                        series = listOf(
+                            ChartSeries(
+                                "", HeadwindColor, headSeries, smooth = false,
+                                negativeColor = TailwindColor, tooltipText = headTailTooltip(),
+                            ),
+                        ),
+                    )
+                    RelativeWindReadout(windHere, relativeWind, Modifier.padding(top = 8.dp))
+                }
             }
 
             SectionBox {

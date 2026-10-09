@@ -25,3 +25,8 @@ val AqiModerate = Color(0xFFF6D743)
 val AqiPoor = Color(0xFFF4A93E)
 val AqiVeryPoor = Color(0xFFE8593E)
 val AqiSevere = Color(0xFFB44FD1)
+
+// Wind relative to the rider: in the face, from behind, from the side.
+val HeadwindColor = Color(0xFFE5533D)
+val TailwindColor = Color(0xFF2FA86B)
+val CrosswindColor = Color(0xFF7C6FD6)
