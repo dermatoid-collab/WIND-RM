@@ -87,7 +87,7 @@ dall'app di Strava), **CARTO Positron**, **CARTO Voyager / Dark Matter** (i nomi
 `MAPBOX_ACCESS_TOKEN` (gratuito su <https://account.mapbox.com/access-tokens/>),
 `CARTO_API_KEY` (gratuita su <https://carto.com/basemaps/apikey/>) e
 `THUNDERFOREST_API_KEY` (gratuita su <https://www.thunderforest.com/pricing/>, piano Hobby).
-Senza queste chiavi, Settings mostra solo le due opzioni gratuite senza chiave.
+Senza queste chiavi, Settings mostra solo le opzioni gratuite senza chiave. In alternativa ai secret, le chiavi si possono anche incollare direttamente in Settings, sotto la scelta dello stile mappa: valgono subito, senza una nuova build.
 
 ### Opzione B — Android Studio
 

@@ -20,6 +20,13 @@ import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore by preferencesDataStore(name = "app_settings")
 
+/** The map services that need their own key; [url] is where a free one is made. */
+enum class MapKeyProvider(val label: String, val url: String) {
+    CARTO("CARTO", "https://carto.com/basemaps/apikey/"),
+    MAPBOX("Mapbox", "https://account.mapbox.com/access-tokens/"),
+    THUNDERFOREST("Thunderforest", "https://www.thunderforest.com/pricing/"),
+}
+
 /** Raster tile source for every map shown in the app. */
 enum class MapStyle(val label: String, val requiresApiKey: Boolean) {
     OSM_STANDARD("OSM Standard", requiresApiKey = false),
@@ -61,8 +68,19 @@ enum class ThemeMode(val label: String, val dark: Boolean? = null) {
     GRUVBOX_LIGHT("Gruvbox Light", false),
 }
 
+/** The key a style needs, or null for the styles that need none. */
+val MapStyle.keyProvider: MapKeyProvider?
+    get() = when (this) {
+        MapStyle.MAPBOX_OUTDOORS -> MapKeyProvider.MAPBOX
+        MapStyle.CARTO_POSITRON, MapStyle.CARTO_VOYAGER, MapStyle.CARTO_DARK -> MapKeyProvider.CARTO
+        MapStyle.THUNDERFOREST_OUTDOORS -> MapKeyProvider.THUNDERFOREST
+        else -> null
+    }
+
 data class AppSettings(
     val mapStyle: MapStyle = MapStyle.OSM_STANDARD,
+    /** Keys typed in Settings, by service; they win over the ones built into the app. */
+    val mapKeys: Map<MapKeyProvider, String> = emptyMap(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Which routing profile the last route used: the WIND-RM main-roads one or the stock one (and why). */
     val routingProfileNote: String? = null,
@@ -105,6 +123,7 @@ class SettingsRepository(private val context: Context) {
     private val keyMapStyle = stringPreferencesKey("map_style")
     private val keyThemeMode = stringPreferencesKey("theme_mode")
     private val keyRoutingProfileNote = stringPreferencesKey("routing_profile_note")
+    private fun mapKeyPref(provider: MapKeyProvider) = stringPreferencesKey("map_key_${provider.name.lowercase()}")
     private val keyDefaultAvgSpeedKmh = doublePreferencesKey("default_avg_speed_kmh")
     private val keyForecastHorizonDays = intPreferencesKey("forecast_horizon_days")
     private val keyHomeLat = doublePreferencesKey("home_lat")
@@ -156,6 +175,7 @@ class SettingsRepository(private val context: Context) {
         AppSettings(
             mapStyle = prefs[keyMapStyle]?.let { runCatching { MapStyle.valueOf(it) }.getOrNull() } ?: MapStyle.OSM_STANDARD,
             routingProfileNote = prefs[keyRoutingProfileNote],
+            mapKeys = MapKeyProvider.entries.associateWith { prefs[mapKeyPref(it)].orEmpty() },
             themeMode = prefs[keyThemeMode]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM,
             defaultAvgSpeedKmh = prefs[keyDefaultAvgSpeedKmh] ?: 25.0,
             forecastHorizonDays = prefs[keyForecastHorizonDays] ?: 15,
@@ -177,6 +197,10 @@ class SettingsRepository(private val context: Context) {
     /** The id BRouter's server gave the custom routing profile stored under [key] (null = none uploaded yet). */
     suspend fun brouterProfileId(key: String): String? =
         context.settingsDataStore.data.first()[stringPreferencesKey("brouter_profile_$key")]
+
+    suspend fun setMapKey(provider: MapKeyProvider, value: String) {
+        context.settingsDataStore.edit { it[mapKeyPref(provider)] = value.trim() }
+    }
 
     /** Which routing profile the last route really used (see [com.windrm.app.repository.ProfileIdStore.note]). */
     suspend fun setRoutingProfileNote(text: String) {

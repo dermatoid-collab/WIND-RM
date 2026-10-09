@@ -57,7 +57,10 @@ import com.windrm.app.ui.components.AppBar
 import com.windrm.app.ui.theme.themeSwatches
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.RideThresholds
+import com.windrm.app.settings.MapKeyProvider
 import com.windrm.app.settings.MapStyle
+import com.windrm.app.settings.keyProvider
+import com.windrm.app.ui.components.MapApiKeys
 import com.windrm.app.settings.ThemeMode
 import java.time.Instant
 import java.time.ZoneId
@@ -94,7 +97,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             SettingsSection(stringResource(R.string.settings_map)) {
                 Text(stringResource(R.string.settings_map_style), style = MaterialTheme.typography.labelLarge)
                 MapStyle.entries.forEach { style ->
-                    val available = !style.requiresApiKey || apiKeyFor(style).isNotBlank()
+                    val available = style.keyProvider?.let { MapApiKeys.keyFor(it).isNotBlank() } ?: true
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -115,6 +118,36 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                             }
                         }
                     }
+                }
+                // The keys the key-gated styles need. A key typed here is used at once (no new build needed) and wins
+                // over the one built into the app from the GitHub secret.
+                Text(
+                    stringResource(R.string.settings_map_keys),
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+                MapKeyProvider.entries.forEach { provider ->
+                    var text by remember(settings.mapKeys[provider]) { mutableStateOf(settings.mapKeys[provider].orEmpty()) }
+                    val builtIn = MapApiKeys.builtIn(provider).isNotBlank()
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = {
+                            text = it
+                            viewModel.setMapKey(provider, it)
+                        },
+                        label = { Text(stringResource(R.string.settings_map_key_label, provider.label)) },
+                        supportingText = {
+                            Text(
+                                when {
+                                    text.isNotBlank() -> stringResource(R.string.settings_map_key_typed)
+                                    builtIn -> stringResource(R.string.settings_map_key_built_in)
+                                    else -> stringResource(R.string.settings_map_key_missing, provider.url)
+                                },
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    )
                 }
             }
 
@@ -395,12 +428,6 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
     HorizontalDivider()
 }
 
-private fun apiKeyFor(style: MapStyle): String = when (style) {
-    MapStyle.MAPBOX_OUTDOORS -> BuildConfig.MAPBOX_ACCESS_TOKEN
-    MapStyle.CARTO_POSITRON, MapStyle.CARTO_VOYAGER, MapStyle.CARTO_DARK -> BuildConfig.CARTO_API_KEY
-    MapStyle.THUNDERFOREST_OUTDOORS -> BuildConfig.THUNDERFOREST_API_KEY
-    else -> ""
-}
 
 /**
  * Labelled decimal field; accepts "," as the decimal separator too (Italian keyboards). A value is

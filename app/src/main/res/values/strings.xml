@@ -127,7 +127,12 @@
     <string name="disconnect_strava">Disconnect</string>
     <string name="settings_map">Map</string>
     <string name="settings_map_style">Map style</string>
-    <string name="settings_requires_api_key">Requires an API key — see the README</string>
+    <string name="settings_requires_api_key">Requires an API key: type it below</string>
+    <string name="settings_map_keys">API keys for the map styles that need one</string>
+    <string name="settings_map_key_label">%1$s key</string>
+    <string name="settings_map_key_typed">Using the key typed here</string>
+    <string name="settings_map_key_built_in">Using the key built into this app</string>
+    <string name="settings_map_key_missing">No key yet. Free at %1$s</string>
     <string name="settings_forecast">Forecast defaults</string>
     <string name="settings_default_speed">Default average speed</string>
     <string name="settings_forecast_horizon">Planning horizon</string>

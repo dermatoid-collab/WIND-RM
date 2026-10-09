@@ -34,6 +34,7 @@ import com.windrm.app.R
 import com.windrm.app.domain.cropPoints
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteStop
+import com.windrm.app.settings.MapKeyProvider
 import com.windrm.app.settings.MapStyle
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.osmdroid.tileprovider.tilesource.ITileSource
@@ -63,7 +64,7 @@ data class KmMarker(val point: RoutePoint, val label: String)
 data class MapArrow(val point: RoutePoint, val bearingDeg: Double)
 
 /** What was last applied to a MapView, stashed in its tag so update() can skip redundant work. */
-private data class MapViewFitState(val style: MapStyle, val points: List<RoutePoint>)
+private data class MapViewFitState(val style: MapStyle, val points: List<RoutePoint>, val keys: String)
 
 /**
  * osmdroid map showing the route polyline, and optionally a set of wind-direction arrows
@@ -112,6 +113,8 @@ fun RouteMapView(
     val mapRef = remember { MapViewRef() }
     val drag = remember { DragState() }
     val labels = remember { LabelsLayer() }
+    // Read here so that typing a key in Settings makes this map fetch its tiles again.
+    val keys = MapApiKeys.fingerprint()
     DisposableEffect(Unit) { onDispose { labels.release() } }
     // Without clipToBounds(), osmdroid's MapView can render past its Compose-assigned bounds
     // while the surrounding Column is scrolling, bleeding over the next section's title.
@@ -133,7 +136,7 @@ fun RouteMapView(
                     mapView.controller.setZoom(initialZoom)
                     mapView.controller.setCenter(GeoPoint(initialCenter.first, initialCenter.second))
                 }
-                if (lastState?.style != mapStyle) {
+                if (lastState?.style != mapStyle || lastState?.keys != keys) {
                     val tileSource = tileSourceFor(mapStyle)
                     mapView.setTileSource(tileSource)
                     // Each provider renders tiles up to a different zoom (OpenTopoMap stops at z17,
@@ -227,7 +230,7 @@ fun RouteMapView(
                 if (onPointDragged != null && draggablePoints.isNotEmpty()) {
                     mapView.overlays.add(DragHandlesOverlay(draggablePoints, drag, mapView.resources.displayMetrics.density, onPointDragged))
                 }
-                mapView.tag = MapViewFitState(mapStyle, points)
+                mapView.tag = MapViewFitState(mapStyle, points, keys)
                 mapView.invalidate()
             },
         )
@@ -491,23 +494,23 @@ private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
     MapStyle.OSM_STANDARD -> TileSourceFactory.MAPNIK
     MapStyle.OPEN_TOPO -> TileSourceFactory.OpenTopo
     MapStyle.CARTO_POSITRON -> xyzTileSource(
-        "CartoPositron", 20, "https://basemaps.cartocdn.com/light_all/", ".png?api_key=${BuildConfig.CARTO_API_KEY}",
+        "CartoPositron", 20, "https://{s}.basemaps.cartocdn.com/light_all/", CARTO_SUFFIX, CARTO_COPYRIGHT, subdomains = CARTO_SUBDOMAINS,
     )
     MapStyle.THUNDERFOREST_OUTDOORS -> xyzTileSource(
-        "ThunderforestOutdoors", 22, "https://tile.thunderforest.com/outdoors/", ".png?apikey=${BuildConfig.THUNDERFOREST_API_KEY}",
+        "ThunderforestOutdoors", 22, "https://tile.thunderforest.com/outdoors/", ".png?apikey=${MapApiKeys.keyFor(MapKeyProvider.THUNDERFOREST)}",
     )
     // Same provider Strava's own app uses (confirmed via its "Map Data Sources" panel: Mapbox,
     // Maxar, Intermap -- the usual Mapbox "Outdoors" style stack). The classic v4 raster tile API
     // returned nothing for newer accounts (it's been retired); this is Mapbox's current Static
     // Tiles API, which renders a v1 style to plain raster tiles any z/x/y client can consume.
     MapStyle.MAPBOX_OUTDOORS -> xyzTileSource(
-        "MapboxOutdoors", 20, "https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/", "?access_token=${BuildConfig.MAPBOX_ACCESS_TOKEN}",
+        "MapboxOutdoors", 20, "https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/tiles/256/", "?access_token=${MapApiKeys.keyFor(MapKeyProvider.MAPBOX)}",
     )
     MapStyle.CARTO_VOYAGER -> xyzTileSource(
-        "CartoVoyagerNoLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
+        "CartoVoyagerNoLabels", 20, "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/", CARTO_SUFFIX, CARTO_COPYRIGHT, subdomains = CARTO_SUBDOMAINS,
     )
     MapStyle.CARTO_DARK -> xyzTileSource(
-        "CartoDarkNoLabels", 20, "https://basemaps.cartocdn.com/dark_nolabels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
+        "CartoDarkNoLabels", 20, "https://{s}.basemaps.cartocdn.com/dark_nolabels/", CARTO_SUFFIX, CARTO_COPYRIGHT, subdomains = CARTO_SUBDOMAINS,
     )
     MapStyle.ESRI_LIGHT_GRAY -> xyzTileSource(
         "EsriLightGrayBase", 16, "$ESRI_TILES/Canvas/World_Light_Gray_Base/MapServer/tile/", "", ESRI_COPYRIGHT, yBeforeX = true,
@@ -517,7 +520,9 @@ private fun tileSourceFor(style: MapStyle): ITileSource = when (style) {
     )
 }
 
-private val CARTO_SUFFIX get() = ".png?api_key=${BuildConfig.CARTO_API_KEY}"
+// CARTO asks for the key as "?key=" (its documentation; "api_key" is ignored and the tiles come with an "API key required" watermark).
+private val CARTO_SUFFIX get() = ".png?key=${MapApiKeys.keyFor(MapKeyProvider.CARTO)}"
+private const val CARTO_SUBDOMAINS = "abcd"
 private const val CARTO_COPYRIGHT = "© OpenStreetMap contributors © CARTO"
 private const val ESRI_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services"
 private const val ESRI_COPYRIGHT = "Tiles © Esri, HERE, Garmin, © OpenStreetMap contributors"
@@ -525,10 +530,10 @@ private const val ESRI_COPYRIGHT = "Tiles © Esri, HERE, Garmin, © OpenStreetMa
 /** The transparent layer of place names that goes above the route for the styles that draw their names separately. */
 private fun labelsSourceFor(style: MapStyle): ITileSource? = when (style) {
     MapStyle.CARTO_VOYAGER -> xyzTileSource(
-        "CartoVoyagerLabels", 20, "https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
+        "CartoVoyagerLabels", 20, "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/", CARTO_SUFFIX, CARTO_COPYRIGHT, subdomains = CARTO_SUBDOMAINS,
     )
     MapStyle.CARTO_DARK -> xyzTileSource(
-        "CartoDarkLabels", 20, "https://basemaps.cartocdn.com/dark_only_labels/", CARTO_SUFFIX, CARTO_COPYRIGHT,
+        "CartoDarkLabels", 20, "https://{s}.basemaps.cartocdn.com/dark_only_labels/", CARTO_SUFFIX, CARTO_COPYRIGHT, subdomains = CARTO_SUBDOMAINS,
     )
     MapStyle.ESRI_LIGHT_GRAY -> xyzTileSource(
         "EsriLightGrayLabels", 16, "$ESRI_TILES/Canvas/World_Light_Gray_Reference/MapServer/tile/", "", ESRI_COPYRIGHT, yBeforeX = true,
@@ -545,6 +550,7 @@ private fun labelsSourceFor(style: MapStyle): ITileSource? = when (style) {
  */
 private class LabelsLayer {
     private var style: MapStyle? = null
+    private var keys: String? = null
     private var provider: MapTileProviderBasic? = null
     private var overlay: TilesOverlay? = null
 
@@ -554,7 +560,7 @@ private class LabelsLayer {
             release()
             return null
         }
-        if (this.style != style) {
+        if (this.style != style || this.keys != MapApiKeys.fingerprint()) {
             release()
             val tileProvider = MapTileProviderBasic(context.applicationContext, source)
             overlay = TilesOverlay(tileProvider, context).apply {
@@ -563,6 +569,7 @@ private class LabelsLayer {
             }
             provider = tileProvider
             this.style = style
+            this.keys = MapApiKeys.fingerprint()
         }
         return overlay
     }
@@ -572,6 +579,7 @@ private class LabelsLayer {
         provider = null
         overlay = null
         style = null
+        keys = null
     }
 }
 
@@ -586,13 +594,16 @@ private fun xyzTileSource(
     copyright: String = "",
     /** Esri's servers number tiles zoom/row/column, i.e. y before x. */
     yBeforeX: Boolean = false,
+    /** Letters to pick from for a "{s}" in [baseUrl] (CARTO spreads its tiles over a, b, c and d). */
+    subdomains: String = "",
 ): OnlineTileSourceBase =
     object : OnlineTileSourceBase(name, 0, maxZoom, 256, urlSuffix, arrayOf(baseUrl), copyright) {
         override fun getTileURLString(pMapTileIndex: Long): String {
             val x = MapTileIndex.getX(pMapTileIndex)
             val y = MapTileIndex.getY(pMapTileIndex)
             val (first, second) = if (yBeforeX) y to x else x to y
-            return baseUrl + MapTileIndex.getZoom(pMapTileIndex) + "/" + first + "/" + second + urlSuffix
+            val host = if (subdomains.isEmpty()) baseUrl else baseUrl.replace("{s}", subdomains.random().toString())
+            return host + MapTileIndex.getZoom(pMapTileIndex) + "/" + first + "/" + second + urlSuffix
         }
     }
 

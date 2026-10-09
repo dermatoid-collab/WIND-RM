@@ -7,10 +7,13 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import com.windrm.app.settings.AppSettings
+import com.windrm.app.settings.MapKeyProvider
+import com.windrm.app.ui.components.MapApiKeys
 import com.windrm.app.settings.ThemeMode
 import com.windrm.app.ui.navigation.WindRmNavHost
 import com.windrm.app.ui.theme.WindRmTheme
@@ -28,6 +31,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings by container.settingsRepository.settings.collectAsState(initial = AppSettings())
+            // The keys typed in Settings go to every map.
+            LaunchedEffect(settings.mapKeys) {
+                MapApiKeys.carto = settings.mapKeys[MapKeyProvider.CARTO].orEmpty()
+                MapApiKeys.mapbox = settings.mapKeys[MapKeyProvider.MAPBOX].orEmpty()
+                MapApiKeys.thunderforest = settings.mapKeys[MapKeyProvider.THUNDERFOREST].orEmpty()
+            }
             WindRmTheme(mode = settings.themeMode) {
                 WindRmNavHost(container)
             }

@@ -79,6 +79,8 @@ class SettingsViewModel(
 
     fun setMapStyle(style: MapStyle) = viewModelScope.launch { settingsRepository.setMapStyle(style) }
 
+    fun setMapKey(provider: com.windrm.app.settings.MapKeyProvider, value: String) = viewModelScope.launch { settingsRepository.setMapKey(provider, value) }
+
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { settingsRepository.setThemeMode(mode) }
 
     fun setDefaultAvgSpeedKmh(speedKmh: Double) = viewModelScope.launch {
