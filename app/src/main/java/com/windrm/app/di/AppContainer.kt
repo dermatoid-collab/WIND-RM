@@ -42,8 +42,15 @@ class AppContainer(context: Context) {
         .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
         .build()
 
-    private val weatherApi: OpenMeteoApi = retrofit(OpenMeteoApi.WEATHER_BASE_URL).create(OpenMeteoApi::class.java)
-    private val airQualityApi: OpenMeteoApi = retrofit(OpenMeteoApi.AIR_QUALITY_BASE_URL).create(OpenMeteoApi::class.java)
+    // A forecast along a long route is a big answer, often fetched on a weak signal: OkHttp's default of 10 s
+    // for a read is too tight (it showed up as a bare "timeout").
+    private val weatherClient = okHttpClient.newBuilder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(120, TimeUnit.SECONDS)
+        .build()
+    private val weatherApi: OpenMeteoApi = retrofit(OpenMeteoApi.WEATHER_BASE_URL, weatherClient).create(OpenMeteoApi::class.java)
+    private val airQualityApi: OpenMeteoApi = retrofit(OpenMeteoApi.AIR_QUALITY_BASE_URL, weatherClient).create(OpenMeteoApi::class.java)
     // BRouter's public server can take a while on a long stretch: more room than the 10 s default.
     private val bRouterApi: BRouterApi = retrofit(
         BRouterApi.BASE_URL,

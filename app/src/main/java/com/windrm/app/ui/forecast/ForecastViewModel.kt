@@ -117,7 +117,14 @@ class ForecastViewModel(
                     scrubFraction = null
                     uiState = ForecastUiState.Success(it)
                 }
-                .onFailure { uiState = ForecastUiState.Error(it.message ?: "Couldn't calculate the forecast") }
+                .onFailure { uiState = ForecastUiState.Error(failureText(it)) }
         }
+    }
+
+    /** What went wrong, in words: a bare "timeout" tells nothing. */
+    private fun failureText(e: Throwable): String = when (e) {
+        is java.io.IOException ->
+            "The weather service didn't answer in time or the connection dropped (${e.message ?: e.javaClass.simpleName}). Check the signal and try again."
+        else -> e.message ?: "Couldn't calculate the forecast"
     }
 }

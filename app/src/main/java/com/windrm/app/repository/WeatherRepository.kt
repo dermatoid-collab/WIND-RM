@@ -18,10 +18,16 @@ import com.windrm.app.model.RouteForecastResult
 import com.windrm.app.model.WeatherPoint
 import com.windrm.app.remote.openmeteo.OpenMeteoApi
 import com.windrm.app.remote.openmeteo.OpenMeteoResponse
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
+import retrofit2.HttpException
+import java.io.IOException
 import java.time.Instant
 import java.time.Duration
 import java.time.ZoneOffset
@@ -36,6 +42,47 @@ class WeatherRepository(
 
     private companion object {
         const val WIND_ITERATIONS = 2
+
+        /** A long route is asked of the weather service in several smaller requests, side by side. */
+        const val LOCATIONS_PER_REQUEST = 15
+        const val MAX_RETRIES = 2
+        const val RETRY_DELAY_MS = 1_500L
+        const val AIR_QUALITY_TIMEOUT_MS = 25_000L
+    }
+
+    /** Runs [block], again (up to twice) when the network drops it or the server is busy: a weak signal often only needs a second try. */
+    private suspend fun <T> retrying(block: suspend () -> T): T {
+        var attempt = 0
+        while (true) {
+            try {
+                return block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val retryable = e is IOException || (e is HttpException && (e.code() == 429 || e.code() >= 500))
+                if (!retryable || ++attempt > MAX_RETRIES) throw e
+                delay(RETRY_DELAY_MS * attempt)
+            }
+        }
+    }
+
+    /**
+     * The sample points cut into requests of about [LOCATIONS_PER_REQUEST], evenly (so none is left with a single
+     * location, which the service would answer with an object instead of a list), asked in parallel and put back in order.
+     */
+    private suspend fun <T> perChunk(
+        samples: List<com.windrm.app.model.RoutePoint>,
+        retry: Boolean = true,
+        request: suspend (latitudes: String, longitudes: String) -> List<T>,
+    ): List<T> = coroutineScope {
+        val chunks = kotlin.math.ceil(samples.size / LOCATIONS_PER_REQUEST.toDouble()).toInt().coerceAtLeast(1)
+        (0 until chunks).map { i ->
+            val part = samples.subList(i * samples.size / chunks, (i + 1) * samples.size / chunks)
+            async {
+                val call = suspend { request(part.joinToString(",") { it.lat.toString() }, part.joinToString(",") { it.lon.toString() }) }
+                if (retry) retrying(call) else call()
+            }
+        }.awaitAll().flatten()
     }
 
     suspend fun forecastRoute(
@@ -59,14 +106,14 @@ class WeatherRepository(
         val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.first().minusSeconds(86_400))
         val endDate = dateFormatter.withZone(ZoneOffset.UTC).format(arrivalTimes.last().plusSeconds(86_400))
 
-        val latitudeParam = samples.joinToString(",") { it.lat.toString() }
-        val longitudeParam = samples.joinToString(",") { it.lon.toString() }
-
         val weatherDeferred = async {
-            weatherApi.forecast(latitudeParam, longitudeParam, startDate, endDate)
+            perChunk(samples) { lat, lon -> weatherApi.forecast(lat, lon, startDate, endDate) }
         }
         val airQualityDeferred = async {
-            runCatching { airQualityApi.airQuality(latitudeParam, longitudeParam, startDate, endDate) }.getOrNull()
+            // Air quality is a bonus: one try, and no waiting for it for long.
+            withTimeoutOrNull(AIR_QUALITY_TIMEOUT_MS) {
+                runCatching { perChunk(samples, retry = false) { lat, lon -> airQualityApi.airQuality(lat, lon, startDate, endDate) } }.getOrNull()
+            }
         }
 
         val weatherResponses = weatherDeferred.await()
