@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -72,5 +73,37 @@ private fun LegendArrow(color: Color) {
         drawPath(head, Color.White, style = Stroke(width = 2 * edge, join = StrokeJoin.Round))
         drawLine(color, Offset(edge, midY), Offset(baseX + 0.5f, midY), strokeWidth = shaftWidth)
         drawPath(head, color)
+    }
+}
+
+/**
+ * A wind arrow in the style of the map's: black-edged-in-white shaft and head, coloured by the speed band, pointing the
+ * way the wind blows (so opposite to [windFromDeg], the direction it comes from). The shaft has one fixed length; the
+ * speed is written beside it by the caller.
+ */
+@Composable
+fun WindDirectionArrow(windFromDeg: Double, windSpeedKmh: Double, modifier: Modifier = Modifier.size(28.dp)) {
+    Canvas(modifier) {
+        val headLength = 8.dp.toPx()
+        val headHalfWidth = 5.dp.toPx()
+        val shaftWidth = 2.5.dp.toPx()
+        val edge = 1.dp.toPx()
+        val color = Color(windBandColor(windSpeedKmh))
+        val total = headLength + 14.dp.toPx()
+        val x = size.width / 2
+        val top = (size.height - total) / 2
+        // Drawn pointing up (north); the wind blows towards from + 180, clockwise like a compass bearing.
+        rotate(degrees = ((windFromDeg + 180.0) % 360.0).toFloat(), pivot = center) {
+            val head = Path().apply {
+                moveTo(x, top)
+                lineTo(x + headHalfWidth, top + headLength)
+                lineTo(x - headHalfWidth, top + headLength)
+                close()
+            }
+            drawLine(Color.White, Offset(x, top + headLength), Offset(x, top + total + edge), strokeWidth = shaftWidth + 2 * edge)
+            drawPath(head, Color.White, style = Stroke(width = 2 * edge, join = StrokeJoin.Round))
+            drawLine(color, Offset(x, top + headLength - 0.5f), Offset(x, top + total), strokeWidth = shaftWidth)
+            drawPath(head, color)
+        }
     }
 }

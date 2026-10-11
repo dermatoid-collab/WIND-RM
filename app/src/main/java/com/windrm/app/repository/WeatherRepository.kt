@@ -171,7 +171,7 @@ class WeatherRepository(
         return (0..hours).map { buildWeatherPoint(first.plusSeconds(it * 3600L), response) }
     }
 
-    suspend fun currentWeather(lat: Double, lon: Double, locationLabel: String, hoursAhead: Int = 6): CurrentWeatherSnapshot {
+    suspend fun currentWeather(lat: Double, lon: Double, locationLabel: String, hoursAhead: Int = 12): CurrentWeatherSnapshot {
         val now = Instant.now()
         val startDate = dateFormatter.withZone(ZoneOffset.UTC).format(now)
         val endDate = dateFormatter.withZone(ZoneOffset.UTC).format(now.plusSeconds(86_400))

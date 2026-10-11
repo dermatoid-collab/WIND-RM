@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.windrm.app.R
 import com.windrm.app.ui.components.AppBar
 import com.windrm.app.model.CurrentWeatherSnapshot
+import com.windrm.app.ui.components.WindDirectionArrow
 import com.windrm.app.model.Route
 import com.windrm.app.model.WeatherPoint
 import com.windrm.app.ui.builder.SaveRouteDialog
@@ -236,6 +237,9 @@ private fun CurrentWeatherCard(snapshot: CurrentWeatherSnapshot) {
                     Text(timeFmt.format(hour.time), style = MaterialTheme.typography.labelMedium)
                     Icon(weatherIcon(hour), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
                     Text("${hour.temperatureC.roundToInt()}°", style = MaterialTheme.typography.bodyMedium)
+                    // The wind of that hour: an arrow like the map's, pointing where the wind blows, and its speed below.
+                    WindDirectionArrow(hour.windDirectionDeg, hour.windSpeedKmh, Modifier.padding(top = 4.dp).size(28.dp))
+                    Text("${hour.windSpeedKmh.roundToInt()} km/h", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
