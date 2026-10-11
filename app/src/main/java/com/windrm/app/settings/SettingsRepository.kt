@@ -171,6 +171,50 @@ class SettingsRepository(private val context: Context) {
         ThresholdField(doublePreferencesKey("ride_ice_max_temp"), { it.iceMaxTempC }, { t, v -> t.copy(iceMaxTempC = v) }),
     )
 
+    /**
+     * The settings a backup file holds, by name. Left out on purpose: the GPX folder and its file links (the permission
+     * to the folder doesn't survive a reinstall), the routing profile ids and note (the server's own), and what lives
+     * outside the settings (saved routes, the Strava login).
+     */
+    private val backupKinds: Map<String, BackupKind> by lazy {
+        buildMap {
+            listOf(keyMapStyle, keyThemeMode, keyHomeLabel).plus(MapKeyProvider.entries.map(::mapKeyPref)).forEach { put(it.name, BackupKind.STRING) }
+            listOf(keyDefaultAvgSpeedKmh, keyHomeLat, keyHomeLon, keyRiderMassKg, keyBikeMassKg, keyMaxDescentSpeedKmh, keyWindHeightFactor)
+                .plus(caiFields.map { it.key }).plus(rideThresholdFields.map { it.key }).forEach { put(it.name, BackupKind.DOUBLE) }
+            put(keyForecastHorizonDays.name, BackupKind.INT)
+            put(keyHasHomeLocation.name, BackupKind.BOOLEAN)
+        }
+    }
+
+    /** All the backed-up settings that have a value, as the text of a settings file. */
+    suspend fun exportBackup(): String {
+        val prefs = context.settingsDataStore.data.first()
+        val values = HashMap<String, Any>()
+        for (entry in prefs.asMap()) {
+            if (backupKinds.containsKey(entry.key.name)) values[entry.key.name] = entry.value
+        }
+        return SettingsBackup.encode(values)
+    }
+
+    /** Puts the settings of a backup file back; returns how many. Throws [BackupException] for a file that isn't one. */
+    suspend fun importBackup(text: String): Int {
+        val values = SettingsBackup.decode(text, backupKinds).toMutableMap()
+        // A map style or theme this version doesn't know is skipped, not stored.
+        (values[keyMapStyle.name] as? String)?.let { if (runCatching { MapStyle.valueOf(it) }.isFailure) values.remove(keyMapStyle.name) }
+        (values[keyThemeMode.name] as? String)?.let { if (runCatching { ThemeMode.valueOf(it) }.isFailure) values.remove(keyThemeMode.name) }
+        context.settingsDataStore.edit { prefs ->
+            for ((name, value) in values) {
+                when (value) {
+                    is String -> prefs[stringPreferencesKey(name)] = value
+                    is Double -> prefs[doublePreferencesKey(name)] = value
+                    is Int -> prefs[intPreferencesKey(name)] = value
+                    is Boolean -> prefs[booleanPreferencesKey(name)] = value
+                }
+            }
+        }
+        return values.size
+    }
+
     val settings: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
             mapStyle = prefs[keyMapStyle]?.let { runCatching { MapStyle.valueOf(it) }.getOrNull() } ?: MapStyle.OSM_STANDARD,

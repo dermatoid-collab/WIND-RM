@@ -74,6 +74,12 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) viewModel.setGpxFolder(uri)
     }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.exportSettings(uri)
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importSettings(uri)
+    }
     val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.useCurrentLocationAsHome()
     }
@@ -337,6 +343,26 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                             }
                         }
                     }
+                }
+            }
+
+            SettingsSection(stringResource(R.string.settings_backup)) {
+                Text(
+                    stringResource(R.string.settings_backup_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { exportLauncher.launch("windrm-settings.json") }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.settings_backup_export))
+                    }
+                    OutlinedButton(
+                        onClick = { importLauncher.launch(arrayOf("application/json", "text/plain", "application/octet-stream", "*/*")) },
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.settings_backup_import)) }
+                }
+                viewModel.backupMessage?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
                 }
             }
 

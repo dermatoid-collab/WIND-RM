@@ -141,6 +141,49 @@ class SettingsViewModel(
         }
     }
 
+    /** What the last export or import of the settings file did, in words; null until one is done. */
+    var backupMessage by mutableStateOf<String?>(null)
+        private set
+
+    /** Writes the settings to the file the user picked ([uri]). */
+    fun exportSettings(uri: Uri) {
+        viewModelScope.launch {
+            backupMessage = try {
+                val text = settingsRepository.exportBackup()
+                withContext(Dispatchers.IO) {
+                    appContext.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(text) }
+                        ?: error("Can't write to that file")
+                }
+                "Settings saved to the file."
+            } catch (e: Exception) {
+                "Couldn't save the settings: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
+
+    /** Reads the settings back from the file the user picked ([uri]). */
+    fun importSettings(uri: Uri) {
+        viewModelScope.launch {
+            backupMessage = try {
+                val text = withContext(Dispatchers.IO) {
+                    appContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                        ?.also { if (it.length > MAX_BACKUP_CHARS) error("That file is too big to be a settings file") }
+                        ?: error("Can't read that file")
+                }
+                val count = settingsRepository.importBackup(text)
+                if (count == 0) "The file has no settings to restore." else "$count settings restored."
+            } catch (e: com.windrm.app.settings.BackupException) {
+                "That is not a WIND-RM settings file (${e.message})."
+            } catch (e: Exception) {
+                "Couldn't read the settings: ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }
+
+    private companion object {
+        const val MAX_BACKUP_CHARS = 200_000
+    }
+
     /** Where the place picker opens: the favourite place, else the last known position, else the middle of Italy. */
     fun pickerStart(): Pair<Double, Double> {
         val s = settings
