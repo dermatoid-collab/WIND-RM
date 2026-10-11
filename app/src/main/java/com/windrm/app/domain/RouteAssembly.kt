@@ -21,6 +21,7 @@ fun assembleRoute(
     segments: List<RoutedSegment>,
     nowEpochMs: Long,
     allowUnpaved: Boolean = false,
+    shortest: Boolean = true,
 ): Route? {
     val joined = ArrayList<RoutedPoint>()
     // Where each waypoint ended up in the joined track: the start, then the end of every stretch.
@@ -50,6 +51,7 @@ fun assembleRoute(
         activity = activity,
         builderState = BuilderState(
             allowUnpaved = allowUnpaved,
+            shortest = shortest,
             junctions = junctions,
             legs = segments.map { s ->
                 BuilderLeg(
@@ -67,7 +69,7 @@ fun assembleRoute(
 }
 
 /** A saved route opened in the builder: its waypoints, and the stretches between them (the track cut at the waypoints). */
-data class BuilderDraft(val waypoints: List<LatLon>, val segments: List<RoutedSegment>, val allowUnpaved: Boolean)
+data class BuilderDraft(val waypoints: List<LatLon>, val segments: List<RoutedSegment>, val allowUnpaved: Boolean, val shortest: Boolean)
 
 /**
  * The builder's waypoints and stretches for [route]. A route drawn in the builder gets back exactly what was saved.
@@ -97,6 +99,7 @@ fun draftOf(route: Route): BuilderDraft? {
         waypoints = junctions.map { LatLon(points[it].lat, points[it].lon) },
         segments = segments,
         allowUnpaved = saved?.allowUnpaved ?: false,
+        shortest = saved?.shortest ?: true,
     )
 }
 

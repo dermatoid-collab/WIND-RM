@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -161,8 +163,9 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                     selected = viewModel.activity.ordinal,
                     onSelect = { viewModel.changeActivity(ActivityType.entries[it]) },
                 )
-                // Both switches on one row: paved roads only (a ride's choice) and manual mode (straight lines, off the roads).
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // The switches on one row: paved roads only (a ride's choice), manual mode (straight lines, off the roads)
+                // and shortest (the shortest way, or the one on main roads; a ride's choice too).
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (viewModel.activity == ActivityType.RIDE) {
                         ToggleItem(
                             stringResource(R.string.builder_paved_only),
@@ -177,6 +180,14 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                         onChange = viewModel::changeManualMode,
                         modifier = Modifier.weight(1f),
                     )
+                    if (viewModel.activity == ActivityType.RIDE) {
+                        ToggleItem(
+                            stringResource(R.string.builder_shortest),
+                            checked = viewModel.shortest,
+                            onChange = viewModel::changeShortest,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
 
@@ -367,12 +378,21 @@ private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileV
     }
 }
 
-/** A label with its switch, for the row of switches under Ride / Trekking. */
+/** A label with its switch, for the row of switches under Ride / Trekking: compact, so that three fit on one line. */
 @Composable
 private fun ToggleItem(label: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.weight(1f).padding(end = 4.dp),
+        )
+        // The switch is drawn at 84% of its size inside a box of that size, to leave the labels room.
+        Box(Modifier.size(width = 44.dp, height = 28.dp), contentAlignment = Alignment.Center) {
+            Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.requiredSize(52.dp, 32.dp).scale(0.84f))
+        }
     }
 }
 

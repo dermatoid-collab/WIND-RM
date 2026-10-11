@@ -74,6 +74,13 @@ class RouteBuilderViewModel(
         private set
 
     /**
+     * The shortest way, side roads included (on); or the way that keeps to main roads (off). On by default.
+     * Has no effect on a trek, which has its own paths.
+     */
+    var shortest by mutableStateOf(true)
+        private set
+
+    /**
      * Manual mode: new points are joined by straight lines, off any road or path, until it is switched off again.
      * Stretches already drawn keep the way they were made.
      */
@@ -112,10 +119,10 @@ class RouteBuilderViewModel(
 
     private var job: Job? = null
 
-    val profile: BuilderProfile get() = BuilderProfile.of(activity, allowUnpaved)
+    val profile: BuilderProfile get() = BuilderProfile.of(activity, allowUnpaved, shortest)
 
     /** Paved-only rides keep unpaved ways out, so any that remain after a settings change are flagged. */
-    val strictPaved: Boolean get() = profile == BuilderProfile.ROAD_PAVED
+    val strictPaved: Boolean get() = profile.pavedOnly
 
     val totalDistanceM: Double get() = segments.sumOf { s -> s.points.zipWithNext { a, b -> haversineMeters(a.lat, a.lon, b.lat, b.lon) }.sum() }
     val pavedM: Double get() = segments.sumOf { it.pavedM }
@@ -139,7 +146,7 @@ class RouteBuilderViewModel(
     }
 
     /** The finished route, or null until there are two points; the name is only a placeholder here. */
-    val draft: Route? get() = assembleRoute("", activity, segments, 0L, allowUnpaved)
+    val draft: Route? get() = assembleRoute("", activity, segments, 0L, allowUnpaved, shortest)
 
     init {
         viewModelScope.launch {
@@ -156,6 +163,7 @@ class RouteBuilderViewModel(
                 source = opened
                 activity = opened.activity
                 allowUnpaved = openedDraft.allowUnpaved
+                shortest = openedDraft.shortest
                 waypoints = openedDraft.waypoints
                 segments = openedDraft.segments
                 val (center, zoom) = viewFitting(opened.points)
@@ -340,20 +348,27 @@ class RouteBuilderViewModel(
 
     fun changeActivity(newActivity: ActivityType) {
         if (newActivity == activity) return
-        val previous = activity to allowUnpaved
+        val previous = Triple(activity, allowUnpaved, shortest)
         activity = newActivity
         rerouteAll(previous)
     }
 
     fun changeAllowUnpaved(allow: Boolean) {
         if (allow == allowUnpaved) return
-        val previous = activity to allowUnpaved
+        val previous = Triple(activity, allowUnpaved, shortest)
         allowUnpaved = allow
         rerouteAll(previous)
     }
 
+    fun changeShortest(on: Boolean) {
+        if (on == shortest) return
+        val previous = Triple(activity, allowUnpaved, shortest)
+        shortest = on
+        rerouteAll(previous)
+    }
+
     /** A different profile means different roads: every stretch is routed again, or the change is undone. */
-    private fun rerouteAll(previous: Pair<ActivityType, Boolean>) {
+    private fun rerouteAll(previous: Triple<ActivityType, Boolean, Boolean>) {
         error = null
         val points = waypoints
         if (points.size < 2) return
@@ -371,6 +386,7 @@ class RouteBuilderViewModel(
             } catch (e: RoutingException) {
                 activity = previous.first
                 allowUnpaved = previous.second
+                shortest = previous.third
                 error = e.error
             } finally {
                 busy = false
@@ -447,7 +463,7 @@ class RouteBuilderViewModel(
      */
     fun save(name: String, toFolder: Boolean, onSaved: (Route) -> Unit) {
         val now = System.currentTimeMillis()
-        val built = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, now, allowUnpaved) ?: return
+        val built = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, now, allowUnpaved, shortest) ?: return
         val original = source
         val route = when {
             // The route itself, changed: same place in the list, same favourite, same history; its stops follow the new track.

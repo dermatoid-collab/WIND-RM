@@ -67,6 +67,10 @@ Non ha Android Studio installato/configurato.
   ha chiesto di togliere (Undo, Clear, "Delete" su un waypoint). "End here" non tronca mai il percorso:
   aggiunge un waypoint in quel punto e il percorso finisce lì (anche su un punto già percorso).
 - Un tap su un waypoint apre il menu **End here / Delete** (End here assente sull'ultimo waypoint).
+- Sotto Ride / Trekking stanno tre switch sulla stessa riga: "Paved" (default on), "Manual" (default off) e "Shortest"
+  (default on: strada più corta, anche su strade minori; spento: strada principale). Cambiarli ricalcola i tratti non manuali.
+- "Edit" apre la route stessa nel builder (il salvataggio la sostituisce); "Duplicate" ne apre una copia (il salvataggio crea
+  sempre una route nuova). Il dialog di salvataggio non offre mai la scelta tra i due. I tre puntini della lista: Edit, Duplicate, Delete.
 - La mappa del builder parte con zoom 15 (14 + 1: il doppio più vicino) sul luogo preferito, altrimenti sul GPS.
 - Il luogo preferito (rinominabile, impostabile dal GPS o scegliendolo sulla mappa) sta in Settings ed è sia
   il punto di partenza delle mappe sia la località del meteo in Home.

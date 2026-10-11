@@ -19,8 +19,9 @@
     <string name="builder_title_edit">Edit route</string>
     <string name="builder_title_duplicate">Copy of route</string>
     <string name="builder_save">Save</string>
-    <string name="builder_paved_only">Paved roads only</string>
-    <string name="builder_manual_mode">Manual mode</string>
+    <string name="builder_paved_only">Paved</string>
+    <string name="builder_manual_mode">Manual</string>
+    <string name="builder_shortest">Shortest</string>
     <string name="builder_manual">Manual</string>
     <string name="builder_paved_hint">Unpaved only if you allow it</string>
     <string name="builder_unpaved_allowed">Unpaved roads allowed: you chose it</string>
@@ -43,9 +44,9 @@
     <string name="builder_trail">Trail</string>
     <string name="builder_unknown_surface">Surface unknown for this route</string>
     <string name="builder_unpaved_title">Unpaved stretch</string>
-    <string name="builder_unpaved_message">No fully paved way was found: this stretch includes %1$d m of unpaved road or trail. Use it anyway? To allow unpaved roads on the whole route, turn off “Paved roads only”.</string>
+    <string name="builder_unpaved_message">No fully paved way was found: this stretch includes %1$d m of unpaved road or trail. Use it anyway? To allow unpaved roads on the whole route, turn off “Paved”.</string>
     <string name="builder_use_stretch">Use it</string>
-    <string name="builder_leftover_warning">Includes %1$d m of unpaved road. Turn off “Paved roads only” or move the points.</string>
+    <string name="builder_leftover_warning">Includes %1$d m of unpaved road. Turn off “Paved” or move the points.</string>
     <string name="builder_name_title">Save route</string>
     <string name="builder_name_title_edit">Save changes</string>
     <string name="builder_name_title_copy">Save as a new route</string>

@@ -123,22 +123,29 @@ private fun interpolate(a: RoutedPoint, b: RoutedPoint, t: Double) = RoutedPoint
  * through road instead of cutting through towns. They are uploaded to the server once; [brouterName] is
  * the stock profile used if that upload is not possible.
  */
-enum class BuilderProfile(val brouterName: String, val customKey: String? = null) {
+enum class BuilderProfile(val brouterName: String, val customKey: String? = null, val pavedOnly: Boolean = false) {
     /** Ride, paved only: main roads first, unpaved ways ten times dearer, then checked against the way tags. */
-    ROAD_PAVED("fastbike", "ride_paved"),
+    ROAD_PAVED("fastbike", "ride_paved", pavedOnly = true),
 
     /** Ride with unpaved roads allowed by the user: main roads first, unpaved ways only a little dearer. */
     ROAD_ANY("trekking", "ride_any"),
+
+    /** Like [ROAD_PAVED], but the shortest way: every paved road class costs about the same, so side roads are used where shorter. */
+    ROAD_PAVED_SHORT("fastbike", "ride_paved_short", pavedOnly = true),
+
+    /** Like [ROAD_ANY], but the shortest way. */
+    ROAD_ANY_SHORT("trekking", "ride_any_short"),
 
     /** Trekking: mountain hiking paths and trails. */
     TREK("hiking-mountain"),
     ;
 
     companion object {
-        fun of(activity: ActivityType, allowUnpaved: Boolean): BuilderProfile = when {
+        /** [shortest] picks the shortest way over the one that keeps to main roads; a trek has one profile either way. */
+        fun of(activity: ActivityType, allowUnpaved: Boolean, shortest: Boolean = false): BuilderProfile = when {
             activity == ActivityType.TREK -> TREK
-            allowUnpaved -> ROAD_ANY
-            else -> ROAD_PAVED
+            allowUnpaved -> if (shortest) ROAD_ANY_SHORT else ROAD_ANY
+            else -> if (shortest) ROAD_PAVED_SHORT else ROAD_PAVED
         }
     }
 }
@@ -200,7 +207,7 @@ class RoutingRepository(
     private suspend fun reportProfile(profile: BuilderProfile, name: String) {
         if (profile.customKey == null) return
         val note = if (name != profile.brouterName) {
-            "WIND-RM main-roads profile ($name)"
+            "WIND-RM ${if (profile == BuilderProfile.ROAD_PAVED_SHORT || profile == BuilderProfile.ROAD_ANY_SHORT) "shortest-way" else "main-roads"} profile ($name)"
         } else {
             "stock ${profile.brouterName} profile, the WIND-RM one could not be uploaded" + (lastUploadError?.let { ": $it" } ?: "")
         }
@@ -239,14 +246,14 @@ class RoutingRepository(
     }
 
     /**
-     * The most direct route from [from] to [to]: BRouter's best one. With [BuilderProfile.ROAD_PAVED] a
+     * The most direct route from [from] to [to]: BRouter's best one. With a [BuilderProfile.pavedOnly] profile a
      * route that has unpaved or trail ways is swapped for one of BRouter's alternatives only if that one is
      * fully paved (or at least less rough) and not much longer; otherwise the direct route stays and its
      * rough stretches are shown to the user, who can move a point or allow unpaved roads.
      */
     suspend fun route(from: LatLon, to: LatLon, profile: BuilderProfile): RoutedSegment {
         val best = fetch(from, to, profile, 0)
-        if (profile != BuilderProfile.ROAD_PAVED || !best.surfaceKnown || best.roughM <= PAVED_EPSILON_M) return best
+        if (!profile.pavedOnly || !best.surfaceKnown || best.roughM <= PAVED_EPSILON_M) return best
         val longest = best.lengthM * MAX_DETOUR_FACTOR + MAX_DETOUR_EXTRA_M
         var candidate: RoutedSegment? = null
         for (index in 1..MAX_ALTERNATIVE_INDEX) {

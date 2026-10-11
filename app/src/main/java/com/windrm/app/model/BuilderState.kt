@@ -11,6 +11,8 @@ import kotlinx.serialization.Serializable
 data class BuilderState(
     /** The "paved roads only" switch was off when the route was drawn. */
     val allowUnpaved: Boolean,
+    /** The "shortest" switch was on (the shortest way, not the one on main roads). */
+    val shortest: Boolean = true,
     val junctions: List<Int>,
     val legs: List<BuilderLeg>,
 ) {

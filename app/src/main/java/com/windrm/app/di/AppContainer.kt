@@ -70,6 +70,8 @@ class AppContainer(context: Context) {
             val resource = when (key) {
                 "ride_paved" -> R.raw.windrm_ride_paved
                 "ride_any" -> R.raw.windrm_ride_any
+                "ride_paved_short" -> R.raw.windrm_ride_paved_short
+                "ride_any_short" -> R.raw.windrm_ride_any_short
                 else -> error("No routing profile $key")
             }
             context.resources.openRawResource(resource).bufferedReader().use { it.readText() }
