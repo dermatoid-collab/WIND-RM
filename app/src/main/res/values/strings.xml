@@ -34,6 +34,13 @@
     <string name="builder_delete_waypoint">Delete</string>
     <string name="builder_waypoint_title">Point %1$d</string>
     <string name="builder_undo">Undo</string>
+    <string name="builder_redo">Redo</string>
+    <string name="builder_reverse">Reverse route</string>
+    <string name="builder_back_shortest">Shortest way</string>
+    <string name="builder_back_shortest_hint">Back to the start by the most direct way</string>
+    <string name="builder_back_retrace">Retrace my route</string>
+    <string name="builder_back_retrace_hint">Ride the route back the way you came, unpaved stretches included</string>
+    <string name="builder_reversed_notice">Route reversed. On one-way roads you now ride against the traffic.</string>
     <string name="builder_back_to_start">Back to start</string>
     <string name="builder_clear">Clear</string>
     <string name="builder_points">points</string>

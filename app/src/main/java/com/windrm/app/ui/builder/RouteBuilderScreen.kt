@@ -19,17 +19,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Hiking
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -54,6 +61,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
@@ -64,6 +72,7 @@ import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.repository.RoutingError
 import com.windrm.app.ui.components.AppBar
+import com.windrm.app.ui.components.BackToStartIcon
 import com.windrm.app.ui.components.KmMarker
 import com.windrm.app.ui.components.MapArrow
 import com.windrm.app.ui.components.MapMarker
@@ -103,6 +112,14 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
         viewModel.error?.let { error ->
             snackbar.showSnackbar(errorTexts.getValue(error) + (viewModel.errorDetail?.let { "\n($it)" } ?: ""))
             viewModel.clearError()
+        }
+    }
+
+    val reversedText = stringResource(R.string.builder_reversed_notice)
+    LaunchedEffect(viewModel.reversedNotice) {
+        if (viewModel.reversedNotice) {
+            snackbar.showSnackbar(reversedText)
+            viewModel.clearReversedNotice()
         }
     }
 
@@ -246,11 +263,48 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
 
             RouteStats(viewModel, draft, profileValues)
 
-            // Undo and Clear are as wide as each other; the middle one is wider so "Back to start" stays on one line.
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActionPill(stringResource(R.string.builder_undo), viewModel::undo, viewModel.waypoints.isNotEmpty() && !viewModel.busy, Modifier.weight(1f))
-                ActionPill(stringResource(R.string.builder_back_to_start), viewModel::returnToStart, viewModel.canReturnToStart() && !viewModel.busy, Modifier.weight(1.5f))
-                ActionPill(stringResource(R.string.builder_clear), viewModel::clear, viewModel.waypoints.isNotEmpty(), Modifier.weight(1f))
+            // Icons from the left: Undo, Redo, Clear, Reverse, Back to start (which opens a choice of two ways back).
+            val idle = !viewModel.busy
+            var backMenu by remember { mutableStateOf(false) }
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ActionIcon(Icons.AutoMirrored.Filled.Undo, stringResource(R.string.builder_undo), viewModel::undo, viewModel.canUndo && idle)
+                ActionIcon(Icons.AutoMirrored.Filled.Redo, stringResource(R.string.builder_redo), viewModel::redo, viewModel.canRedo && idle)
+                ActionIcon(Icons.Filled.Delete, stringResource(R.string.builder_clear), viewModel::clear, viewModel.waypoints.isNotEmpty())
+                ActionIcon(Icons.Filled.SwapHoriz, stringResource(R.string.builder_reverse), viewModel::reverse, viewModel.segments.isNotEmpty() && idle)
+                Box {
+                    ActionIcon(BackToStartIcon, stringResource(R.string.builder_back_to_start), { backMenu = true }, viewModel.segments.isNotEmpty() && idle)
+                    DropdownMenu(expanded = backMenu, onDismissRequest = { backMenu = false }) {
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(stringResource(R.string.builder_back_shortest))
+                                    Text(stringResource(R.string.builder_back_shortest_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            enabled = viewModel.canReturnToStart(),
+                            onClick = {
+                                backMenu = false
+                                viewModel.returnToStart()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(stringResource(R.string.builder_back_retrace))
+                                    Text(stringResource(R.string.builder_back_retrace_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            onClick = {
+                                backMenu = false
+                                viewModel.retraceToStart()
+                            },
+                        )
+                    }
+                }
             }
         }
     }
@@ -390,10 +444,11 @@ private fun ToggleItem(label: String, checked: Boolean, onChange: (Boolean) -> U
     }
 }
 
+/** One of the round icon buttons under the stats: Undo, Redo, Clear, Reverse, Back to start. */
 @Composable
-private fun ActionPill(text: String, onClick: () -> Unit, enabled: Boolean, modifier: Modifier) {
-    OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)) {
-        Text(text, style = MaterialTheme.typography.titleMedium, maxLines = 1, softWrap = false)
+private fun ActionIcon(icon: ImageVector, description: String, onClick: () -> Unit, enabled: Boolean) {
+    OutlinedIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
+        Icon(icon, contentDescription = description)
     }
 }
 

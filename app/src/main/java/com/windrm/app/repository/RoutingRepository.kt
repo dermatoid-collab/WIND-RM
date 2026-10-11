@@ -34,6 +34,15 @@ data class RoutedSegment(
 ) {
     val roughM: Double get() = unpavedM + trailM
 
+    /** The same stretch ridden the other way: the points in reverse and the rough spans mirrored along BRouter's own distances. */
+    fun reversed(): RoutedSegment {
+        val surface = pavedM + unpavedM + trailM
+        val spans = roughSpans.map { (from, to) ->
+            (surface - to).coerceIn(0.0, surface) to (surface - from).coerceIn(0.0, surface)
+        }.reversed()
+        return copy(points = points.reversed(), roughSpans = spans)
+    }
+
     /** Cumulative length along [points] at each of them, metres. */
     private val cumulative: DoubleArray by lazy {
         DoubleArray(points.size).also { c ->

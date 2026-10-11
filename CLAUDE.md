@@ -73,6 +73,11 @@ Non ha Android Studio installato/configurato.
   cambio Ride/Trekking ricalcola i tratti non manuali.
 - "Edit" apre la route stessa nel builder (il salvataggio la sostituisce); "Duplicate" ne apre una copia (il salvataggio crea
   sempre una route nuova). Il dialog di salvataggio non offre mai la scelta tra i due. I tre puntini della lista: Edit, Duplicate, Delete.
+- Sotto le statistiche, icone da sinistra: **Undo, Redo, Clear (cestino), Inverti, Back to start**. Undo/Redo seguono la cronologia
+  delle operazioni (punto aggiunto, waypoint spostato/inserito/cancellato, Inverti, Back to start, Clear, cambio Ride/Trekking),
+  mai i singoli punti della route. Una route aperta con Edit/Duplicate parte con cronologia vuota (Undo grigio). Clear si può
+  annullare; Paved/Manual/Shortest non sono nella cronologia. Inverti = stessa traccia al contrario (sterrati inclusi, nessun
+  ricalcolo) e mostra un avviso sui sensi unici. Back to start apre due voci: "Shortest way" e "Retrace my route" (a ritroso).
 - La mappa del builder parte con zoom 15 (14 + 1: il doppio più vicino) sul luogo preferito, altrimenti sul GPS.
 - Il luogo preferito (rinominabile, impostabile dal GPS o scegliendolo sulla mappa) sta in Settings ed è sia
   il punto di partenza delle mappe sia la località del meteo in Home.

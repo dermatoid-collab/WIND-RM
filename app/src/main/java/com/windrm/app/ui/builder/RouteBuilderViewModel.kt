@@ -128,6 +128,47 @@ class RouteBuilderViewModel(
 
     private var job: Job? = null
 
+    /** The drawing as it is at one moment: what Undo and Redo go back to and forward to. */
+    private data class Snapshot(val waypoints: List<LatLon>, val segments: List<RoutedSegment>, val activity: ActivityType)
+
+    // The operations done on the route, one step each; a route opened for Edit or Duplicate starts with none.
+    private val undoStack = ArrayList<Snapshot>()
+    private val redoStack = ArrayList<Snapshot>()
+
+    var canUndo by mutableStateOf(false)
+        private set
+    var canRedo by mutableStateOf(false)
+        private set
+
+    /** Set when a route has just been reversed, so the screen can say what that means for one-way roads. */
+    var reversedNotice by mutableStateOf(false)
+        private set
+
+    fun clearReversedNotice() {
+        reversedNotice = false
+    }
+
+    private fun snapshot(activityBefore: ActivityType = activity) = Snapshot(waypoints, segments, activityBefore)
+
+    private fun updateHistoryFlags() {
+        canUndo = undoStack.isNotEmpty()
+        canRedo = redoStack.isNotEmpty()
+    }
+
+    /** Called just before a change to the drawing is applied: the state now is the step Undo will return to. A new step drops the Redo ones. */
+    private fun record(activityBefore: ActivityType = activity) {
+        undoStack += snapshot(activityBefore)
+        if (undoStack.size > MAX_HISTORY) undoStack.removeAt(0)
+        redoStack.clear()
+        updateHistoryFlags()
+    }
+
+    private fun restore(snapshot: Snapshot) {
+        waypoints = snapshot.waypoints
+        segments = snapshot.segments
+        activity = snapshot.activity
+    }
+
     val profile: BuilderProfile get() = BuilderProfile.of(activity, allowUnpaved, shortest)
 
     /** Paved-only rides keep unpaved ways out, so any that remain after a settings change are flagged. */
@@ -199,7 +240,12 @@ class RouteBuilderViewModel(
         error = null
         val target = LatLon(lat, lon)
         val from = waypoints.lastOrNull()
-        if (from == null) waypoints = listOf(target) else extend(from, target)
+        if (from == null) {
+            record()
+            waypoints = listOf(target)
+        } else {
+            extend(from, target)
+        }
     }
 
     fun changeManualMode(on: Boolean) {
@@ -227,6 +273,7 @@ class RouteBuilderViewModel(
     private fun append(segment: RoutedSegment) {
         val start = segment.points.first().let { LatLon(it.lat, it.lon) }
         val end = segment.points.last().let { LatLon(it.lat, it.lon) }
+        record()
         // The very first tap is replaced by where the router actually snapped it onto the road.
         waypoints = (if (segments.isEmpty()) listOf(start) else waypoints) + end
         segments = segments + segment
@@ -242,6 +289,7 @@ class RouteBuilderViewModel(
         val target = LatLon(lat, lon)
         // A lone first point has no stretch to route: it simply moves.
         if (segments.isEmpty()) {
+            record()
             waypoints = listOf(target)
             return
         }
@@ -261,6 +309,7 @@ class RouteBuilderViewModel(
                 val newSegments = segments.toMutableList()
                 if (before != null) newSegments[index - 1] = before
                 if (after != null) newSegments[index] = after
+                record()
                 segments = newSegments
                 waypoints = points.toMutableList().also { it[index] = snapped }
             } catch (e: RoutingException) {
@@ -290,6 +339,7 @@ class RouteBuilderViewModel(
         if (busy) return
         val (s, j) = locate(flatIndex) ?: return
         val (before, after) = segments[s].splitAt(j, lat, lon)
+        record()
         segments = segments.toMutableList().also {
             it[s] = before
             it.add(s + 1, after)
@@ -326,10 +376,12 @@ class RouteBuilderViewModel(
         when {
             waypoints.size == 1 -> clear()
             index == 0 -> {
+                record()
                 segments = segments.drop(1)
                 waypoints = waypoints.drop(1)
             }
             index == waypoints.lastIndex -> {
+                record()
                 segments = segments.dropLast(1)
                 waypoints = waypoints.dropLast(1)
             }
@@ -340,6 +392,7 @@ class RouteBuilderViewModel(
                     busy = true
                     try {
                         val joined = leg(points[index - 1], points[index + 1], manual)
+                        record()
                         segments = segments.toMutableList().also {
                             it[index - 1] = joined
                             it.removeAt(index)
@@ -393,6 +446,8 @@ class RouteBuilderViewModel(
                     val kept = segments.getOrNull(i - 1)?.takeIf { it.manual }
                     routed += kept ?: routingRepository.route(points[i - 1], points[i], profile)
                 }
+                // The step Undo returns to is the drawing with the activity it had before the switch.
+                record(previous.first)
                 segments = routed
             } catch (e: RoutingException) {
                 activity = previous.first
@@ -405,24 +460,55 @@ class RouteBuilderViewModel(
         }
     }
 
+    /** Goes back one step: what the last operation did is undone, however much of the route that is. */
     fun undo() {
-        if (busy) return
+        if (busy || undoStack.isEmpty()) return
         error = null
-        when {
-            segments.isNotEmpty() -> {
-                segments = segments.dropLast(1)
-                waypoints = waypoints.dropLast(1)
-            }
-            waypoints.isNotEmpty() -> waypoints = emptyList()
-        }
+        redoStack += snapshot()
+        restore(undoStack.removeAt(undoStack.lastIndex))
+        updateHistoryFlags()
     }
 
+    /** Does again the step Undo took back. */
+    fun redo() {
+        if (busy || redoStack.isEmpty()) return
+        error = null
+        undoStack += snapshot()
+        restore(redoStack.removeAt(redoStack.lastIndex))
+        updateHistoryFlags()
+    }
+
+    /** Clears the route; it is a step of its own, so Undo brings everything back. */
     fun clear() {
         job?.cancel()
         busy = false
         error = null
+        if (segments.isEmpty() && waypoints.isEmpty()) return
+        record()
         segments = emptyList()
         waypoints = emptyList()
+    }
+
+    /**
+     * The same track ridden the other way: waypoints and stretches in reverse order, each stretch turned round (its
+     * unpaved spans with it). Nothing is routed again.
+     */
+    fun reverse() {
+        if (busy || segments.isEmpty()) return
+        error = null
+        record()
+        segments = segments.asReversed().map { it.reversed() }
+        waypoints = waypoints.reversed()
+        reversedNotice = true
+    }
+
+    /** Back to the start the way it was ridden: the whole route again, in reverse, unpaved stretches included. */
+    fun retraceToStart() {
+        if (busy || segments.isEmpty()) return
+        error = null
+        record()
+        segments = segments + segments.asReversed().map { it.reversed() }
+        waypoints = waypoints + waypoints.reversed().drop(1)
     }
 
     fun canReturnToStart(): Boolean {
@@ -431,6 +517,7 @@ class RouteBuilderViewModel(
         return waypoints.size >= 3 && haversineMeters(first.lat, first.lon, last.lat, last.lon) > RETURN_MIN_M
     }
 
+    /** Back to the start by the most direct way (a new stretch, routed like any other). */
     fun returnToStart() {
         if (busy || !canReturnToStart()) return
         error = null
@@ -511,5 +598,6 @@ class RouteBuilderViewModel(
         const val DEFAULT_COUNTRY_ZOOM = 7.0
         val DEFAULT_CENTER = 42.5 to 12.5
         const val RETURN_MIN_M = 30.0
+        const val MAX_HISTORY = 100
     }
 }
