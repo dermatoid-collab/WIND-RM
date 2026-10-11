@@ -118,7 +118,7 @@ class RouteBuilderViewModel(
     }
 
     /** The finished route, or null until there are two points; the name is only a placeholder here. */
-    val draft: Route? get() = assembleRoute("", activity, segments, 0L)
+    val draft: Route? get() = assembleRoute("", activity, segments, 0L, allowUnpaved)
 
     init {
         viewModelScope.launch {
@@ -387,7 +387,7 @@ class RouteBuilderViewModel(
      * Settings. The saved route (with its new id) is handed back for the caller to open or share.
      */
     fun save(name: String, toFolder: Boolean, onSaved: (Route) -> Unit) {
-        val route = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, System.currentTimeMillis()) ?: return
+        val route = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, System.currentTimeMillis(), allowUnpaved) ?: return
         viewModelScope.launch {
             val id = routeRepository.saveRoute(route)
             val saved = route.copy(id = id)

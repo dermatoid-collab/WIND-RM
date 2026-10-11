@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.windrm.app.domain.ActivityType
+import com.windrm.app.model.BuilderState
 import com.windrm.app.model.Route
 import com.windrm.app.model.RoutePoint
 import com.windrm.app.model.RouteSource
@@ -33,6 +34,8 @@ data class RouteEntity(
     @ColumnInfo(defaultValue = "'[]'") val stopsJson: String = "[]",
     // ActivityType name; the default matches the 2 -> 3 migration.
     @ColumnInfo(defaultValue = "'RIDE'") val activity: String = "RIDE",
+    // The route builder's waypoints and stretches (BuilderState as JSON); null for imported routes.
+    val builderJson: String? = null,
 ) {
     fun toRoute(): Route = Route(
         id = id,
@@ -48,6 +51,7 @@ data class RouteEntity(
         originalDateEpochMs = originalDateEpochMs,
         stops = json.decodeFromString(stopsJson),
         activity = runCatching { ActivityType.valueOf(activity) }.getOrDefault(ActivityType.RIDE),
+        builderState = builderJson?.let { runCatching { json.decodeFromString<BuilderState>(it) }.getOrNull() },
     )
 
     companion object {
@@ -65,6 +69,7 @@ data class RouteEntity(
             originalDateEpochMs = route.originalDateEpochMs,
             stopsJson = encodeStops(route.stops),
             activity = route.activity.name,
+            builderJson = route.builderState?.let { json.encodeToString(it) },
         )
 
         fun encodeStops(stops: List<RouteStop>): String = json.encodeToString(stops)

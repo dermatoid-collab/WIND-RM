@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [RouteEntity::class], version = 3, exportSchema = false)
+@Database(entities = [RouteEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun routeDao(): RouteDao
 
@@ -20,7 +20,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "windrm.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }
@@ -38,5 +38,12 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
 private val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE routes ADD COLUMN activity TEXT NOT NULL DEFAULT 'RIDE'")
+    }
+}
+
+/** Adds the route builder's waypoints and stretches, so a route drawn there can be opened for editing again. */
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE routes ADD COLUMN builderJson TEXT")
     }
 }

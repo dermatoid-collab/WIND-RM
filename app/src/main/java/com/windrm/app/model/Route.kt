@@ -51,6 +51,8 @@ data class Route(
     val stops: List<RouteStop> = emptyList(),
     /** Ride or trek: picks the realistic pacing model. */
     val activity: ActivityType = ActivityType.RIDE,
+    /** Waypoints and stretches as the route builder drew them; null for a route that came from a GPX file or Strava. */
+    val builderState: BuilderState? = null,
 ) {
     val startPoint: RoutePoint? get() = points.firstOrNull()
 
