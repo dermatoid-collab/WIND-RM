@@ -369,11 +369,12 @@ class RouteBuilderViewModel(
         rerouteAll(previous)
     }
 
+    /**
+     * Shortest or main roads: applies to the stretches routed from now on (a new point, a point moved or deleted).
+     * What is already drawn is left exactly as it is; only the "paved" switch and Ride / Trekking route it all again.
+     */
     fun changeShortest(on: Boolean) {
-        if (on == shortest) return
-        val previous = Triple(activity, allowUnpaved, shortest)
         shortest = on
-        rerouteAll(previous)
     }
 
     /** A different profile means different roads: every stretch is routed again, or the change is undone. */

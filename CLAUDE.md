@@ -68,7 +68,9 @@ Non ha Android Studio installato/configurato.
   aggiunge un waypoint in quel punto e il percorso finisce lì (anche su un punto già percorso).
 - Un tap su un waypoint apre il menu **End here / Delete** (End here assente sull'ultimo waypoint).
 - Sotto Ride / Trekking stanno tre switch sulla stessa riga: "Paved" (default on), "Manual" (default off) e "Shortest"
-  (default on: strada più corta, anche su strade minori; spento: strada principale). Cambiarli ricalcola i tratti non manuali.
+  (default on: strada più corta, anche su strade minori; spento: strada principale). **"Shortest" non tocca mai la traccia già
+  inserita**: vale solo per i tratti calcolati da quel momento (nuovo punto, waypoint spostato o cancellato). "Paved" e
+  Ride/Trekking invece ricalcolano i tratti non manuali.
 - "Edit" apre la route stessa nel builder (il salvataggio la sostituisce); "Duplicate" ne apre una copia (il salvataggio crea
   sempre una route nuova). Il dialog di salvataggio non offre mai la scelta tra i due. I tre puntini della lista: Edit, Duplicate, Delete.
 - La mappa del builder parte con zoom 15 (14 + 1: il doppio più vicino) sul luogo preferito, altrimenti sul GPS.
