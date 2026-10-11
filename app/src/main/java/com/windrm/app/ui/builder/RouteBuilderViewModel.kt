@@ -362,16 +362,17 @@ class RouteBuilderViewModel(
         rerouteAll(previous)
     }
 
+    /**
+     * Paved only or unpaved allowed: applies to the stretches routed from now on, like [changeShortest]. What is already
+     * drawn is left exactly as it is, also where it has unpaved ways (the surface bar and the warning still show them).
+     */
     fun changeAllowUnpaved(allow: Boolean) {
-        if (allow == allowUnpaved) return
-        val previous = Triple(activity, allowUnpaved, shortest)
         allowUnpaved = allow
-        rerouteAll(previous)
     }
 
     /**
      * Shortest or main roads: applies to the stretches routed from now on (a new point, a point moved or deleted).
-     * What is already drawn is left exactly as it is; only the "paved" switch and Ride / Trekking route it all again.
+     * What is already drawn is left exactly as it is; only switching Ride / Trekking routes it all again.
      */
     fun changeShortest(on: Boolean) {
         shortest = on
