@@ -29,6 +29,7 @@ internal fun SaveRouteDialog(
     folderName: String?,
     /** Off for a file that already sits in the GPX folder, where a copy would only duplicate it. */
     folderCopyByDefault: Boolean = true,
+    mode: BuilderMode = BuilderMode.NEW,
     onDismiss: () -> Unit,
     onConfirm: (name: String, toFolder: Boolean, share: Boolean) -> Unit,
 ) {
@@ -37,9 +38,27 @@ internal fun SaveRouteDialog(
     var share by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.builder_name_title)) },
+        title = {
+            Text(
+                stringResource(
+                    when (mode) {
+                        BuilderMode.NEW -> R.string.builder_name_title
+                        BuilderMode.EDIT -> R.string.builder_name_title_edit
+                        BuilderMode.DUPLICATE -> R.string.builder_name_title_copy
+                    },
+                ),
+            )
+        },
         text = {
             Column {
+                // Saving over a route and saving a copy look alike, so the dialog says which one this is.
+                if (mode != BuilderMode.NEW) {
+                    Text(
+                        stringResource(if (mode == BuilderMode.EDIT) R.string.builder_name_hint_edit else R.string.builder_name_hint_copy),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -62,7 +81,15 @@ internal fun SaveRouteDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name, toFolder && folderName != null, share) }, enabled = name.isNotBlank()) {
-                Text(stringResource(R.string.builder_save))
+                Text(
+                    stringResource(
+                        when (mode) {
+                            BuilderMode.NEW -> R.string.builder_save
+                            BuilderMode.EDIT -> R.string.builder_save_changes
+                            BuilderMode.DUPLICATE -> R.string.builder_save_copy
+                        },
+                    ),
+                )
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },

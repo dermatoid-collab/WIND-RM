@@ -32,7 +32,9 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Hiking
 import androidx.compose.material.icons.filled.HorizontalRule
@@ -102,6 +104,8 @@ fun RouteDetailScreen(
     onForecast: (startEpochS: Long, speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
     onLive: (speedKmh: Double, pacing: PacingMode, cropRangeM: ClosedFloatingPointRange<Double>) -> Unit,
     onOpenSettings: () -> Unit,
+    onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
 ) {
     val route = viewModel.route
     // The part actually ridden: header stats and the forecast follow the crop slider.
@@ -286,6 +290,20 @@ fun RouteDetailScreen(
                     shape = RoundedCornerShape(4.dp),
                 ) {
                     Text(stringResource(R.string.live_route), style = MaterialTheme.typography.titleMedium)
+                }
+            }
+            // Open the route in the builder: the route itself (saving replaces it) or a copy (saving makes a new route).
+            Row(
+                Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedButton(onClick = onEdit, shape = RoundedCornerShape(4.dp)) {
+                    Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.route_edit), modifier = Modifier.padding(start = 8.dp))
+                }
+                OutlinedButton(onClick = onDuplicate, shape = RoundedCornerShape(4.dp)) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.route_duplicate), modifier = Modifier.padding(start = 8.dp))
                 }
             }
 

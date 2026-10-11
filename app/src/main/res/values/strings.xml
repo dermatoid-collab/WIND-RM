@@ -16,6 +16,8 @@
     <string name="menu_create_route">Create route</string>
     <string name="menu_new">New route</string>
     <string name="builder_title">Create route</string>
+    <string name="builder_title_edit">Edit route</string>
+    <string name="builder_title_duplicate">Copy of route</string>
     <string name="builder_save">Save</string>
     <string name="builder_paved_only">Paved roads only</string>
     <string name="builder_manual_mode">Manual mode</string>
@@ -45,6 +47,12 @@
     <string name="builder_use_stretch">Use it</string>
     <string name="builder_leftover_warning">Includes %1$d m of unpaved road. Turn off “Paved roads only” or move the points.</string>
     <string name="builder_name_title">Save route</string>
+    <string name="builder_name_title_edit">Save changes</string>
+    <string name="builder_name_title_copy">Save as a new route</string>
+    <string name="builder_name_hint_edit">This replaces the route in your list. To keep the original, go back and use Duplicate instead.</string>
+    <string name="builder_name_hint_copy">The original route stays as it is.</string>
+    <string name="builder_save_changes">Save changes</string>
+    <string name="builder_save_copy">Save copy</string>
     <string name="builder_name_label">Route name</string>
     <string name="builder_export_gpx">Also share as a GPX file</string>
     <string name="builder_gpx_to_folder">Save a GPX copy to “%1$s”</string>
@@ -63,6 +71,9 @@
     <string name="strava_not_configured_message">To connect Strava, set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in local.properties. See the project README.</string>
     <string name="no_routes_yet">No routes yet. Import a GPX file or connect Strava to get started.</string>
     <string name="delete_route">Delete route</string>
+    <string name="route_edit">Edit</string>
+    <string name="route_duplicate">Duplicate</string>
+    <string name="route_more_actions">More actions</string>
 
     <!-- Strava sub-selector: Activities / Routes / Segments -->
     <string name="strava_section_activities">Activities</string>

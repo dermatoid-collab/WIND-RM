@@ -18,10 +18,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.UploadFile
@@ -29,6 +32,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -89,6 +94,8 @@ fun RoutesListScreen(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onRouteSelected: (Route) -> Unit,
+    onEditRoute: (Route) -> Unit,
+    onDuplicateRoute: (Route) -> Unit,
 ) {
     val context = LocalContext.current
     val routes by viewModel.routes.collectAsStateWithLifecycle()
@@ -150,6 +157,8 @@ fun RoutesListScreen(
                     onSelected = onRouteSelected,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onDelete = viewModel::deleteRoute,
+                    onEdit = onEditRoute,
+                    onDuplicate = onDuplicateRoute,
                 )
                 TAB_FAVORITES -> RouteListTab(
                     routes = routes.filter { it.isFavorite },
@@ -157,6 +166,8 @@ fun RoutesListScreen(
                     onSelected = onRouteSelected,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onDelete = viewModel::deleteRoute,
+                    onEdit = onEditRoute,
+                    onDuplicate = onDuplicateRoute,
                 )
                 TAB_STRAVA -> StravaTab(
                     viewModel = viewModel,
@@ -267,6 +278,8 @@ private fun RouteListTab(
     onSelected: (Route) -> Unit,
     onToggleFavorite: (Route) -> Unit,
     onDelete: (Route) -> Unit,
+    onEdit: (Route) -> Unit,
+    onDuplicate: (Route) -> Unit,
 ) {
     if (routes.isEmpty()) {
         EmptyState(emptyMessage)
@@ -279,13 +292,22 @@ private fun RouteListTab(
                 onClick = { onSelected(route) },
                 onToggleFavorite = { onToggleFavorite(route) },
                 onDelete = { onDelete(route) },
+                onEdit = { onEdit(route) },
+                onDuplicate = { onDuplicate(route) },
             )
         }
     }
 }
 
 @Composable
-private fun RouteCard(route: Route, onClick: () -> Unit, onToggleFavorite: () -> Unit, onDelete: () -> Unit) {
+private fun RouteCard(
+    route: Route,
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             RoutePolylinePreview(points = route.points.map { it.lat to it.lon })
@@ -305,8 +327,29 @@ private fun RouteCard(route: Route, onClick: () -> Unit, onToggleFavorite: () ->
                 }
             }
             FavoriteButton(isFavorite = route.isFavorite, onClick = onToggleFavorite)
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete_route))
+            // Edit, Duplicate and Delete behind one button: Delete is never a single stray tap away.
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.route_more_actions))
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.route_edit)) },
+                        leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+                        onClick = { menuOpen = false; onEdit() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.route_duplicate)) },
+                        leadingIcon = { Icon(Icons.Filled.ContentCopy, contentDescription = null) },
+                        onClick = { menuOpen = false; onDuplicate() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.delete_route), color = MaterialTheme.colorScheme.error) },
+                        leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                        onClick = { menuOpen = false; onDelete() },
+                    )
+                }
             }
         }
     }

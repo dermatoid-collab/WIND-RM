@@ -128,7 +128,13 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
     Scaffold(
         topBar = {
             AppBar(
-                title = stringResource(R.string.builder_title),
+                title = stringResource(
+                    when (viewModel.mode) {
+                        BuilderMode.NEW -> R.string.builder_title
+                        BuilderMode.EDIT -> R.string.builder_title_edit
+                        BuilderMode.DUPLICATE -> R.string.builder_title_duplicate
+                    },
+                ),
                 onBack = onBack,
                 onOpenSettings = onOpenSettings,
                 actions = {
@@ -299,6 +305,9 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
         SaveRouteDialog(
             initialName = remember { viewModel.defaultName() },
             folderName = viewModel.gpxFolderName,
+            // A changed route would only add a second, different file to the folder: left to the user to ask for.
+            folderCopyByDefault = viewModel.mode != BuilderMode.EDIT,
+            mode = viewModel.mode,
             onDismiss = { showSave = false },
             onConfirm = { name, toFolder, share ->
                 showSave = false

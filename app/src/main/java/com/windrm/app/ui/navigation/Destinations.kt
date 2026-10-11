@@ -7,7 +7,16 @@ sealed class Destination(val route: String) {
 
     data object Settings : Destination("settings")
 
-    data object RouteBuilder : Destination("builder")
+    /** The route builder: a new route, or a saved one opened to edit in place or to copy (mode and route id are optional). */
+    data object RouteBuilder : Destination("builder?mode={mode}&routeId={routeId}") {
+        const val ARG_MODE = "mode"
+        const val ARG_ROUTE_ID = "routeId"
+        const val MODE_EDIT = "edit"
+        const val MODE_DUPLICATE = "duplicate"
+        fun path() = "builder"
+        fun edit(routeId: Long) = "builder?mode=$MODE_EDIT&routeId=$routeId"
+        fun duplicate(routeId: Long) = "builder?mode=$MODE_DUPLICATE&routeId=$routeId"
+    }
 
     data object RoutesList : Destination("routes/{initialTab}") {
         const val ARG_INITIAL_TAB = "initialTab"

@@ -12,6 +12,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.windrm.app.di.AppContainer
 import com.windrm.app.domain.PacingMode
+import com.windrm.app.ui.builder.BuilderMode
 import com.windrm.app.ui.builder.RouteBuilderScreen
 import com.windrm.app.ui.builder.RouteBuilderViewModel
 import com.windrm.app.ui.forecast.ForecastScreen
@@ -50,17 +51,32 @@ fun WindRmNavHost(container: AppContainer) {
                 onOpenStrava = { navController.navigate(Destination.RoutesList.path(TAB_STRAVA)) },
                 onOpenFiles = { navController.navigate(Destination.RoutesList.path(TAB_FILES)) },
                 onOpenSettings = { navController.navigate(Destination.Settings.route) },
-                onCreateRoute = { navController.navigate(Destination.RouteBuilder.route) },
+                onCreateRoute = { navController.navigate(Destination.RouteBuilder.path()) },
                 onRouteImported = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
             )
         }
 
-        composable(Destination.RouteBuilder.route) {
+        composable(
+            route = Destination.RouteBuilder.route,
+            arguments = listOf(
+                navArgument(Destination.RouteBuilder.ARG_MODE) { type = NavType.StringType; defaultValue = "" },
+                navArgument(Destination.RouteBuilder.ARG_ROUTE_ID) { type = NavType.LongType; defaultValue = -1L },
+            ),
+        ) { backStackEntry ->
             val appContext = LocalContext.current.applicationContext
+            val sourceRouteId = backStackEntry.arguments?.getLong(Destination.RouteBuilder.ARG_ROUTE_ID)?.takeIf { it >= 0 }
+            val mode = when (backStackEntry.arguments?.getString(Destination.RouteBuilder.ARG_MODE)) {
+                Destination.RouteBuilder.MODE_EDIT -> BuilderMode.EDIT
+                Destination.RouteBuilder.MODE_DUPLICATE -> BuilderMode.DUPLICATE
+                else -> BuilderMode.NEW
+            }
             val viewModel = viewModel<RouteBuilderViewModel>(
                 factory = viewModelFactory {
                     initializer {
-                        RouteBuilderViewModel(appContext, container.routeRepository, container.settingsRepository, container.routingRepository)
+                        RouteBuilderViewModel(
+                            appContext, container.routeRepository, container.settingsRepository, container.routingRepository,
+                            sourceRouteId, mode,
+                        )
                     }
                 },
             )
@@ -68,11 +84,17 @@ fun WindRmNavHost(container: AppContainer) {
                 viewModel = viewModel,
                 onBack = { navController.popBackStack() },
                 onOpenSettings = { navController.navigate(Destination.Settings.route) },
-                // The saved route replaces the builder in the back stack, so Back from its screen goes Home.
+                // The saved route replaces the builder in the back stack, so Back from its screen goes where the builder came from.
                 onSaved = { route ->
-                    navController.navigate(Destination.RouteDetail.path(route.id)) {
-                        popUpTo(Destination.RouteBuilder.route) { inclusive = true }
+                    navController.popBackStack()
+                    // A screen of this very route below (the one the edit started from) shows the old version: it goes too.
+                    val below = navController.currentBackStackEntry
+                    if (below?.destination?.route == Destination.RouteDetail.route &&
+                        below.arguments?.getLong(Destination.RouteDetail.ARG_ROUTE_ID) == route.id
+                    ) {
+                        navController.popBackStack()
                     }
+                    navController.navigate(Destination.RouteDetail.path(route.id))
                 },
             )
         }
@@ -103,6 +125,8 @@ fun WindRmNavHost(container: AppContainer) {
                 onBack = { navController.popBackStack() },
                 onOpenSettings = { navController.navigate(Destination.Settings.route) },
                 onRouteSelected = { route -> navController.navigate(Destination.RouteDetail.path(route.id)) },
+                onEditRoute = { route -> navController.navigate(Destination.RouteBuilder.edit(route.id)) },
+                onDuplicateRoute = { route -> navController.navigate(Destination.RouteBuilder.duplicate(route.id)) },
             )
         }
 
@@ -126,6 +150,8 @@ fun WindRmNavHost(container: AppContainer) {
                 onLive = { speedKmh, pacing, crop ->
                     navController.navigate(Destination.Live.path(routeId, speedKmh, pacing, crop.start, crop.endInclusive))
                 },
+                onEdit = { navController.navigate(Destination.RouteBuilder.edit(routeId)) },
+                onDuplicate = { navController.navigate(Destination.RouteBuilder.duplicate(routeId)) },
             )
         }
 

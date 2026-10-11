@@ -11,12 +11,16 @@ import com.windrm.app.domain.ActivityType
 import com.windrm.app.domain.CaiPacing
 import com.windrm.app.domain.CaiProfile
 import com.windrm.app.domain.assembleRoute
+import com.windrm.app.domain.draftOf
+import com.windrm.app.domain.remapStops
 import com.windrm.app.domain.haversineMeters
 import com.windrm.app.gpx.GpxFolder
 import com.windrm.app.gpx.GpxFolderExport
 import com.windrm.app.location.DeviceLocation
 import com.windrm.app.model.LatLon
 import com.windrm.app.model.Route
+import com.windrm.app.model.RoutePoint
+import com.windrm.app.model.RouteSource
 import com.windrm.app.repository.BuilderProfile
 import com.windrm.app.repository.RouteRepository
 import com.windrm.app.repository.RoutedSegment
@@ -32,6 +36,13 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.ln
+import kotlin.math.max
+import kotlin.math.min
+
+/** What the builder is for: a new route, a saved route opened to change in place, or a copy of one to save as a new route. */
+enum class BuilderMode { NEW, EDIT, DUPLICATE }
 
 /**
  * The route being drawn: points tapped on the map, joined by routed stretches. Each new point is
@@ -43,7 +54,17 @@ class RouteBuilderViewModel(
     private val routeRepository: RouteRepository,
     private val settingsRepository: SettingsRepository,
     private val routingRepository: RoutingRepository,
+    /** Which saved route to open ([BuilderMode.EDIT] or [BuilderMode.DUPLICATE]); ignored for a new one. */
+    private val sourceRouteId: Long? = null,
+    requestedMode: BuilderMode = BuilderMode.NEW,
 ) : ViewModel() {
+
+    /** The mode in force: a route that can't be opened (deleted meanwhile) leaves a plain new route. */
+    var mode by mutableStateOf(if (sourceRouteId == null) BuilderMode.NEW else requestedMode)
+        private set
+
+    /** The saved route being edited or copied, once loaded. */
+    private var source: Route? = null
 
     var activity by mutableStateOf(ActivityType.RIDE)
         private set
@@ -129,6 +150,20 @@ class RouteBuilderViewModel(
             gpxFolderName = settings.gpxFolderUri?.let(Uri::parse)?.let { tree ->
                 withContext(Dispatchers.IO) { GpxFolder.displayName(appContext, tree) }
             }
+            val opened = sourceRouteId?.takeIf { mode != BuilderMode.NEW }?.let { routeRepository.getRoute(it) }
+            val openedDraft = opened?.let(::draftOf)
+            if (opened != null && openedDraft != null) {
+                source = opened
+                activity = opened.activity
+                allowUnpaved = openedDraft.allowUnpaved
+                waypoints = openedDraft.waypoints
+                segments = openedDraft.segments
+                val (center, zoom) = viewFitting(opened.points)
+                mapCenter = center
+                mapZoom = zoom
+                return@launch
+            }
+            mode = BuilderMode.NEW
             val home = settings.homeLat?.let { lat -> settings.homeLon?.let { lon -> lat to lon } }
             val here = home ?: withContext(Dispatchers.IO) {
                 runCatching { DeviceLocation.lastKnown(appContext) }.getOrNull()?.let { it.latitude to it.longitude }
@@ -379,15 +414,60 @@ class RouteBuilderViewModel(
         error = null
     }
 
-    fun defaultName(): String =
-        "Route ${LocalDate.now().format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))}"
+    /** The name offered when saving: the route's own to change it, "(copy)" after it for a copy, the date for a new one. */
+    fun defaultName(): String = when (mode) {
+        BuilderMode.EDIT -> source?.name
+        BuilderMode.DUPLICATE -> source?.name?.let { "$it (copy)" }
+        BuilderMode.NEW -> null
+    } ?: "Route ${LocalDate.now().format(DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()))}"
+
+    /**
+     * Centre and zoom that show all of [points] on this screen, as the map would open on them. The map view
+     * itself keeps its position while the track is changed, so this is worked out once, when a route is opened.
+     */
+    private fun viewFitting(points: List<RoutePoint>): Pair<Pair<Double, Double>, Double> {
+        val metrics = appContext.resources.displayMetrics
+        val widthPx = metrics.widthPixels * 0.9
+        val heightPx = metrics.heightPixels * 0.4
+        val minLat = points.minOf { it.lat }
+        val maxLat = points.maxOf { it.lat }
+        val minLon = points.minOf { it.lon }
+        val maxLon = points.maxOf { it.lon }
+        val midLat = (minLat + maxLat) / 2
+        // 256-pixel tiles: the pixels across a span of degrees at zoom z are 256 * 2^z * span / 360 (latitude stretched by 1 / cos).
+        val zoomForWidth = ln(widthPx * 360.0 / (256.0 * max(maxLon - minLon, 1e-4))) / ln(2.0)
+        val zoomForHeight = ln(heightPx * 360.0 * cos(Math.toRadians(midLat)) / (256.0 * max(maxLat - minLat, 1e-4))) / ln(2.0)
+        val zoom = (min(zoomForWidth, zoomForHeight) - 0.3).coerceIn(5.0, 17.0)
+        return (midLat to (minLon + maxLon) / 2) to zoom
+    }
 
     /**
      * Saves the route under [name]; with [toFolder] also writes its GPX into the folder chosen in
      * Settings. The saved route (with its new id) is handed back for the caller to open or share.
      */
     fun save(name: String, toFolder: Boolean, onSaved: (Route) -> Unit) {
-        val route = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, System.currentTimeMillis(), allowUnpaved) ?: return
+        val now = System.currentTimeMillis()
+        val built = assembleRoute(name.trim().ifEmpty { defaultName() }, activity, segments, now, allowUnpaved) ?: return
+        val original = source
+        val route = when {
+            // The route itself, changed: same place in the list, same favourite, same history; its stops follow the new track.
+            mode == BuilderMode.EDIT && original != null -> built.copy(
+                id = original.id,
+                source = original.source,
+                createdAtEpochMs = original.createdAtEpochMs,
+                stravaRouteId = original.stravaRouteId,
+                isFavorite = original.isFavorite,
+                originalDateEpochMs = original.originalDateEpochMs,
+                stops = remapStops(original.stops, built.points),
+            )
+            // A copy is always a new route (id 0, a local one, not a favourite): the original is never touched.
+            mode == BuilderMode.DUPLICATE && original != null -> built.copy(
+                id = 0,
+                source = RouteSource.LOCAL,
+                stops = remapStops(original.stops, built.points),
+            )
+            else -> built
+        }
         viewModelScope.launch {
             val id = routeRepository.saveRoute(route)
             val saved = route.copy(id = id)
