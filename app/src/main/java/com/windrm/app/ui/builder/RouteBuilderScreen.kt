@@ -166,27 +166,26 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                 )
                 // The switches on one row: paved roads only (a ride's choice), manual mode (straight lines, off the roads)
                 // and shortest (the shortest way, or the one on main roads; a ride's choice too).
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Each label sits right next to its own switch; the room left over goes between the three pairs, so no
+                // switch looks like it belongs to the label after it.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     if (viewModel.activity == ActivityType.RIDE) {
                         ToggleItem(
                             stringResource(R.string.builder_paved_only),
                             checked = !viewModel.allowUnpaved,
                             onChange = { viewModel.changeAllowUnpaved(!it) },
-                            modifier = Modifier.weight(1f),
                         )
                     }
                     ToggleItem(
                         stringResource(R.string.builder_manual_mode),
                         checked = viewModel.manualMode,
                         onChange = viewModel::changeManualMode,
-                        modifier = Modifier.weight(1f),
                     )
                     if (viewModel.activity == ActivityType.RIDE) {
                         ToggleItem(
                             stringResource(R.string.builder_shortest),
                             checked = viewModel.shortest,
                             onChange = viewModel::changeShortest,
-                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
@@ -379,17 +378,11 @@ private fun RouteStats(viewModel: RouteBuilderViewModel, draft: Route?, profileV
     }
 }
 
-/** A label with its switch, for the row of switches under Ride / Trekking: compact, so that three fit on one line. */
+/** A label with its switch right next to it, for the row of switches under Ride / Trekking: compact, so that three fit on one line. */
 @Composable
 private fun ToggleItem(label: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            softWrap = false,
-            modifier = Modifier.weight(1f).padding(end = 4.dp),
-        )
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false)
         // The switch is drawn at 84% of its size inside a box of that size, to leave the labels room.
         Box(Modifier.size(width = 44.dp, height = 28.dp), contentAlignment = Alignment.Center) {
             Switch(checked = checked, onCheckedChange = onChange, modifier = Modifier.requiredSize(52.dp, 32.dp).scale(0.84f))
