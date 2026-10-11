@@ -134,7 +134,8 @@ fun RouteMapView(
                 // route had actually changed. A tag on the view remembers what was last applied so
                 // each is only redone when it genuinely changes.
                 val lastState = mapView.tag as? MapViewFitState
-                if (lastState == null && points.isEmpty() && initialCenter != null) {
+                // Also when a route is already there (one opened for Edit): the builder fits the view itself, and updates keep it.
+                if (lastState == null && initialCenter != null) {
                     mapView.controller.setZoom(initialZoom)
                     mapView.controller.setCenter(GeoPoint(initialCenter.first, initialCenter.second))
                 }
