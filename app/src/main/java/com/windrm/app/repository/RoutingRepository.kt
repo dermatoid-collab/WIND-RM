@@ -159,9 +159,10 @@ interface ProfileIdStore {
     suspend fun note(text: String) {}
 }
 
-enum class RoutingError { NO_ROUTE, NO_CONNECTION, FAILED }
+enum class RoutingError { NO_ROUTE, NO_CONNECTION, FAILED, TIMEOUT }
 
-class RoutingException(val error: RoutingError, cause: Throwable? = null) : Exception(error.name, cause)
+/** [detail] is the reason the routing server gave in words, when it gave one (shown to the user, so a failure can be told apart). */
+class RoutingException(val error: RoutingError, cause: Throwable? = null, val detail: String? = null) : Exception(error.name, cause)
 
 /** Routes between points along real roads and trails, and says what surface each stretch has. */
 class RoutingRepository(
@@ -286,8 +287,14 @@ class RoutingRepository(
                 api.route(lonLats, again, alternative)
             }
         } catch (e: HttpException) {
-            // BRouter answers 4xx/5xx with a plain-text reason (no way near the point, outside the data...).
-            throw RoutingException(RoutingError.NO_ROUTE, e)
+            // BRouter answers 4xx/5xx with a plain-text reason (no way near the point, island, outside the data, took too long...).
+            val reason = runCatching { e.response()?.errorBody()?.string() }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
+            val kind = when {
+                reason?.contains("timeout", ignoreCase = true) == true -> RoutingError.TIMEOUT
+                e.code() >= 500 -> RoutingError.FAILED
+                else -> RoutingError.NO_ROUTE
+            }
+            throw RoutingException(kind, e, reason ?: "HTTP ${e.code()}")
         } catch (e: IOException) {
             throw RoutingException(RoutingError.NO_CONNECTION, e)
         } catch (e: kotlinx.serialization.SerializationException) {

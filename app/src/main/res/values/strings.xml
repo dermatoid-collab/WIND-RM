@@ -62,6 +62,7 @@
     <string name="builder_gpx_failed">Route saved, but the GPX file couldn\'t be written to the folder</string>
     <string name="builder_error_no_route">No route found. Tap closer to a road (or a trail on a trek).</string>
     <string name="builder_error_connection">Can’t reach the routing service. Check your connection.</string>
+    <string name="builder_error_timeout">Routing took too long for such a long stretch. Add a point in between and try again.</string>
     <string name="builder_error_failed">Routing failed. Try again in a moment.</string>
     <string name="source_routing_title">Route builder</string>
     <string name="source_routing_text">Routing by BRouter (brouter.de; the road weights are derived from its fastbike profile, MIT licence), based on OpenStreetMap data © OpenStreetMap contributors (ODbL). Elevations from SRTM.</string>

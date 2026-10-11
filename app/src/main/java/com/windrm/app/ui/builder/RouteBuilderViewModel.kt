@@ -98,6 +98,15 @@ class RouteBuilderViewModel(
     var error by mutableStateOf<RoutingError?>(null)
         private set
 
+    /** What the routing server said about the last failure, when it said anything. */
+    var errorDetail by mutableStateOf<String?>(null)
+        private set
+
+    private fun fail(e: RoutingException) {
+        errorDetail = e.detail
+        error = e.error
+    }
+
     var mapStyle by mutableStateOf(MapStyle.OSM_STANDARD)
         private set
 
@@ -208,7 +217,7 @@ class RouteBuilderViewModel(
             try {
                 append(leg(from, to, manualMode))
             } catch (e: RoutingException) {
-                error = e.error
+                fail(e)
             } finally {
                 busy = false
             }
@@ -255,7 +264,7 @@ class RouteBuilderViewModel(
                 segments = newSegments
                 waypoints = points.toMutableList().also { it[index] = snapped }
             } catch (e: RoutingException) {
-                error = e.error
+                fail(e)
             } finally {
                 busy = false
             }
@@ -337,7 +346,7 @@ class RouteBuilderViewModel(
                         }
                         waypoints = points.toMutableList().also { it.removeAt(index) }
                     } catch (e: RoutingException) {
-                        error = e.error
+                        fail(e)
                     } finally {
                         busy = false
                     }
@@ -387,7 +396,7 @@ class RouteBuilderViewModel(
                 activity = previous.first
                 allowUnpaved = previous.second
                 shortest = previous.third
-                error = e.error
+                fail(e)
             } finally {
                 busy = false
             }

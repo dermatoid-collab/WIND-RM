@@ -97,10 +97,11 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
         RoutingError.NO_ROUTE to stringResource(R.string.builder_error_no_route),
         RoutingError.NO_CONNECTION to stringResource(R.string.builder_error_connection),
         RoutingError.FAILED to stringResource(R.string.builder_error_failed),
+        RoutingError.TIMEOUT to stringResource(R.string.builder_error_timeout),
     )
     LaunchedEffect(viewModel.error) {
         viewModel.error?.let { error ->
-            snackbar.showSnackbar(errorTexts.getValue(error))
+            snackbar.showSnackbar(errorTexts.getValue(error) + (viewModel.errorDetail?.let { "\n($it)" } ?: ""))
             viewModel.clearError()
         }
     }
