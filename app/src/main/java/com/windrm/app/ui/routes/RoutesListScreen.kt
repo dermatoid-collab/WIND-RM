@@ -2,7 +2,9 @@ package com.windrm.app.ui.routes
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +13,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -22,14 +27,19 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -39,6 +49,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -57,13 +68,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.windrm.app.R
+import com.windrm.app.domain.RouteSort
+import com.windrm.app.domain.matchesQuery
+import com.windrm.app.domain.searchAndSort
+import com.windrm.app.ui.components.AppBarHeight
 import com.windrm.app.ui.components.AppBar
 import com.windrm.app.domain.PolylineDecoder
 import com.windrm.app.gpx.GpxFolder
@@ -83,6 +102,15 @@ const val TAB_RECENT = 0
 const val TAB_FAVORITES = 1
 const val TAB_STRAVA = 2
 const val TAB_FILES = 3
+
+/** The orders offered by the Sort button, with the text of each. */
+private val SORT_CHOICES = listOf(
+    RouteSort.DEFAULT to R.string.sort_default,
+    RouteSort.DISTANCE_ASC to R.string.sort_distance_asc,
+    RouteSort.DISTANCE_DESC to R.string.sort_distance_desc,
+    RouteSort.ELEVATION_ASC to R.string.sort_elevation_asc,
+    RouteSort.ELEVATION_DESC to R.string.sort_elevation_desc,
+)
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM yyyy HH:mm").withZone(ZoneId.systemDefault())
 
@@ -108,6 +136,9 @@ fun RoutesListScreen(
         onPauseOrDispose { }
     }
 
+    // Back closes the search first.
+    BackHandler(enabled = viewModel.searchOpen) { viewModel.closeSearch() }
+
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) viewModel.setGpxFolder(context, uri)
     }
@@ -124,7 +155,48 @@ fun RoutesListScreen(
 
     Scaffold(
         topBar = {
-            AppBar(title = stringResource(R.string.routes_title), onBack = onBack, onOpenSettings = onOpenSettings)
+            AppBar(
+                title = stringResource(R.string.routes_title),
+                onBack = onBack,
+                onOpenSettings = onOpenSettings,
+                actions = {
+                    // Search and Sort sit to the left of the Settings gear.
+                    IconButton(
+                        onClick = { if (viewModel.searchOpen) viewModel.closeSearch() else viewModel.openSearch() },
+                        modifier = Modifier.size(AppBarHeight),
+                    ) {
+                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.routes_search), tint = Color.White)
+                    }
+                    var sortMenu by remember { mutableStateOf(false) }
+                    // Files carry no distance or climb to order by.
+                    val canSort = selectedTab != TAB_FILES
+                    Box {
+                        IconButton(onClick = { sortMenu = true }, enabled = canSort, modifier = Modifier.size(AppBarHeight)) {
+                            BadgedBox(badge = { if (viewModel.sort != RouteSort.DEFAULT && canSort) Badge() }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Sort,
+                                    contentDescription = stringResource(R.string.routes_sort),
+                                    tint = Color.White.copy(alpha = if (canSort) 1f else 0.4f),
+                                )
+                            }
+                        }
+                        DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                            SORT_CHOICES.forEach { (order, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(label)) },
+                                    leadingIcon = {
+                                        if (viewModel.sort == order) Icon(Icons.Filled.Check, contentDescription = null) else Spacer(Modifier.size(24.dp))
+                                    },
+                                    onClick = {
+                                        sortMenu = false
+                                        viewModel.changeSort(order)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                },
+            )
         },
         floatingActionButton = {
             if (selectedTab == TAB_RECENT) {
@@ -143,6 +215,26 @@ fun RoutesListScreen(
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if (viewModel.searchOpen) {
+                val focus = remember { FocusRequester() }
+                val keyboard = LocalSoftwareKeyboardController.current
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                OutlinedTextField(
+                    value = viewModel.query,
+                    onValueChange = viewModel::updateQuery,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).focusRequester(focus),
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.routes_search_hint)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(onClick = viewModel::closeSearch) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.routes_search_close))
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                )
+            }
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(selected = selectedTab == TAB_RECENT, onClick = { selectedTab = TAB_RECENT }, text = { Text(stringResource(R.string.tab_recent)) })
                 Tab(selected = selectedTab == TAB_FAVORITES, onClick = { selectedTab = TAB_FAVORITES }, text = { Text(stringResource(R.string.tab_favorites)) })
@@ -152,8 +244,8 @@ fun RoutesListScreen(
 
             when (selectedTab) {
                 TAB_RECENT -> RouteListTab(
-                    routes = routes,
-                    emptyMessage = stringResource(R.string.no_routes_yet),
+                    routes = routes.searchAndSort(viewModel.query, viewModel.sort, { it.name }, { it.distanceKm * 1000.0 }, { it.elevationGainM }),
+                    emptyMessage = if (viewModel.query.isBlank() || routes.isEmpty()) stringResource(R.string.no_routes_yet) else stringResource(R.string.routes_no_match, viewModel.query),
                     onSelected = onRouteSelected,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onDelete = viewModel::deleteRoute,
@@ -161,8 +253,8 @@ fun RoutesListScreen(
                     onDuplicate = onDuplicateRoute,
                 )
                 TAB_FAVORITES -> RouteListTab(
-                    routes = routes.filter { it.isFavorite },
-                    emptyMessage = stringResource(R.string.no_favorites_yet),
+                    routes = routes.filter { it.isFavorite }.searchAndSort(viewModel.query, viewModel.sort, { it.name }, { it.distanceKm * 1000.0 }, { it.elevationGainM }),
+                    emptyMessage = if (viewModel.query.isBlank() || routes.none { it.isFavorite }) stringResource(R.string.no_favorites_yet) else stringResource(R.string.routes_no_match, viewModel.query),
                     onSelected = onRouteSelected,
                     onToggleFavorite = viewModel::toggleFavorite,
                     onDelete = viewModel::deleteRoute,
@@ -221,8 +313,15 @@ private fun FilesTab(viewModel: RoutesListViewModel, onChooseFolder: () -> Unit,
             viewModel.filesLoading && viewModel.gpxFiles.isEmpty() ->
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             viewModel.gpxFiles.isEmpty() -> EmptyState(stringResource(R.string.files_empty))
-            else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(viewModel.gpxFiles, key = { it.documentUri.toString() }) { entry -> GpxFileCard(entry, onClick = { onOpen(entry) }) }
+            else -> {
+                val files = viewModel.gpxFiles.filter { matchesQuery(it.name.substringBeforeLast('.'), viewModel.query) }
+                if (files.isEmpty()) {
+                    EmptyState(stringResource(R.string.routes_no_match, viewModel.query))
+                } else {
+                    LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(files, key = { it.documentUri.toString() }) { entry -> GpxFileCard(entry, onClick = { onOpen(entry) }) }
+                    }
+                }
             }
         }
     }
@@ -402,8 +501,13 @@ private fun StravaActivitiesList(viewModel: RoutesListViewModel, onImported: (Ro
         EmptyState(stringResource(R.string.strava_no_activities))
         return
     }
+    val shown = viewModel.stravaActivities.searchAndSort(viewModel.query, viewModel.sort, { it.name }, { it.distance }, { it.total_elevation_gain })
+    if (shown.isEmpty()) {
+        EmptyState(stringResource(R.string.routes_no_match, viewModel.query))
+        return
+    }
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(viewModel.stravaActivities, key = { it.id }) { activity ->
+        items(shown, key = { it.id }) { activity ->
             StravaActivityCard(
                 activity = activity,
                 importing = viewModel.importingId == activity.id,
@@ -419,8 +523,13 @@ private fun StravaRoutesList(viewModel: RoutesListViewModel, onImported: (Route)
         EmptyState(stringResource(R.string.strava_no_routes))
         return
     }
+    val shown = viewModel.stravaRoutes.searchAndSort(viewModel.query, viewModel.sort, { it.name }, { it.distance }, { it.elevation_gain })
+    if (shown.isEmpty()) {
+        EmptyState(stringResource(R.string.routes_no_match, viewModel.query))
+        return
+    }
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(viewModel.stravaRoutes, key = { it.id }) { route ->
+        items(shown, key = { it.id }) { route ->
             StravaRouteCard(
                 route = route,
                 importing = viewModel.importingId == route.id,
@@ -436,8 +545,13 @@ private fun StravaSegmentsList(viewModel: RoutesListViewModel, onImported: (Rout
         EmptyState(stringResource(R.string.strava_no_segments))
         return
     }
+    val shown = viewModel.stravaSegments.searchAndSort(viewModel.query, viewModel.sort, { it.name }, { it.distance }, { it.elevation_high - it.elevation_low })
+    if (shown.isEmpty()) {
+        EmptyState(stringResource(R.string.routes_no_match, viewModel.query))
+        return
+    }
     LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(viewModel.stravaSegments, key = { it.id }) { segment ->
+        items(shown, key = { it.id }) { segment ->
             StravaSegmentCard(
                 segment = segment,
                 importing = viewModel.importingId == segment.id,

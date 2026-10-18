@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.windrm.app.domain.RouteSort
 import com.windrm.app.gpx.GpxFolder
 import com.windrm.app.gpx.GpxUriImporter
 import com.windrm.app.model.Route
@@ -34,6 +35,32 @@ class RoutesListViewModel(
     private val stravaAuthManager: StravaAuthManager,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
+
+    /** The search field under the top bar (open or not), what is typed in it, and the order of the lists: one for the whole screen. */
+    var searchOpen by mutableStateOf(false)
+        private set
+    var query by mutableStateOf("")
+        private set
+    var sort by mutableStateOf(RouteSort.DEFAULT)
+        private set
+
+    fun openSearch() {
+        searchOpen = true
+    }
+
+    /** Closing the search also clears it, so no list stays filtered by something that is no longer in sight. */
+    fun closeSearch() {
+        searchOpen = false
+        query = ""
+    }
+
+    fun updateQuery(text: String) {
+        query = text
+    }
+
+    fun changeSort(order: RouteSort) {
+        sort = order
+    }
 
     val routes: StateFlow<List<Route>> = routeRepository.observeRoutes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

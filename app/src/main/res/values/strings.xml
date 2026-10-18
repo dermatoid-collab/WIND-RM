@@ -80,6 +80,16 @@
     <string name="strava_not_configured_message">To connect Strava, set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET in local.properties. See the project README.</string>
     <string name="no_routes_yet">No routes yet. Import a GPX file or connect Strava to get started.</string>
     <string name="delete_route">Delete route</string>
+    <string name="routes_search">Search</string>
+    <string name="routes_search_hint">Search by name</string>
+    <string name="routes_search_close">Close search</string>
+    <string name="routes_sort">Sort</string>
+    <string name="routes_no_match">Nothing matches “%1$s”.</string>
+    <string name="sort_default">Default order</string>
+    <string name="sort_distance_asc">Distance, shortest first</string>
+    <string name="sort_distance_desc">Distance, longest first</string>
+    <string name="sort_elevation_asc">Elevation gain, lowest first</string>
+    <string name="sort_elevation_desc">Elevation gain, highest first</string>
     <string name="route_edit">Edit</string>
     <string name="route_duplicate">Duplicate</string>
     <string name="route_more_actions">More actions</string>
