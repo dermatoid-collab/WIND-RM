@@ -27,8 +27,9 @@ private val DarkColors = darkColorScheme(
 
 /**
  * One colour palette, as 0xRRGGBB values. The bars and buttons carry white text, so [primary] is the deeper
- * shade of the palette's blue, purple or orange (white stays readable on it); the palette's own bright
- * accent colours go to [secondary] and [tertiary].
+ * shade of the palette's blue, purple or orange: white on it has a contrast of at least 4.5 (WCAG AA); the palette's
+ * own bright accent colours go to [secondary] and [tertiary]. On the dark palettes [error] also reads at 4.5 or more
+ * on the background.
  */
 private class Palette(
     val dark: Boolean,
@@ -95,14 +96,14 @@ private val Palettes: Map<ThemeMode, Palette> = mapOf(
     // folke/tokyonight.nvim "night"
     ThemeMode.TOKYO_NIGHT to Palette(
         dark = true, background = 0x1A1B26, surface = 0x1F2335, surfaceHigh = 0x292E42, surfaceHighest = 0x2F3549,
-        onBackground = 0xC0CAF5, onVariant = 0xA9B1D6, primary = 0x5A7BD0, primaryContainer = 0x3D59A1, onPrimaryContainer = 0xC0CAF5,
+        onBackground = 0xC0CAF5, onVariant = 0xA9B1D6, primary = 0x4E71CD, primaryContainer = 0x3D59A1, onPrimaryContainer = 0xC0CAF5,
         secondary = 0xBB9AF7, tertiary = 0x7DCFFF, outline = 0x565F89, outlineVariant = 0x3B4261, error = 0xF7768E, errorContainer = 0x51283A,
     ),
     // Arctic Ice Studio's Nord
     ThemeMode.NORD to Palette(
         dark = true, background = 0x2E3440, surface = 0x3B4252, surfaceHigh = 0x434C5E, surfaceHighest = 0x4C566A,
-        onBackground = 0xECEFF4, onVariant = 0xD8DEE9, primary = 0x5E81AC, primaryContainer = 0x4C6A8F, onPrimaryContainer = 0xECEFF4,
-        secondary = 0x88C0D0, tertiary = 0xA3BE8C, outline = 0x616E88, outlineVariant = 0x4C566A, error = 0xBF616A, errorContainer = 0x5B3438,
+        onBackground = 0xECEFF4, onVariant = 0xD8DEE9, primary = 0x5578A4, primaryContainer = 0x4C6A8F, onPrimaryContainer = 0xECEFF4,
+        secondary = 0x88C0D0, tertiary = 0xA3BE8C, outline = 0x616E88, outlineVariant = 0x4C566A, error = 0xCF8A90, errorContainer = 0x5B3438,
     ),
     ThemeMode.DRACULA to Palette(
         dark = true, background = 0x282A36, surface = 0x2F3142, surfaceHigh = 0x44475A, surfaceHighest = 0x51556B,
@@ -116,23 +117,23 @@ private val Palettes: Map<ThemeMode, Palette> = mapOf(
     ),
     ThemeMode.CATPPUCCIN_MOCHA to Palette(
         dark = true, background = 0x1E1E2E, surface = 0x262637, surfaceHigh = 0x313244, surfaceHighest = 0x45475A,
-        onBackground = 0xCDD6F4, onVariant = 0xBAC2DE, primary = 0x7B68D9, primaryContainer = 0x5B4DA8, onPrimaryContainer = 0xE0D8FF,
+        onBackground = 0xCDD6F4, onVariant = 0xBAC2DE, primary = 0x7764D8, primaryContainer = 0x5B4DA8, onPrimaryContainer = 0xE0D8FF,
         secondary = 0xF5C2E7, tertiary = 0x89DCEB, outline = 0x6C7086, outlineVariant = 0x45475A, error = 0xF38BA8, errorContainer = 0x5A2D3A,
     ),
     ThemeMode.ONE_DARK to Palette(
         dark = true, background = 0x282C34, surface = 0x2C313A, surfaceHigh = 0x353B45, surfaceHighest = 0x3E4451,
-        onBackground = 0xABB2BF, onVariant = 0x9DA5B4, primary = 0x4D78CC, primaryContainer = 0x3A5A9B, onPrimaryContainer = 0xDCE8FF,
+        onBackground = 0xABB2BF, onVariant = 0x9DA5B4, primary = 0x4773CA, primaryContainer = 0x3A5A9B, onPrimaryContainer = 0xDCE8FF,
         secondary = 0xC678DD, tertiary = 0x56B6C2, outline = 0x5C6370, outlineVariant = 0x3E4451, error = 0xE06C75, errorContainer = 0x58323A,
     ),
     ThemeMode.SOLARIZED_DARK to Palette(
         dark = true, background = 0x002B36, surface = 0x073642, surfaceHigh = 0x0E4350, surfaceHighest = 0x15505E,
         onBackground = 0x93A1A1, onVariant = 0x839496, primary = 0x1F7BBF, primaryContainer = 0x14557F, onPrimaryContainer = 0xD6ECFA,
-        secondary = 0x2AA198, tertiary = 0xB58900, outline = 0x586E75, outlineVariant = 0x0E4350, error = 0xDC322F, errorContainer = 0x4A1F1E,
+        secondary = 0x2AA198, tertiary = 0xB58900, outline = 0x586E75, outlineVariant = 0x0E4350, error = 0xE56563, errorContainer = 0x4A1F1E,
     ),
     // True black for OLED screens, with the app's own orange
     ThemeMode.AMOLED to Palette(
         dark = true, background = 0x000000, surface = 0x0A0A0A, surfaceHigh = 0x161616, surfaceHighest = 0x222222,
-        onBackground = 0xE6E1E5, onVariant = 0xCAC4D0, primary = 0xD84315, primaryContainer = 0x8A2C0C, onPrimaryContainer = 0xFFDBCF,
+        onBackground = 0xE6E1E5, onVariant = 0xCAC4D0, primary = 0xD44215, primaryContainer = 0x8A2C0C, onPrimaryContainer = 0xFFDBCF,
         secondary = 0xFF8A65, tertiary = 0x4285F4, outline = 0x6A6A6A, outlineVariant = 0x2E2E2E, error = 0xFF6B6B, errorContainer = 0x5A1E1E,
     ),
     ThemeMode.SOLARIZED_LIGHT to Palette(
