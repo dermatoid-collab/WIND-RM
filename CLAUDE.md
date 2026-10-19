@@ -81,3 +81,13 @@ Non ha Android Studio installato/configurato.
 - La mappa del builder parte con zoom 15 (14 + 1: il doppio più vicino) sul luogo preferito, altrimenti sul GPS.
 - Il luogo preferito (rinominabile, impostabile dal GPS o scegliendolo sulla mappa) sta in Settings ed è sia
   il punto di partenza delle mappe sia la località del meteo in Home.
+
+## Temi (Settings → Appearance)
+
+- 40 temi, in `ThemeMode` (settings/SettingsRepository.kt), raggruppati da `ThemeGroup`: **WIND-RM Legacy** per primo e da solo
+  (nessun titolo, divisore sotto; è il look arancione che segue chiaro/scuro del telefono ed è il default), poi System
+  (`STOCK_SYSTEM/LIGHT/DARK` = Material 3 standard), Community — Dark/Light, "WIND-RM — Dark", "WIND-RM — Light", Minimalist.
+- I nomi `STOCK_*` sono voluti: chi aveva salvato i vecchi `SYSTEM/LIGHT/DARK` ricade su Legacy (valore sconosciuto → default).
+- Le palette stanno in `ui/theme/Theme.kt` (`Palettes`). Il testo su barre/bottoni è `colorScheme.onPrimary` (bianco se il contrasto
+  con `primary` è ≥ 4.0, altrimenti nero): nelle barre non usare `Color.White` fisso.
+- Palette nuove: errore ≥ 4.5 sullo sfondo e testo secondario ≥ 4.5 (WCAG AA).

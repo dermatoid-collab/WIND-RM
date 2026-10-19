@@ -61,6 +61,7 @@ import com.windrm.app.settings.MapKeyProvider
 import com.windrm.app.settings.MapStyle
 import com.windrm.app.settings.keyProvider
 import com.windrm.app.ui.components.MapApiKeys
+import com.windrm.app.settings.ThemeGroup
 import com.windrm.app.settings.ThemeMode
 import java.time.Instant
 import java.time.ZoneId
@@ -307,15 +308,12 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
             }
 
             SettingsSection(stringResource(R.string.settings_appearance)) {
-                val groups = listOf(
-                    null to listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK),
-                    R.string.settings_palettes_dark to ThemeMode.entries.filter { it.dark == true && it != ThemeMode.DARK },
-                    R.string.settings_palettes_light to ThemeMode.entries.filter { it.dark == false && it != ThemeMode.LIGHT },
-                )
-                groups.forEach { (title, modes) ->
-                    if (title != null) {
+                ThemeGroup.entries.forEach { group ->
+                    val modes = ThemeMode.entries.filter { it.group == group }
+                    // Legacy sits alone above everything, with no heading, set apart by a divider.
+                    group.title?.let {
                         Text(
-                            stringResource(title),
+                            it,
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
@@ -343,6 +341,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onBack: () -> Unit) {
                             }
                         }
                     }
+                    if (group == ThemeGroup.LEGACY) HorizontalDivider(Modifier.padding(top = 4.dp))
                 }
             }
 

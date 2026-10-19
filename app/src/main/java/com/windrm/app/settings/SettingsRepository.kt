@@ -43,29 +43,75 @@ enum class MapStyle(val label: String, val requiresApiKey: Boolean) {
     ESRI_DARK_GRAY("Esri Dark Gray (names above the route)", requiresApiKey = false),
 }
 
+/** The sections of the theme list in Settings; [LEGACY] has no title: it stands first and alone. */
+enum class ThemeGroup(val title: String?) {
+    LEGACY(null),
+    SYSTEM("System"),
+    COMMUNITY_DARK("Community — Dark"),
+    COMMUNITY_LIGHT("Community — Light"),
+    WINDRM_DARK("WIND-RM — Dark"),
+    WINDRM_LIGHT("WIND-RM — Light"),
+    MINIMALIST("Minimalist"),
+}
+
 /**
- * How the app looks: the system / light / dark choice of the orange default palette, or one of the
- * colour palettes. [dark] says whether a palette is a dark or a light one (null = follows the phone).
+ * How the app looks: the original orange look ([WIND_RM_LEGACY], which follows the phone's light or dark), the
+ * stock Material 3 colours, or one of the colour palettes. [dark] says whether a palette is a dark or a light one
+ * (null = follows the phone). The stock ones are named STOCK_* so that the SYSTEM, LIGHT and DARK of older versions,
+ * which were the orange look, no longer match anything and fall back to [WIND_RM_LEGACY].
  */
-enum class ThemeMode(val label: String, val dark: Boolean? = null) {
-    SYSTEM("System default"),
-    LIGHT("Light", false),
-    DARK("Dark", true),
+enum class ThemeMode(val label: String, val group: ThemeGroup, val dark: Boolean? = null) {
+    WIND_RM_LEGACY("WIND-RM Legacy", ThemeGroup.LEGACY),
 
-    // Dark palettes
-    TOKYO_NIGHT("Tokyo Night", true),
-    NORD("Nord", true),
-    DRACULA("Dracula", true),
-    GRUVBOX_DARK("Gruvbox Dark", true),
-    CATPPUCCIN_MOCHA("Catppuccin Mocha", true),
-    ONE_DARK("One Dark", true),
-    SOLARIZED_DARK("Solarized Dark", true),
-    AMOLED("Black (OLED)", true),
+    STOCK_SYSTEM("System default", ThemeGroup.SYSTEM),
+    STOCK_LIGHT("Light", ThemeGroup.SYSTEM, false),
+    STOCK_DARK("Dark", ThemeGroup.SYSTEM, true),
 
-    // Light palettes
-    SOLARIZED_LIGHT("Solarized Light", false),
-    CATPPUCCIN_LATTE("Catppuccin Latte", false),
-    GRUVBOX_LIGHT("Gruvbox Light", false),
+    // Community palettes, dark
+    TOKYO_NIGHT("Tokyo Night", ThemeGroup.COMMUNITY_DARK, true),
+    NORD("Nord", ThemeGroup.COMMUNITY_DARK, true),
+    DRACULA("Dracula", ThemeGroup.COMMUNITY_DARK, true),
+    GRUVBOX_DARK("Gruvbox Dark", ThemeGroup.COMMUNITY_DARK, true),
+    CATPPUCCIN_MOCHA("Catppuccin Mocha", ThemeGroup.COMMUNITY_DARK, true),
+    ONE_DARK("One Dark", ThemeGroup.COMMUNITY_DARK, true),
+    SOLARIZED_DARK("Solarized Dark", ThemeGroup.COMMUNITY_DARK, true),
+    AMOLED("Black (OLED)", ThemeGroup.COMMUNITY_DARK, true),
+
+    // Community palettes, light
+    SOLARIZED_LIGHT("Solarized Light", ThemeGroup.COMMUNITY_LIGHT, false),
+    CATPPUCCIN_LATTE("Catppuccin Latte", ThemeGroup.COMMUNITY_LIGHT, false),
+    GRUVBOX_LIGHT("Gruvbox Light", ThemeGroup.COMMUNITY_LIGHT, false),
+
+    // WIND-RM palettes, dark
+    ROSE_PINE("Rosé Pine", ThemeGroup.WINDRM_DARK, true),
+    EVERFOREST("Everforest", ThemeGroup.WINDRM_DARK, true),
+    NIGHT_OWL("Night Owl", ThemeGroup.WINDRM_DARK, true),
+    PALENIGHT("Palenight", ThemeGroup.WINDRM_DARK, true),
+    AYU_MIRAGE("Ayu Mirage", ThemeGroup.WINDRM_DARK, true),
+    VINO("Vino", ThemeGroup.WINDRM_DARK, true),
+    METEOBLUE("MeteoBlue", ThemeGroup.WINDRM_DARK, true),
+    TURCHESE("Turchese", ThemeGroup.WINDRM_DARK, true),
+    VIOLA("Viola", ThemeGroup.WINDRM_DARK, true),
+    CORALLO("Corallo", ThemeGroup.WINDRM_DARK, true),
+    LIME("Lime", ThemeGroup.WINDRM_DARK, true),
+
+    // WIND-RM palettes, light
+    ARDESIA("Ardesia", ThemeGroup.WINDRM_LIGHT, false),
+    SALVIA("Salvia", ThemeGroup.WINDRM_LIGHT, false),
+    DUNA("Duna", ThemeGroup.WINDRM_LIGHT, false),
+    ILMETEO("ilMeteo", ThemeGroup.WINDRM_LIGHT, false),
+    AZZURRO("Azzurro", ThemeGroup.WINDRM_LIGHT, false),
+    GIALLO("Giallo", ThemeGroup.WINDRM_LIGHT, false),
+
+    // Minimalist: four low-saturation families, each in a dark and a light version
+    NEUTRAL_DARK("Neutral Dark", ThemeGroup.MINIMALIST, true),
+    NEUTRAL_LIGHT("Neutral Light", ThemeGroup.MINIMALIST, false),
+    SEPIA_DARK("Sepia Dark", ThemeGroup.MINIMALIST, true),
+    SEPIA_LIGHT("Sepia Light", ThemeGroup.MINIMALIST, false),
+    SAGE_DARK("Sage Dark", ThemeGroup.MINIMALIST, true),
+    SAGE_LIGHT("Sage Light", ThemeGroup.MINIMALIST, false),
+    LAVENDER_DARK("Lavender Dark", ThemeGroup.MINIMALIST, true),
+    LAVENDER_LIGHT("Lavender Light", ThemeGroup.MINIMALIST, false),
 }
 
 /** The key a style needs, or null for the styles that need none. */
@@ -81,7 +127,7 @@ data class AppSettings(
     val mapStyle: MapStyle = MapStyle.OSM_STANDARD,
     /** Keys typed in Settings, by service; they win over the ones built into the app. */
     val mapKeys: Map<MapKeyProvider, String> = emptyMap(),
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val themeMode: ThemeMode = ThemeMode.WIND_RM_LEGACY,
     /** Which routing profile the last route used: the WIND-RM main-roads one or the stock one (and why). */
     val routingProfileNote: String? = null,
     val defaultAvgSpeedKmh: Double = 25.0,
@@ -220,7 +266,7 @@ class SettingsRepository(private val context: Context) {
             mapStyle = prefs[keyMapStyle]?.let { runCatching { MapStyle.valueOf(it) }.getOrNull() } ?: MapStyle.OSM_STANDARD,
             routingProfileNote = prefs[keyRoutingProfileNote],
             mapKeys = MapKeyProvider.entries.associateWith { prefs[mapKeyPref(it)].orEmpty() },
-            themeMode = prefs[keyThemeMode]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.SYSTEM,
+            themeMode = prefs[keyThemeMode]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.WIND_RM_LEGACY,
             defaultAvgSpeedKmh = prefs[keyDefaultAvgSpeedKmh] ?: 25.0,
             forecastHorizonDays = prefs[keyForecastHorizonDays] ?: 15,
             homeLat = if (prefs[keyHasHomeLocation] == true) prefs[keyHomeLat] else null,
