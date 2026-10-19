@@ -117,13 +117,13 @@ fun RouteDetailScreen(
     Scaffold(
         topBar = {
             // Hand-built so it can grow to three lines (name, ride summary, date), centred like the original app.
-            Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
+            Surface(color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
                 Row(
                     Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                     }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(route?.name ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleLarge)
@@ -143,12 +143,12 @@ fun RouteDetailScreen(
                             Text(
                                 dateFormatter.format(Instant.ofEpochMilli(r.originalDateEpochMs ?: r.createdAtEpochMs)),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.8f),
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                             )
                         }
                     }
                     if (route != null) {
-                        FavoriteButton(isFavorite = route.isFavorite, onClick = viewModel::toggleFavorite, tint = Color.White)
+                        FavoriteButton(isFavorite = route.isFavorite, onClick = viewModel::toggleFavorite, tint = MaterialTheme.colorScheme.onPrimary)
                     } else {
                         Spacer(Modifier.size(48.dp))
                     }
@@ -345,7 +345,7 @@ fun RouteDetailScreen(
                     Icon(
                         Icons.Filled.AddLocationAlt,
                         contentDescription = stringResource(R.string.add_stop),
-                        tint = if (placingStop) Color.White else Color.DarkGray,
+                        tint = if (placingStop) MaterialTheme.colorScheme.onPrimary else Color.DarkGray,
                         modifier = Modifier.padding(8.dp).size(20.dp),
                     )
                 }

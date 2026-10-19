@@ -107,9 +107,9 @@ fun StartTimePickerDialog(
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(0.95f)) {
             Column {
-                Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
+                Surface(color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = Color.White) }
+                        TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = MaterialTheme.colorScheme.onPrimary) }
                         Text(
                             stringResource(R.string.start_time),
                             style = MaterialTheme.typography.titleLarge,
@@ -118,7 +118,7 @@ fun StartTimePickerDialog(
                         )
                         TextButton(onClick = {
                             onConfirm(date.atStartOfDay(zone).plusMinutes(minuteOfDay.toLong()).toInstant())
-                        }) { Text("OK", color = Color.White) }
+                        }) { Text("OK", color = MaterialTheme.colorScheme.onPrimary) }
                     }
                 }
 

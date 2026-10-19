@@ -41,14 +41,14 @@ fun AppBar(
     onOpenSettings: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
+    Surface(color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(AppBarHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onBack != null) {
                 IconButton(onClick = onBack, modifier = Modifier.size(AppBarHeight)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
                 }
             } else {
                 Spacer(Modifier.width(16.dp))
@@ -70,6 +70,6 @@ fun AppBar(
 @Composable
 fun SettingsGear(onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.size(AppBarHeight)) {
-        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.menu_settings), tint = Color.White)
+        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.menu_settings), tint = MaterialTheme.colorScheme.onPrimary)
     }
 }

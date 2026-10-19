@@ -165,7 +165,7 @@ fun RoutesListScreen(
                         onClick = { if (viewModel.searchOpen) viewModel.closeSearch() else viewModel.openSearch() },
                         modifier = Modifier.size(AppBarHeight),
                     ) {
-                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.routes_search), tint = Color.White)
+                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.routes_search), tint = MaterialTheme.colorScheme.onPrimary)
                     }
                     var sortMenu by remember { mutableStateOf(false) }
                     // Files carry no distance or climb to order by.
@@ -176,7 +176,7 @@ fun RoutesListScreen(
                                 Icon(
                                     Icons.AutoMirrored.Filled.Sort,
                                     contentDescription = stringResource(R.string.routes_sort),
-                                    tint = Color.White.copy(alpha = if (canSort) 1f else 0.4f),
+                                    tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (canSort) 1f else 0.4f),
                                 )
                             }
                         }

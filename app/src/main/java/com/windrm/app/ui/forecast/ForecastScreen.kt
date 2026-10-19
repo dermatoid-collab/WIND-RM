@@ -229,13 +229,13 @@ private fun CompactTopBar(
     onShare: (() -> Unit)?,
     onStartTime: (() -> Unit)?,
 ) {
-    Surface(color = MaterialTheme.colorScheme.primary, contentColor = Color.White) {
+    Surface(color = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).height(com.windrm.app.ui.components.AppBarHeight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
             }
             quality?.let { TrafficLight(it.level, onClick = onQualityClick) }
             Text(
@@ -247,12 +247,12 @@ private fun CompactTopBar(
             )
             onStartTime?.let {
                 IconButton(onClick = it) {
-                    Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.start_time), tint = Color.White)
+                    Icon(Icons.Filled.Schedule, contentDescription = stringResource(R.string.start_time), tint = MaterialTheme.colorScheme.onPrimary)
                 }
             }
             onShare?.let {
                 IconButton(onClick = it) {
-                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = Color.White)
+                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.share), tint = MaterialTheme.colorScheme.onPrimary)
                 }
             }
             SettingsGear(onOpenSettings)

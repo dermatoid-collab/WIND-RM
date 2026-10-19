@@ -162,8 +162,8 @@ fun RouteBuilderScreen(viewModel: RouteBuilderViewModel, onBack: () -> Unit, onO
                         onClick = { showSave = true },
                         enabled = draft != null && !viewModel.busy,
                         colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color.White,
-                            disabledContentColor = Color.White.copy(alpha = 0.5f),
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContentColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.5f),
                         ),
                     ) { Text(stringResource(R.string.builder_save).uppercase()) }
                 },
