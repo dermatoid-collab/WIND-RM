@@ -287,6 +287,10 @@ private class DragState {
     var index: Int = -1
     var lat: Double = 0.0
     var lon: Double = 0.0
+    /** Where the finger went down, and whether it has since moved far enough for this to be a drag and not a tap. */
+    var downX: Float = 0f
+    var downY: Float = 0f
+    var moving: Boolean = false
 }
 
 /**
@@ -332,12 +336,18 @@ private class DragHandlesOverlay(
                 drag.index = best
                 drag.lat = points[best].lat
                 drag.lon = points[best].lon
+                drag.downX = event.x
+                drag.downY = event.y
+                drag.moving = false
                 mapView.parent?.requestDisallowInterceptTouchEvent(true)
                 mapView.invalidate()
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 if (drag.index < 0) return false
+                // A finger always wobbles a little: under the touch slop the point stays put and the touch can still be a tap.
+                if (!drag.moving && kotlin.math.hypot(event.x - drag.downX, event.y - drag.downY) <= TAP_SLOP_DP * density) return true
+                drag.moving = true
                 val p = mapView.projection.fromPixels(event.x.toInt(), event.y.toInt())
                 drag.lat = p.latitude
                 drag.lon = p.longitude
@@ -348,19 +358,18 @@ private class DragHandlesOverlay(
                 if (drag.index < 0) return false
                 val index = drag.index
                 val p = mapView.projection.fromPixels(event.x.toInt(), event.y.toInt())
-                val moved = kotlin.math.hypot(
-                    (p.latitude - points[index].lat) * 111_320.0,
-                    (p.longitude - points[index].lon) * 111_320.0 * kotlin.math.cos(Math.toRadians(p.latitude)),
-                )
+                val dropped = drag.moving
                 drag.index = -1
+                drag.moving = false
                 mapView.invalidate()
                 // A touch that never left the point is a tap on it, not a move.
-                if (moved > MIN_DRAG_M) onDropped(index, p.latitude, p.longitude) else onTapped?.invoke(index)
+                if (dropped) onDropped(index, p.latitude, p.longitude) else onTapped?.invoke(index)
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (drag.index < 0) return false
                 drag.index = -1
+                drag.moving = false
                 mapView.invalidate()
                 return true
             }
@@ -369,7 +378,8 @@ private class DragHandlesOverlay(
     }
 }
 
-private const val MIN_DRAG_M = 5.0
+/** A touch that stays within this many dp of where it began is a tap, not a drag (Android's own touch slop is 8 dp). */
+private const val TAP_SLOP_DP = 10f
 
 /** Distance labels along the route: black pills with white text and a tail pointing at the line, like Strava's. */
 private class KmMarkersOverlay(private val markers: List<KmMarker>, private val density: Float) : Overlay() {
